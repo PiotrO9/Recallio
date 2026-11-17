@@ -23,11 +23,9 @@ Działa wyłącznie demo. Nie opisuj historii ocen jako planowania powtórek, In
 
 ## Praca niezależnych agentów
 
-Każde zadanie ma właściciela, dozwolone pliki, bazowy commit i zależności. Używaj osobnych branchy/worktree, gdy repozytorium Git będzie już skonfigurowane. Obecny katalog może nie być repozytorium. Bez Git: osobne kopie i integrator, nigdy równoczesne mutacje wspólnych plików. Nie inicjalizuj Git, nie commituj, nie pushuj ani nie wdrażaj bez zlecenia.
+Przed zmianą plików przeczytaj `docs/COORDINATION.md`. Rejestr we wspólnym katalogu Git to źródło statusu; backlog opisuje zadania, ale jego status nie rezerwuje pracy. Uruchom `node scripts/coordinate.mjs status`, a potem `claim` z unikalnym właścicielem. Rezerwacja obejmuje atomową kontrolę zależności. Skopiuj token do prywatnego kontekstu czatu i przekaż go do kolejnych poleceń; nie commituj go. Osobny branch/worktree utwórz od zintegrowanego HEAD, zgłoś przez `attach`, przed pracą sprawdź status i zakres. Jeśli rejestr zablokowany lub brak zadań — zgłoś sytuację, nie obchodź blokady.
 
-Przed startem oznacz zadanie IN_PROGRESS i właściciela przez integratora. Wspólne pliki (package.json/lock, tsconfig, src/contracts, globals.css, migracje SQL, dokument decyzji) zmienia tylko integrator albo jeden jawnie przydzielony właściciel. Nie rozszerzaj zakresu cudzego zadania. Zmiana kontraktu wymaga opisania wpływu i zintegrowania przed pracą konsumentów. Mocki wolno pisać wyłącznie względem ustalonego interfejsu.
-
-Oddając zadanie podaj: ID, bazę, zmienione pliki, zachowanie, komendy i wyniki testów, migracje, ograniczenia, zadania odblokowane. Nie oznaczaj DONE na podstawie samego kodu; integrator musi odtworzyć istotne testy. Nowy agent nie potrzebuje historii czatu — cały kontekst ma być w repo.
+`CORE-01` należy do integratora; DATA/LOCAL/LEARN/CSV/PLATFORM zaczynają dopiero po jego integracji i DONE. Wspólne pliki (`package.json`, lockfile, tsconfig, `src/contracts`, `globals.css`, migracje SQL, decyzje) zmienia tylko integrator lub jeden jawnie wyznaczony właściciel. Każdy agent przekazuje commit i raport przez `review`; integrator sprawdza, integruje i dopiero wtedy wykonuje `done`. Nie wykonuj push ani wdrożenia bez zlecenia. Rejestr lokalny nie jest koordynacją między różnymi kopiami repozytorium lub komputerami. Nie usuwaj automatycznie rezerwacji ani blokady.
 
 ## Niezmienniki
 

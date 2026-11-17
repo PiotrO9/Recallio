@@ -4,7 +4,7 @@ Stan początkowy: 2026-11-17. Wszystkie zadania poniżej TODO; wykonany bootstra
 
 ## Protokół przydziału
 
-Integrator utrzymuje tabelę: ID, status TODO/READY/IN_PROGRESS/REVIEW/DONE/BLOCKED, właściciel, branch/worktree, bazowy commit, zależności, link do wyniku. Zmianę statusu scala wyłącznie integrator, aby agenci nie edytowali wspólnego pliku jednocześnie. Osobny worktree per zadanie po skonfigurowaniu Git. Przed konfiguracją Git osobne kopie robocze. Polecenia testowe mają działać z katalogu konkretnego worktree.
+Status pracy zapisuje wspólny rejestr we wspólnym katalogu Git. Instrukcje i komendy: `docs/COORDINATION.md`. Integrator odpowiada za przegląd, integrację i oznaczenie DONE; zależności sprawdza rejestr. Osobny worktree per zadanie po skonfigurowaniu Git. Przed konfiguracją Git osobne kopie robocze. Polecenia testowe mają działać z katalogu konkretnego worktree.
 
 Gotowość do startu: wszystkie zależności DONE, zamrożony kontrakt, wskazane katalogi i fixture. Gotowość do integracji: kryteria odbioru zaliczone, brak ukrytych zmian kontraktu, migracje opisane, wynik przekazany według szablonu na końcu. Integrator rozwiązuje konflikty i uruchamia testy po scaleniu. Zmiana wspólnej zależności lub lockfile jest osobnym zadaniem integratora; agenci zgłaszają potrzebę, nie instalują równolegle.
 

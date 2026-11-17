@@ -4,7 +4,10 @@ import { z } from "zod";
 export const revisionSchema = z
   .string()
   .regex(/^(0|[1-9]\d*)$/)
-  .refine((v) => BigInt(v) <= 9223372036854775807n, "Poza zakresem bigint");
+  .refine(
+    (v) => /^(0|[1-9]\d*)$/.test(v) && BigInt(v) <= 9223372036854775807n,
+    "Poza zakresem bigint",
+  );
 export const uuidSchema = z.uuid();
 export const instantSchema = z.iso.datetime({ offset: false });
 export const directionSchema = z.enum(["a-b", "b-a"]);
@@ -100,6 +103,13 @@ export const operationSchema = z.discriminatedUnion("type", [
     }),
   }),
 ]);
+// Envelope validation is separate from per-operation validation: one malformed
+// operation must not prevent other operations in an otherwise valid batch.
+export const pushEnvelopeSchema = z.strictObject({
+  protocolVersion: z.literal(1),
+  deviceId: uuidSchema,
+  operations: z.array(z.unknown()).min(1).max(100),
+});
 export const pushSchema = z.strictObject({
   protocolVersion: z.literal(1),
   deviceId: uuidSchema,
@@ -165,7 +175,7 @@ export interface Progress {
   epoch: string;
   dueAt: string;
   lastEffectiveAt: string;
-  schedulerState: unknown;
+  schedulerState: { version: string; data: unknown };
   revision: string;
   algorithmVersion: string;
 }
@@ -211,3 +221,128 @@ export interface LearningRepository {
   commitReview(command: PreparedReview): Promise<CommitReceipt>;
   snapshot(deckId: string): Promise<LearningSnapshot>;
 }
+
+// Runtime validation for records crossing API/storage boundaries.
+export const cardSchema = cardContent.extend({
+  id: uuidSchema,
+  deckId: uuidSchema,
+  contentRevision: revisionSchema,
+  deletedAt: instantSchema.nullable(),
+});
+export const deckSchema = deckContent.extend({
+  id: uuidSchema,
+  revision: revisionSchema,
+  deletedAt: instantSchema.nullable(),
+});
+export const reviewEventSchema = z.strictObject({
+  id: uuidSchema,
+  cardId: uuidSchema,
+  direction: directionSchema,
+  rating: ratingSchema,
+  occurredAt: instantSchema,
+  deviceId: uuidSchema,
+  clientSeq: revisionSchema,
+  observedContentRevision: revisionSchema,
+  observedProgressRevision: revisionSchema.nullable(),
+  epoch: revisionSchema,
+  algorithmVersion: z.string().min(1).max(100),
+});
+// State is JSON and algorithm-specific; LEARN-01 defines its inner schema.
+export const jsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number().finite(),
+    z.boolean(),
+    z.null(),
+    z.array(jsonValueSchema),
+    z.record(z.string(), jsonValueSchema),
+  ]),
+);
+export const schedulerStateSchema = z.strictObject({
+  version: z.string().min(1).max(100),
+  data: jsonValueSchema,
+});
+export const progressSchema = z
+  .strictObject({
+    cardId: uuidSchema,
+    direction: directionSchema,
+    epoch: revisionSchema,
+    dueAt: instantSchema,
+    lastEffectiveAt: instantSchema,
+    schedulerState: schedulerStateSchema,
+    revision: revisionSchema,
+    algorithmVersion: z.string().min(1).max(100),
+  })
+  .refine(
+    (v) => v.schedulerState.version === v.algorithmVersion,
+    "Wersje algorytmu i stanu muszą być zgodne",
+  );
+export const settingsSchema = z.strictObject({
+  timezone: z.string().min(1).max(100),
+  newLimit: z.number().int().min(0).max(10000),
+  showDue: z.boolean(),
+  showSession: z.boolean(),
+  revision: revisionSchema,
+});
+export const changeSchema = z.strictObject({
+  sequence: revisionSchema,
+  entity: z.enum([
+    "deck",
+    "card",
+    "progress",
+    "settings",
+    "review",
+    "reset",
+    "introduction",
+  ]),
+  entityId: uuidSchema,
+  revision: revisionSchema,
+  payload: jsonValueSchema,
+  deleted: z.boolean(),
+});
+export const pullQuerySchema = z.strictObject({
+  cursor: revisionSchema.default("0"),
+  limit: z.coerce.number().int().min(1).max(500).default(100),
+});
+export const pullResponseSchema = z.strictObject({
+  changes: z.array(changeSchema).max(500),
+  nextCursor: revisionSchema,
+  hasMore: z.boolean(),
+  serverTime: instantSchema,
+});
+export const snapshotQuerySchema = z
+  .strictObject({
+    snapshotToken: z.string().min(1).max(4096).optional(),
+    pageToken: z.string().min(1).max(4096).optional(),
+  })
+  .refine(
+    (v) => !v.pageToken || !!v.snapshotToken,
+    "pageToken wymaga snapshotToken",
+  );
+export const snapshotResponseSchema = z.strictObject({
+  snapshotToken: z.string().min(1).max(4096),
+  watermark: revisionSchema,
+  decks: z.array(deckSchema),
+  cards: z.array(cardSchema),
+  progress: z.array(progressSchema),
+  settings: settingsSchema.nullable(),
+  nextPage: z.string().min(1).max(4096).nullable(),
+});
+export const httpErrorSchema = z.strictObject({
+  error: z.strictObject({
+    code: z.enum([
+      "unauthorized",
+      "protocol_conflict",
+      "payload_too_large",
+      "invalid_envelope",
+      "upgrade_required",
+      "rate_limited",
+      "retry_later",
+    ]),
+    message: z.string().min(1).max(1000),
+    requestId: uuidSchema,
+  }),
+});
+export type PullResponse = z.infer<typeof pullResponseSchema>;
+export type SnapshotResponse = z.infer<typeof snapshotResponseSchema>;
+export type HttpError = z.infer<typeof httpErrorSchema>;

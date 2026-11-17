@@ -105,3 +105,11 @@ Offline readiness per zestaw: absent, preparing, ready, stale, error. Ready nie 
 ## Szczegóły walidatora push
 
 Payloady są ścisłe: nieznane pola, w tym `userId`, są odrzucane. Utworzenie karty ma `deckId`; aktualizacja wymaga pełnej treści i `baseRevision`. Przykłady są jawnie `null` albo tekstem. Pierwsza ocena ma `observedProgressRevision: null`. Numery bigint są dziesiętnymi stringami w zakresie nieujemnego bigint PostgreSQL. `parsePushBody` sprawdza 1 MiB UTF-8 przed parsowaniem JSON. Serwer niezależnie weryfikuje własność, integralność, daty oraz powiązania — walidacja struktury nie jest autoryzacją.
+
+## Kontrakt odpowiedzi i walidacji paczek
+
+Walidator `pushEnvelopeSchema` weryfikuje wyłącznie kopertę; każdą pozycję waliduj osobno przez `operationSchema`, aby niepoprawna operacja nie uniemożliwiła wykonania pozostałych. Aby odpowiedzieć per operacja, wadliwa pozycja musi zawierać poprawne ID; w przeciwnym razie odpowiedź to HTTP 422 dla koperty przed wykonaniem jakiejkolwiek operacji. `pushSchema` i `parsePushBody` walidują kompletną paczkę i nadają się do weryfikacji danych klienta; serwer musi sprawdzać limit bajtów przed dekodowaniem, a następnie korzystać z walidacji dwuetapowej.
+
+Pull przyjmuje `cursor` (domyślnie 0) i `limit` (1–500, domyślnie 100); odpowiedź ma `changes`, `nextCursor`, `hasMore`, `serverTime`. Zmiana ma sequence, entity, entityId, revision, payload JSON i flagę deleted. Rodzaje i konkretne payloady zmian wymagają testów w zadaniach DATA/SYNC; obecne DTO dopuszcza dowolną wartość JSON. Snapshot zwraca snapshotToken, watermark, zestawy, karty, postępy, ustawienia i nextPage; token strony wymaga tokenu snapshotu. Serwer gwarantuje spójny watermark i kontroluje wielkość strony.
+
+Wynik błędu HTTP: `{error:{code,message,requestId}}`; kod i HTTP muszą być zgodne z tabelą kodów. Serwer weryfikuje właściciela, powiązania i zawartość każdego JSON niezależnie od typów klienta. Dla `progress.reset` epoch i rewizja dotyczą kierunku wskazanego w payload; model bazy musi mieć klucz cardId+direction+epoch. Zdarzenie oceny ze starszą rewizją postępu nie jest automatycznie odrzucane: serwer wylicza ją ponownie według bieżącego kanonicznego postępu; różny epoch lub usunięta karta nie zmienia projekcji. `schedulerState` to `{version,data}`, gdzie version równa się algorithmVersion; schemat data ustala LEARN-01.

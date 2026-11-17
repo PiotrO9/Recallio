@@ -80,3 +80,35 @@ test("klasyfikacja porównuje bazę i wcześniejsze wiersze bez mutacji", () => 
   assert.deepEqual(result[4].matches, [{ source: "file", row: 5 }]);
   assert.equal(JSON.stringify({ rows, card }), before);
 });
+
+test("odrzuca nazwy odziedziczone z prototypu jako nieznane nagłówki", () => {
+  for (const header of ["constructor", "toString", "__proto__"])
+    assert.throws(() => parseCsv(`side_a,side_b,${header}\na,b,c`), CsvError);
+});
+
+test("zbiorowe pomijanie nie zależy od wcześniej pominiętego wiersza", () => {
+  const rows = parseCsv("side_a,side_b\na,b\na,b\na,b").rows;
+  const result = classifyRows(rows, [], {
+    skippedRows: new Set([2]),
+    skipExactDuplicates: true,
+  });
+  assert.deepEqual(
+    result.map((r) => r.classification),
+    ["valid", "valid", "exact_duplicate"],
+  );
+  assert.deepEqual(
+    result.map((r) => r.automaticallySkipped),
+    [false, false, true],
+  );
+  assert.deepEqual(result[2].matches, [{ source: "file", row: 3 }]);
+});
+
+test("duże grupy duplikatów ograniczają liczbę zwracanych dopasowań", () => {
+  const rows = parseCsv(
+    "side_a,side_b\n" + Array(2000).fill("a,b").join("\n"),
+  ).rows;
+  const result = classifyRows(rows, []);
+  assert.equal(result.at(-1)?.matchCount, 1999);
+  assert.equal(result.at(-1)?.matches.length, 20);
+  assert.equal(result.at(-1)?.matchesTruncated, true);
+});

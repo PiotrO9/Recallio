@@ -16,6 +16,9 @@ export type ImportRow = {
   content: Content;
   classification: Classification;
   matches: Match[];
+  matchCount: number;
+  matchesTruncated: boolean;
+  automaticallySkipped: boolean;
   errors: string[];
 };
 export type ImportAction =
@@ -137,9 +140,12 @@ const aliases: Record<string, keyof Content> = {
   "przykład b": "exampleB",
 };
 function headers(row: RecordRow): (keyof Content)[] {
-  const keys = row.fields.map(
-    (field) => aliases[field.trim().toLocaleLowerCase("pl-PL")],
-  );
+  const keys = row.fields.map((field) => {
+    const key = field.trim().toLocaleLowerCase("pl-PL");
+    if (!Object.hasOwn(aliases, key))
+      throw new CsvError(row.line, "Nieznany nagłówek");
+    return aliases[key];
+  });
   if (
     keys.some((key) => !key) ||
     new Set(keys).size !== keys.length ||
@@ -224,52 +230,90 @@ const norm = (s: string | null) =>
     .trim()
     .replace(/\s+/gu, " ")
     .toLocaleLowerCase("pl-PL");
+/** Reclassify after changing decisions. skippedRows must include every prior row
+ * that will not create the given content, including updates. For bulk skipping,
+ * use automaticallySkipped from this same run; do not skip solely by classification.
+ * matches contains at most 20 representatives of the highest-priority category. */
 export function classifyRows(
   rows: ReturnType<typeof parseCsv>["rows"],
   cards: readonly Card[],
+  options: {
+    skippedRows?: ReadonlySet<number>;
+    skipExactDuplicates?: boolean;
+  } = {},
 ): ImportRow[] {
-  const previous: Array<{ content: Content; match: Match }> = cards
-    .filter((c) => c.deletedAt === null)
-    .map((c) => ({
-      content: c,
-      match: { source: "deck", id: c.id, revision: c.contentRevision },
-    }));
+  type Bucket = { count: number; matches: Match[] };
+  const byQuestion = new Map<string, Bucket>();
+  const byAnswer = new Map<string, Bucket>();
+  const byExact = new Map<string, Bucket>();
+  const keys = (content: Content) => {
+    const a = norm(content.sideA),
+      b = norm(content.sideB);
+    return [
+      JSON.stringify([a]),
+      JSON.stringify([a, b]),
+      JSON.stringify([a, b, norm(content.exampleA), norm(content.exampleB)]),
+    ];
+  };
+  const insert = (content: Content, match: Match) => {
+    const [a, b, exact] = keys(content);
+    for (const [index, key] of [
+      [byQuestion, a],
+      [byAnswer, b],
+      [byExact, exact],
+    ] as const) {
+      let bucket = index.get(key);
+      if (!bucket) {
+        bucket = { count: 0, matches: [] };
+        index.set(key, bucket);
+      }
+      bucket.count++;
+      if (bucket.matches.length < 20) bucket.matches.push(match);
+    }
+  };
+  for (const card of cards)
+    if (card.deletedAt === null)
+      insert(card, {
+        source: "deck",
+        id: card.id,
+        revision: card.contentRevision,
+      });
   return rows.map((row) => {
-    const candidates = previous.filter(
-      ({ content }) => norm(content.sideA) === norm(row.content.sideA),
-    );
-    const exact = candidates.filter(
-      ({ content }) =>
-        norm(content.sideB) === norm(row.content.sideB) &&
-        norm(content.exampleA) === norm(row.content.exampleA) &&
-        norm(content.exampleB) === norm(row.content.exampleB),
-    );
-    const examples = candidates.filter(
-      ({ content }) => norm(content.sideB) === norm(row.content.sideB),
-    );
-    const chosen = exact.length
-      ? exact
-      : examples.length
-        ? examples
-        : candidates;
+    const [a, b, e] = keys(row.content);
+    const candidates = byQuestion.get(a),
+      examples = byAnswer.get(b),
+      exact = byExact.get(e);
+    const chosen = exact ?? examples ?? candidates;
     const classification: Classification = row.errors.length
       ? "invalid"
-      : exact.length
+      : exact
         ? "exact_duplicate"
-        : examples.length
+        : examples
           ? "example_conflict"
-          : candidates.length
+          : candidates
             ? "answer_variant"
             : "valid";
-    if (!row.errors.length)
-      previous.push({
-        content: row.content,
-        match: { source: "file", row: row.row },
-      });
+    const automaticallySkipped = Boolean(
+      options.skipExactDuplicates &&
+      classification === "exact_duplicate" &&
+      !options.skippedRows?.has(row.row),
+    );
+    const matchCount = classification === "invalid" ? 0 : (chosen?.count ?? 0);
+    const matches =
+      classification === "invalid" ? [] : [...(chosen?.matches ?? [])];
+    if (
+      !row.errors.length &&
+      !options.skippedRows?.has(row.row) &&
+      !automaticallySkipped
+    )
+      insert(row.content, { source: "file", row: row.row });
     return {
       ...row,
       classification,
-      matches: row.errors.length ? [] : chosen.map((x) => x.match),
+      matches,
+      matchCount,
+      matchesTruncated: matchCount > 20,
+      automaticallySkipped,
     };
   });
 }

@@ -1,6 +1,6 @@
 # Kontrakty v1 — projekt do zamrożenia w CORE-01
 
-Status: specyfikacja, nie zaimplementowane endpointy. Obecne typy `src/domain/cards.ts` dotyczą wyłącznie demonstracji i nie są jeszcze produkcyjnym DTO. CORE-01 tworzy `src/contracts` z walidacją runtime (kandydat: Zod), przykładami i testami zgodności. Nie tworzyć równoległych typów w modułach.
+Status: propozycja CORE-01 do przeglądu integratora. `src/contracts/index.ts` zawiera kontrakty typów i walidację push; endpointy nie są zaimplementowane. Typy `src/domain/cards.ts` dotyczą wyłącznie demo. Szczegóły i ograniczenia: `docs/handoffs/CORE-01.md`. Nie tworzyć równoległych typów w modułach.
 
 ## Wspólny język
 
@@ -58,7 +58,7 @@ Operacja: `{id, type, entityId, baseRevision?, payload}`. Typy: deck.create/upda
 
 Push: max 100 operacji, max 1 MiB; każda operacja atomowa, batch może być częściowo zaakceptowany. Zależne operacje wysyłaj kolejno (deck.create przed card.create). Niezaakceptowane zależności zwracają retryable dependency_pending, bez efektu. Result: `{operationId, status: applied|duplicate|conflict|rejected, entity?, revision?, error?}`. Conflicts zawierają aktualną wersję i kod, nigdy cudze dane.
 
-Błędy HTTP: 401 unauthorized, 413 payload_too_large, 422 invalid_envelope, 426 upgrade_required, 429 rate_limited, 503 retry_later. Błąd pojedynczej poprawnie opakowanej operacji w results: revision_conflict, entity_deleted, invalid_payload, id_reuse, dependency_pending. 409 dla żądania niezgodnego z protokołem; konflikty encji zwykle w results. Ustalić jeden format w CORE-01, nie mieszać semantyki w klientach.
+Błędy HTTP: 401 unauthorized, 413 payload_too_large, 422 invalid_envelope, 426 upgrade_required, 429 rate_limited, 503 retry_later. Błąd pojedynczej poprawnie opakowanej operacji w results: revision_conflict, entity_deleted, invalid_payload, id_reuse, dependency_pending. Konflikty encji zgłaszane są w `results` z kodem `revision_conflict`; HTTP 409 dotyczy konfliktu na poziomie żądania, nie pojedynczej operacji. Szczegóły schematu błędu HTTP i snapshot/pull pozostają do zamknięcia w przeglądzie CORE-01.
 
 ```json
 {
@@ -101,3 +101,7 @@ Training: loading → question → revealed → saving → question; saving → 
 Sync: idle, syncing, offline, requires_auth, conflict, failed. Outbox: pending, leased, blocked, acknowledged (ostatni można usunąć w tej samej transakcji co apply). Demo nie ma outbox.
 
 Offline readiness per zestaw: absent, preparing, ready, stale, error. Ready nie wynika wyłącznie z navigator.onLine ani z obecności nazwy zestawu.
+
+## Szczegóły walidatora push
+
+Payloady są ścisłe: nieznane pola, w tym `userId`, są odrzucane. Utworzenie karty ma `deckId`; aktualizacja wymaga pełnej treści i `baseRevision`. Przykłady są jawnie `null` albo tekstem. Pierwsza ocena ma `observedProgressRevision: null`. Numery bigint są dziesiętnymi stringami w zakresie nieujemnego bigint PostgreSQL. `parsePushBody` sprawdza 1 MiB UTF-8 przed parsowaniem JSON. Serwer niezależnie weryfikuje własność, integralność, daty oraz powiązania — walidacja struktury nie jest autoryzacją.

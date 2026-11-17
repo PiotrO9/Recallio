@@ -1,0 +1,9 @@
+# ADR 002: konto, lokalne dane i czas
+
+Status: propozycja do przeglądu integratora.
+
+Wygaśnięcie sesji nie usuwa outbox. Ponowne uwierzytelnienie wznawia wysyłkę tylko dla tego samego userId. Świadome wylogowanie z pending oferuje synchronizację, anulowanie lub potwierdzone odrzucenie; po skutecznym wylogowaniu usuwa cache konta. Jeśli inne karty blokują usunięcie, aplikacja nie pokazuje danych następnemu kontu i zgłasza potrzebę zamknięcia kart.
+
+Rejestrujemy surowy czas klienta i czas serwera. Propozycja effectiveAt = max(lastEffectiveAt, min(occurredAt, receivedAt)), porządek akceptacji serwera. Jest to kompromis zależny od kolejności dostarczenia; LEARN-01 musi potwierdzić zgodność z algorytmem. Reset zwiększa epoch, późny event poprzedniego epoch pozostaje w historii bez modyfikowania nowej projekcji.
+
+Nie ustalono domyślnego limitu nowych kart ani ostatecznej polityki strefy po zmianie przez użytkownika. Te decyzje wymagają osobnego rozstrzygnięcia przed ustawieniami.

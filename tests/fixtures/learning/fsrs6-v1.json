@@ -1,0 +1,80 @@
+{
+  "profile": "recallio-fsrs6-v1",
+  "package": "ts-fsrs@5.4.2",
+  "baseline": {
+    "at": "2026-01-01T12:00:00.000Z",
+    "rating": 3,
+    "direction": "a-b",
+    "mode": "introduction",
+    "dueAt": "2026-01-04T12:00:00.000Z",
+    "stability": 2.3065,
+    "difficulty": 2.11810397,
+    "lastModelReview": "2026-01-01T12:00:00.000Z"
+  },
+  "cases": [
+    {
+      "id": "twenty-fast-successes-one-card",
+      "given": "baseline; one card, no alternate card",
+      "events": "20 ratings 3 at one-minute intervals from 12:01 to 12:20 on 2026-01-01 UTC",
+      "expected": "all practice; history adds 20 events; dueAt, stability, difficulty and lastModelReview remain baseline; lastEffectiveAt is 2026-01-01T12:20:00.000Z; same card may be offered again"
+    },
+    {
+      "id": "two-directions",
+      "given": "baseline a-b; b-a has no progress; both belong to one card",
+      "events": "first b-a rating 3 at 2026-01-01T12:01:00.000Z",
+      "expected": "b-a introduction dueAt 2026-01-04T12:01:00.000Z; a-b remains baseline; one unique introduced card consumes one daily unit; avoid immediate reversal if another card is available"
+    },
+    {
+      "id": "on-time-review",
+      "given": "baseline",
+      "events": "rating 3 at 2026-01-04T12:00:00.000Z",
+      "modelResult": {
+        "dueAt": "2026-01-18T12:00:00.000Z",
+        "stability": 13.82690327,
+        "difficulty": 2.11121424
+      },
+      "expected": "due; dueAt 2026-01-18T12:00:00.000Z; stability 13.82690327; difficulty 2.11121424"
+    },
+    {
+      "id": "after-ten-days",
+      "given": "baseline, no intervening events",
+      "events": "rating 3 at 2026-01-11T12:00:00.000Z",
+      "modelResult": {
+        "dueAt": "2026-02-05T12:00:00.000Z",
+        "stability": 25.10871981,
+        "difficulty": 2.11121424
+      },
+      "expected": "due; dueAt 2026-02-05T12:00:00.000Z; stability 25.10871981; difficulty 2.11121424"
+    },
+    {
+      "id": "practice-forgotten",
+      "given": "baseline",
+      "events": "rating 1 at 2026-01-02T12:00:00.000Z",
+      "modelResult": {
+        "dueAt": "2026-01-03T12:00:00.000Z",
+        "stability": 0.57129918,
+        "difficulty": 7.39450274,
+        "lapses": 1
+      },
+      "expected": "practice; dueAt 2026-01-03T12:00:00.000Z; stability 0.57129918; difficulty 7.39450274; lapse 1; queue for current session"
+    },
+    {
+      "id": "late-event-after-due",
+      "given": "on-time-review result; lastEffectiveAt 2026-01-04T12:00:00.000Z",
+      "events": "older offline rating 3 occurredAt 2026-01-02T12:00:00.000Z, receivedAt 2026-01-05T12:00:00.000Z, observedMode due",
+      "expected": "effectiveAt 2026-01-04T12:00:00.000Z; canonical practice; append event, preserve on-time-review model and dueAt; observedMode is not authoritative"
+    },
+    {
+      "id": "future-clock",
+      "given": "baseline",
+      "events": "rating 3 occurredAt 2027-01-01T12:00:00.000Z, receivedAt 2026-01-02T12:00:00.000Z",
+      "expected": "effectiveAt 2026-01-02T12:00:00.000Z; practice; preserve baseline model and dueAt; retain raw occurredAt"
+    },
+    {
+      "id": "old-epoch-after-reset",
+      "given": "baseline epoch 0; a-b reset to epoch 1; b-a unchanged",
+      "events": "late a-b rating 1 with epoch 0",
+      "expected": "append history without changing epoch 1 progress or b-a; next a-b event for epoch 1 is introduction"
+    }
+  ]
+}

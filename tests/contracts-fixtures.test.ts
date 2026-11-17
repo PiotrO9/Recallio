@@ -35,6 +35,7 @@ const operations = [
     payload: {
       direction: "a-b",
       rating: 3,
+      observedMode: "introduction",
       occurredAt: time,
       clientSeq: "1",
       observedContentRevision: "1",
@@ -106,6 +107,9 @@ test("pull and snapshot schemas enforce cursor, limits and versioned state", () 
       decks: [],
       cards: [],
       progress: [progress],
+      introductions: [
+        { cardId: id, firstEffectiveAt: time, studyDay: "2026-11-17" },
+      ],
       settings: null,
       nextPage: null,
     }).success,
@@ -122,6 +126,59 @@ test("pull and snapshot schemas enforce cursor, limits and versioned state", () 
     progressSchema.safeParse({
       ...progress,
       schedulerState: { version: "scheduler-v1", data: undefined },
+    }).success,
+    false,
+  );
+});
+
+test("snapshot requires valid introductions and reviews preserve observed mode", () => {
+  const snapshot = {
+    snapshotToken: "token",
+    watermark: "1",
+    decks: [],
+    cards: [],
+    progress: [],
+    introductions: [
+      { cardId: id, firstEffectiveAt: time, studyDay: "2026-11-17" },
+    ],
+    settings: null,
+    nextPage: null,
+  };
+  assert.deepEqual(
+    snapshotResponseSchema.parse(JSON.parse(JSON.stringify(snapshot))),
+    snapshot,
+  );
+  assert.equal(
+    snapshotResponseSchema.safeParse({ ...snapshot, introductions: undefined })
+      .success,
+    false,
+  );
+  assert.equal(
+    snapshotResponseSchema.safeParse({
+      ...snapshot,
+      introductions: [{ ...snapshot.introductions[0], studyDay: "2026-02-30" }],
+    }).success,
+    false,
+  );
+  const review = operations.find((op) => op.type === "review.record")!;
+  assert.equal(
+    operationSchema.safeParse({
+      ...review,
+      payload: { ...review.payload, observedMode: "practice" },
+    }).success,
+    true,
+  );
+  assert.equal(
+    operationSchema.safeParse({
+      ...review,
+      payload: { ...review.payload, observedMode: "invalid" },
+    }).success,
+    false,
+  );
+  assert.equal(
+    operationSchema.safeParse({
+      ...review,
+      payload: { ...review.payload, observedMode: undefined },
     }).success,
     false,
   );

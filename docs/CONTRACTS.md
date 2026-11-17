@@ -9,7 +9,7 @@ Status: propozycja CORE-01 do przeglądu integratora. `src/contracts/index.ts` z
 - UUID: identyfikatory; IsoInstant: UTC ISO8601; Revision/Cursor: string dziesiętny bigint.
 - Card: id, deckId, sideA, sideB, exampleA?, exampleB?, contentRevision, deletedAt?.
 - ProgressKey: cardId + direction; epoch oddziela jawne resety postępu.
-- ReviewEvent: id, cardId, direction, rating, occurredAt, deviceId, clientSeq, observedContentRevision, observedProgressRevision, epoch, algorithmVersion.
+- ReviewEvent: id, cardId, direction, rating, observedMode, occurredAt, deviceId, clientSeq, observedContentRevision, observedProgressRevision, epoch, algorithmVersion.
 - Postęp: key, epoch, dueAt, lastEffectiveAt, schedulerState (wersjonowany), revision. Wartość z serwera jest autorytatywna; lokalna jest projekcją optymistyczną.
 
 ## Porty domeny (docelowe)
@@ -72,6 +72,7 @@ Błędy HTTP: 401 unauthorized, 413 payload_too_large, 422 invalid_envelope, 426
       "payload": {
         "direction": "a-b",
         "rating": 3,
+        "observedMode": "introduction",
         "occurredAt": "2026-11-17T12:00:00Z",
         "clientSeq": "42",
         "observedContentRevision": "1",
@@ -87,6 +88,10 @@ Błędy HTTP: 401 unauthorized, 413 payload_too_large, 422 invalid_envelope, 426
 Idempotencja: hash kanonicznego payloadu + type/entityId; ten sam id i payload zwraca poprzedni wynik, inny payload = id_reuse. Autoryzacja sprawdzana również dla duplikatu. Operacje nie usuwają receipt przy usunięciu karty.
 
 Snapshot musi mieć stały watermark i spójny zbiór (materializowany snapshot lub transakcja/rejestr zmian z rewalidacją). Sam paging bieżących tabel nie wystarcza. LOCAL-01 zapisuje strony do nowej generacji, dopiero komplet przełącza aktywny snapshot. Pending outbox jest zachowany i ponownie nałożony. Serwer nie może wymagać długiej transakcji HTTP trzymanej między requestami.
+
+Każda strona snapshotu zawiera tablicę `introductions` (także gdy jest pusta). Wprowadzenie ma `cardId`, `firstEffectiveAt` oraz `studyDay` w formacie YYYY-MM-DD; należy do tej samej generacji i watermarku co pozostałe dane. Pełny snapshot obejmuje wprowadzenia całego konta, niezależnie od stron zestawów. LOCAL-01 przełącza je atomowo wraz z generacją i uwzględnia pending outbox. Polityka zmiany strefy pozostaje otwarta w ADR 002.
+
+Ocena zawiera wymagane `observedMode` (`introduction`, `due`, `practice`), zamrożone razem ze zdarzeniem i zachowane przy retry. Jest to obserwacja klienta, nie autorytatywna klasyfikacja: stan lub zegar urządzenia mogą być nieaktualne. LEARN-01 musi określić deterministyczną regułę trybu kanonicznego na podstawie stanu serwera, effectiveAt i ewentualnie tej obserwacji, w tym dla spóźnionych zdarzeń i rozbieżności urządzeń. Do jej zatwierdzenia nie implementować kanonicznego przeliczania zakładającego, że observedMode jest zawsze poprawny.
 
 ## CSV v1
 
@@ -110,6 +115,6 @@ Payloady są ścisłe: nieznane pola, w tym `userId`, są odrzucane. Utworzenie 
 
 Walidator `pushEnvelopeSchema` weryfikuje wyłącznie kopertę; każdą pozycję waliduj osobno przez `operationSchema`, aby niepoprawna operacja nie uniemożliwiła wykonania pozostałych. Aby odpowiedzieć per operacja, wadliwa pozycja musi zawierać poprawne ID; w przeciwnym razie odpowiedź to HTTP 422 dla koperty przed wykonaniem jakiejkolwiek operacji. `pushSchema` i `parsePushBody` walidują kompletną paczkę i nadają się do weryfikacji danych klienta; serwer musi sprawdzać limit bajtów przed dekodowaniem, a następnie korzystać z walidacji dwuetapowej.
 
-Pull przyjmuje `cursor` (domyślnie 0) i `limit` (1–500, domyślnie 100); odpowiedź ma `changes`, `nextCursor`, `hasMore`, `serverTime`. Zmiana ma sequence, entity, entityId, revision, payload JSON i flagę deleted. Rodzaje i konkretne payloady zmian wymagają testów w zadaniach DATA/SYNC; obecne DTO dopuszcza dowolną wartość JSON. Snapshot zwraca snapshotToken, watermark, zestawy, karty, postępy, ustawienia i nextPage; token strony wymaga tokenu snapshotu. Serwer gwarantuje spójny watermark i kontroluje wielkość strony.
+Pull przyjmuje `cursor` (domyślnie 0) i `limit` (1–500, domyślnie 100); odpowiedź ma `changes`, `nextCursor`, `hasMore`, `serverTime`. Zmiana ma sequence, entity, entityId, revision, payload JSON i flagę deleted. Rodzaje i konkretne payloady zmian wymagają testów w zadaniach DATA/SYNC; obecne DTO dopuszcza dowolną wartość JSON. Snapshot zwraca snapshotToken, watermark, zestawy, karty, postępy, wprowadzenia, ustawienia i nextPage; token strony wymaga tokenu snapshotu. Serwer gwarantuje spójny watermark i kontroluje wielkość strony.
 
 Wynik błędu HTTP: `{error:{code,message,requestId}}`; kod i HTTP muszą być zgodne z tabelą kodów. Serwer weryfikuje właściciela, powiązania i zawartość każdego JSON niezależnie od typów klienta. Dla `progress.reset` epoch i rewizja dotyczą kierunku wskazanego w payload; model bazy musi mieć klucz cardId+direction+epoch. Zdarzenie oceny ze starszą rewizją postępu nie jest automatycznie odrzucane: serwer wylicza ją ponownie według bieżącego kanonicznego postępu; różny epoch lub usunięta karta nie zmienia projekcji. `schedulerState` to `{version,data}`, gdzie version równa się algorithmVersion; schemat data ustala LEARN-01.

@@ -18,6 +18,7 @@ const sample = {
       payload: {
         direction: "a-b",
         rating: 3,
+        observedMode: "introduction",
         occurredAt: "2026-11-17T12:00:00Z",
         clientSeq: "9007199254740993",
         observedContentRevision: "1",

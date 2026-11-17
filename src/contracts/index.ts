@@ -12,6 +12,7 @@ export const uuidSchema = z.uuid();
 export const instantSchema = z.iso.datetime({ offset: false });
 export const directionSchema = z.enum(["a-b", "b-a"]);
 export const directionModeSchema = z.enum(["a-b", "b-a", "mixed"]);
+export const reviewModeSchema = z.enum(["introduction", "due", "practice"]);
 export const ratingSchema = z.union([
   z.literal(1),
   z.literal(2),
@@ -76,6 +77,7 @@ export const operationSchema = z.discriminatedUnion("type", [
     payload: z.strictObject({
       direction: directionSchema,
       rating: ratingSchema,
+      observedMode: reviewModeSchema,
       occurredAt: instantSchema,
       clientSeq: revisionSchema,
       observedContentRevision: revisionSchema,
@@ -161,6 +163,7 @@ export interface ReviewEvent {
   cardId: string;
   direction: Direction;
   rating: Rating;
+  observedMode: z.infer<typeof reviewModeSchema>;
   occurredAt: string;
   deviceId: string;
   clientSeq: string;
@@ -182,7 +185,7 @@ export interface Progress {
 export interface Candidate {
   card: Card;
   direction: Direction;
-  mode: "introduction" | "due" | "practice";
+  mode: z.infer<typeof reviewModeSchema>;
 }
 export interface Scheduler {
   readonly version: string;
@@ -239,6 +242,7 @@ export const reviewEventSchema = z.strictObject({
   cardId: uuidSchema,
   direction: directionSchema,
   rating: ratingSchema,
+  observedMode: reviewModeSchema,
   occurredAt: instantSchema,
   deviceId: uuidSchema,
   clientSeq: revisionSchema,
@@ -284,6 +288,12 @@ export const settingsSchema = z.strictObject({
   showSession: z.boolean(),
   revision: revisionSchema,
 });
+export const introductionSchema = z.strictObject({
+  cardId: uuidSchema,
+  firstEffectiveAt: instantSchema,
+  studyDay: z.iso.date(),
+});
+export type Introduction = z.infer<typeof introductionSchema>;
 export const changeSchema = z.strictObject({
   sequence: revisionSchema,
   entity: z.enum([
@@ -325,6 +335,7 @@ export const snapshotResponseSchema = z.strictObject({
   decks: z.array(deckSchema),
   cards: z.array(cardSchema),
   progress: z.array(progressSchema),
+  introductions: z.array(introductionSchema),
   settings: settingsSchema.nullable(),
   nextPage: z.string().min(1).max(4096).nullable(),
 });

@@ -1,0 +1,11 @@
+# LOCAL-01 — praca częściowa, zablokowana
+
+Status: BLOCKED, nie REVIEW i nie do integracji. Baza `542c53c59c4476706986aeeddb9032d983fb28dc`, branch `codex/local-01`, worktree `D:/CODE/Recallio-local-01`. Commit zawierający ten raport jest punktem wznowienia; nie oznacza spełnienia kryteriów.
+
+Dodano eksperymentalne repozytorium w `src/storage/local-repository.ts`: namespace konta, transakcyjny zapis oceny, postępu, wprowadzenia i outbox, kontrolę retry i dzierżawy z wygaśnięciem. Test `tests/storage/local-repository.test.ts` uruchamia się osobno: `npx tsx --test tests/storage/*.test.ts`; obecne `npm test` nie obejmuje podkatalogów. Kod nie jest podłączony do aplikacji.
+
+Do uzgodnienia z integratorem przed uznaniem za produkcyjny: `PreparedReview` nie zawiera introduction ani strefy czasu, a kontrakt wymaga wyznaczenia studyDay; obecny eksperyment wstrzykuje funkcję i wymaga zatwierdzenia semantyki. Kontrakty nie definiują portu i deterministycznego rebase wszystkich rodzajów oczekujących operacji na pełnym snapshotcie, w tym projekcji review, resetów i konfliktów. Nie należy przełączać generacji z oczekującym outbox bez uzgodnienia z SYNC/LEARN. LEARN-01 i algorytm nadal w toku; potrzebny jawny podział odpowiedzialności i kontrakt rebase. Zmiany wspólnych kontraktów i polecenia testowego należą do integratora.
+
+Pozostało: kompletne repozytoria treści i ustawień, staging stron snapshotu i atomowe przełączenie wraz z pending rebase, obsługa cursor/apply, migracje z fixture i testem przerwania, obsługa blocked/versionchange z testami, testy awarii każdej części transakcji, walidacja konfliktów i bezpieczeństwa kolejności outbox, testy integracyjne w przeglądarce. Obecne porównanie command przez JSON i polityka rewizji wymagają przeglądu; brak dowodu poprawności całego przepływu synchronizacji. Nie używać tego prototypu w produkcji.
+
+Weryfikacja: `npm run typecheck`, `npm test`, `npm run build`, `npx playwright install chromium`, `npm run test:e2e` zakończyły się powodzeniem; E2E dotyczy istniejącego demo, nie produkcyjnego storage. Osobny test storage przeszedł, ale obejmuje jedną awarię, retry, lease i izolację. Brak testów chmury i rzeczywistego sync. Żadnego push ani wdrożenia.

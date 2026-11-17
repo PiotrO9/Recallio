@@ -1,6 +1,6 @@
 # LOCAL-01 — praca w toku
 
-Status: IN_PROGRESS, nie REVIEW; nie integrować. Baza `542c53c59c4476706986aeeddb9032d983fb28dc`, branch `codex/local-01`, worktree `D:/CODE/Recallio-local-01`.
+Status: BLOCKED, nie REVIEW; nie integrować. Rejestr wskazuje potrzebę rozstrzygnięcia lokalnej wersji projekcji. Baza `542c53c59c4476706986aeeddb9032d983fb28dc`, branch `codex/local-01`, worktree `D:/CODE/Recallio-local-01`.
 
 Repozytorium implementuje port `LearningRepository`, osobną bazę na konto, zapis oceny/postępu/wprowadzenia/outbox w jednej transakcji, retry, uporządkowane dzierżawy, migrację prototypowej bazy v1 do v2, callbacki blokady i zamykanie przy versionchange. Snapshoty są etapowane stronami, ponowienie tej samej strony jest idempotentne, a przełączenie danych i kursora zachodzi w jednej transakcji. Wstrzykiwany synchroniczny rebase otrzymuje uporządkowany outbox i musi zwrócić dane oraz identyfikatory wszystkich obsłużonych operacji; wyjście jest walidowane, tombstone nie może być przywrócony. Wstrzykiwana funkcja introduction określa dzień w strefie konta. Żadnego połączenia z aplikacją.
 

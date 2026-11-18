@@ -1,6 +1,6 @@
 # Plan techniczny Recallio
 
-Interfejs udostępnia demo. Kontrakty v1, repozytorium konta w IndexedDB i parser CSV są dostępne w kodzie. Poniższy plan opisuje docelową architekturę MVP.
+Plan opisuje architekturę MVP. Bieżący stan funkcji i odbioru środowiska docelowego jest w [kolejce](TASKS.md), a wyniki testów w [weryfikacji](VERIFICATION.md).
 
 ## 1. Zakres pierwszego przyrostu
 
@@ -15,17 +15,17 @@ MVP obejmuje pełny zakres z briefu: konta, prywatne zestawy, CSV, dwa kierunki,
 | D01 | Next.js App Router + React + TS strict + CSS, npm                    | Przyjęta; wersje w lockfile                                                      |
 | D02 | Dane demo w oddzielnej bazie `recallio-demo-v1`                      | Wdrożona; brak migracji do kont                                                  |
 | D03 | idb jako cienka warstwa IndexedDB                                    | Używana przez demo i repozytorium konta                                          |
-| D04 | Zdalne zapisy danych przez Route Handlers i RPC                      | Auth używa SDK Supabase                                                          |
-| D05 | Historia zdarzeń + materializowany postęp per kierunek               | Robocza, obowiązkowa dla synchronizacji                                          |
-| D06 | FSRS-6 z wersjonowanym profilem                                      | [Decyzja o schedulerze](decisions/learning-scheduler.md). Implementacja w planie |
+| D04 | Zapisy przez Route Handlers i transakcje PostgreSQL                  | Auth używa SDK Supabase, synchronizacja ograniczonej roli bazy                   |
+| D05 | Historia zdarzeń i materializowany postęp per kierunek               | Wdrożone w treningu i synchronizacji                                             |
+| D06 | FSRS-6 z wersjonowanym profilem                                      | Wdrożony wg [decyzji o schedulerze](decisions/learning-scheduler.md)              |
 | D07 | PWA przez jawnie wersjonowany service worker                         | Własny service worker w `public/study-sw.js`                                     |
-| D08 | Workers: sprawdzić adapter OpenNext i aktualną ścieżkę Cloudflare    | Zgodność z runtime Workers do weryfikacji                                        |
+| D08 | Workers przez OpenNext                                               | Weryfikacja lokalna w Wranglerze, odbiór wdrożenia w kolejce                      |
 | D09 | Przykład po odsłonięciu, po stronie odpowiedzi                       | Przyjęta roboczo, demo wdrożone                                                  |
 | D10 | Limit nowych = unikalne cardId w lokalnym dniu, oba kierunki wspólne | Domyślna liczba do ustalenia przed ustawieniami                                  |
 | D11 | Licznik sesji = zaakceptowane odpowiedzi, domyślnie ukryty w MVP     | Robocza; licznik demo to łączna historia urządzenia                              |
 | D12 | Wylogowanie usuwa cache konta po sync lub świadomym odrzuceniu       | Robocza; szczegóły poniżej                                                       |
 
-Zmiana decyzji: krótki ADR w `docs/decisions/NNN-temat.md`: kontekst, alternatywy, decyzja, wpływ na kontrakty, migracje, testy. Obecnie nie ma finalnego schematu SQL ani działającego protokołu synchronizacji.
+Zmianę decyzji zapisz w krótkim ADR w `docs/decisions/NNN-temat.md`. Uwzględnij kontekst, rozważone opcje, decyzję oraz wpływ na kontrakty, migracje i testy.
 
 ## 3. Warstwy i zależności
 

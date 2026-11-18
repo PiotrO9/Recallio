@@ -1,6 +1,6 @@
 # Recallio
 
-Aplikacja do nauki fiszek z lokalnym demem. Po skonfigurowaniu Supabase działa również obsługa kont.
+Aplikacja do nauki fiszek z publicznym demem i prywatnym treningiem dla zalogowanych użytkowników. Pełną ścieżkę konta zweryfikowano lokalnie z Supabase, Next.js oraz Wranglerem.
 
 ## Uruchomienie
 
@@ -23,7 +23,7 @@ Otwórz http://localhost:3000. Produkcja lokalna: `npm run build`, potem `npm st
 
 Demo nie wylicza terminów, nie odtwarza pozycji sesji po odświeżeniu, nie synchronizuje danych i nie zapewnia otwarcia strony offline. IndexedDB nie jest kopią zapasową: wyczyszczenie danych witryny usuwa historię. Demo ma osobną bazę i nigdy nie migruje jej do konta.
 
-Repozytorium zawiera też kontrakty v1, lokalne repozytorium danych konta i parser CSV. Te moduły czekają na podłączenie do interfejsu.
+Po skonfigurowaniu konta dostępne są prywatne zestawy, import i eksport CSV, trening z FSRS-6 i osobnym postępem dla obu kierunków oraz synchronizacja zapisów między urządzeniami. Użytkownik wybiera zestawy, które chce przygotować do nauki offline. Stan odbioru środowiska docelowego jest w [kolejce zadań](docs/TASKS.md).
 
 ## Dokumentacja
 
@@ -58,4 +58,4 @@ Testy E2E uruchamiają lokalny build na porcie 3210 i używają Chromium w trybi
 
 ## Konfiguracja kont
 
-Skopiuj [.env.example](.env.example) do `.env.local` i uzupełnij publiczny adres projektu oraz klucz publishable. Konfigurację lokalnej bazy, wiadomości e-mail i testów opisuje [weryfikacja](docs/VERIFICATION.md#konta-i-wiadomości-email).
+Skopiuj [.env.example](.env.example) do `.env.local` i uzupełnij publiczny adres projektu oraz klucz publishable. Synchronizacja potrzebuje osobnego połączenia PostgreSQL dla backendu lub bindingu Hyperdrive. Konfigurację lokalnej bazy, poczty i połączenia opisuje [weryfikacja](docs/VERIFICATION.md#lokalna-baza-supabase).

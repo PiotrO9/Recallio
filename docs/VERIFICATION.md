@@ -34,7 +34,7 @@ node --test tests/database/rest.test.mjs
 Remove-Item Env:RECALLIO_TEST_ANON_KEY, Env:RECALLIO_TEST_SERVICE_ROLE_KEY
 ```
 
-Test REST używa lokalnego adresu `127.0.0.1:54321` i usuwa utworzone konta testowe. Publiczne tabele przyznają użytkownikom wyłącznie odczyt własnych wierszy. Tabele kursora, resetów i potwierdzeń są w prywatnym schemacie. Testy produkcyjnych funkcji RPC do synchronizacji należą do `SYNC-01`.
+Test REST używa lokalnego adresu `127.0.0.1:54321` i usuwa utworzone konta testowe. Publiczne tabele przyznają użytkownikom wyłącznie odczyt własnych wierszy. Tabele kursora, resetów i potwierdzeń są w prywatnym schemacie. Funkcje blokady konta i przydziału kursora sprawdzają testy pgTAP z `SYNC-DB`.
 
 ### Konta i wiadomości e-mail
 
@@ -76,6 +76,23 @@ OpenNext zgłasza ograniczone wsparcie Windows. Przy problemach z narzędziami b
 ## Dostępność
 
 `e2e/demo.spec.ts` sprawdza link pomijający nawigację oraz przejście klawiaturą z rozpoczęcia nauki do oceny w demie, a także fokus w logowaniu. `e2e/study-flow.spec.ts` sprawdza odsłonięcie fiszki, ocenę i ponowienie błędnego zapisu z klawiatury oraz komunikat o nieprawidłowym CSV. Axe analizuje demo, logowanie, trening, zestawy i podgląd importu pod kątem wybranych reguł WCAG A i AA. Testy kontrolują brak przewijania w poziomie przy 320 px. Oba profile Chromium przeszły lokalnie w Next.js i Wranglerze. Testy nie obejmują rzeczywistych czytników ekranu.
+
+## Odbiór MVP
+
+| Kryteria briefu | Lokalny dowód | Co wymaga dalszego sprawdzenia |
+| --- | --- | --- |
+| Rejestracja i reset hasła, demo bez konta | [Auth E2E](../e2e/auth.spec.ts) z lokalną pocztą, [demo E2E](../e2e/demo.spec.ts) | Dostarczenie poczty i callback HTTPS na testowym środowisku |
+| Zestawy ręczne, czytelne błędy CSV, pomijanie duplikatów, zachowanie treści i postępu, eksport bez utraty treści | [Ścieżka użytkownika](../e2e/study-flow.spec.ts), [testy CSV](../tests/import/csv.test.ts) i [test transakcji importu](../tests/storage/content-repository.test.ts) | Pełny eksport i ponowny import z interfejsu na środowisku testowym. Roundtrip samych danych jest sprawdzony jednostkowo |
+| Dwa niezależne kierunki, ciągły trening, odporność na szybkie oceny | [Scheduler](../tests/learning-scheduler.test.ts), [kolejka](../tests/learning-queue.test.ts) i [ścieżka treningu](../e2e/study-flow.spec.ts) | Pomiar długiej prywatnej sesji z ponownym otwarciem aplikacji. Domyślny limit i zmiana strefy czekają na `SETTINGS-01` |
+| Trwały zapis, offline po przygotowaniu, instalacja PWA | [Test IndexedDB](../tests/storage/browser.test.mjs) i [E2E z odświeżeniem oraz aktualizacją workera](../e2e/study-flow.spec.ts) | Instalacja i pełne zamknięcie oraz ponowne uruchomienie na rzeczywistych urządzeniach z wdrożeniem HTTPS |
+| Idempotencja, praca na dwóch urządzeniach, izolacja kont | [API synchronizacji](../e2e/sync-api.spec.ts), [ścieżka dwóch urządzeń](../e2e/study-flow.spec.ts), [REST](../tests/database/rest.test.mjs) i [RLS](../supabase/tests/account_isolation.sql) | Odbiór w Supabase i Workers w `FLOW-02` |
+| Czytelny interfejs i stylistyka Rachmistrza | Wspólne kolory i typografia, scenariusze klawiatury i testy axe | Ręczny odbiór na docelowych urządzeniach |
+
+### Odtworzenie lokalnej kopii
+
+Użyto dwóch tymczasowych baz w lokalnym PostgreSQL z Supabase. W pierwszej uruchomiono migracje Recallio i zapisano dane dwóch syntetycznych kont. Tabela `auth.users` i funkcja `auth.uid()` miały uproszczoną definicję testową, a role PostgreSQL pochodziły ze wspólnego lokalnego klastra. Kopię w formacie custom z `pg_dump -Fc` odtworzono przez `pg_restore --single-transaction --exit-on-error` do drugiej bazy utworzonej z `template0`.
+
+W odtworzonej bazie właściciel odczytał swoją fiszkę i ocenę, a drugie konto nie widziało żadnej z nich. Rola backendu odczytała potwierdzenie operacji, zachowała kursor 3 i poprawnie przydzieliła 4. Usunięto obie tymczasowe bazy i plik kopii. Odbiór środowiska docelowego nadal obejmuje przywrócenie kopii w rzeczywistym Supabase z pełnym Auth oraz test działania aplikacji w Workers.
 
 ## Wymagane scenariusze następnych etapów
 

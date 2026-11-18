@@ -13,18 +13,18 @@ W razie konfliktu pierwszeństwo ma jawna instrukcja użytkownika, potem brief p
 
 ## Stan projektu
 
-Interfejs udostępnia lokalne demo i obsługę kont po skonfigurowaniu Supabase. Silnik powtórek, kolejka, repozytorium IndexedDB i parser CSV czekają na podłączenie do właściwego treningu. Stan kolejnych etapów jest w [kolejce](docs/TASKS.md).
+Demo i prywatny trening zweryfikowano lokalnie, w tym FSRS-6, synchronizację i naukę offline po przygotowaniu zestawu. Stan odbioru chmurowego i pozostałych decyzji jest w [kolejce](docs/TASKS.md). Demo zachowuje osobną historię ocen.
 
 ## Technologia i granice
 
 - npm, Node >=22.12, Next.js App Router, React, TypeScript strict, CSS.
-- `src/app`: routing, layout, kompozycja; przyszłe Route Handlers są adapterami.
+- `src/app`: routing, layout, kompozycja i Route Handlers jako adaptery.
 - `src/domain`: czyste typy i funkcje; bez React, przeglądarki, SQL i HTTP.
 - `src/features`: interakcje i kontrolery przypadków użycia.
 - `src/storage`: lokalne repozytoria i migracje IndexedDB.
 - `src/contracts`: współdzielone schematy runtime i DTO.
-- Przyszłe `src/sync`: kolejka, transport i uzgadnianie danych.
-- Przyszłe `src/server`: weryfikacja tożsamości, usługi, adapter Supabase.
+- `src/sync`: kolejka, transport i uzgadnianie danych.
+- `src/server`: weryfikacja tożsamości, usługi i adapter bazy.
 - Wstrzykuj zegar, generator identyfikatorów i losowość w logice produkcyjnej.
 - Przy zmianie UI korzystaj z [referencji Rachmistrza](docs/TECHNICAL-PLAN.md#rachmistrz). Zachowaj czytelną treść i trening bez presji czasu. Nie kopiuj logiki matematyki.
 

@@ -38,6 +38,7 @@ export default async function AuthPage({
           <input
             type="email"
             name="email"
+            spellCheck={false}
             autoComplete="email"
             maxLength={254}
             required

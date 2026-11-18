@@ -1,7 +1,8 @@
 :root {
   --ink: #293c33;
-  --muted: #687166;
+  --muted: #596359;
   --line: #dedfd5;
+  --control-line: #858d80;
   --accent: #d9ef8b;
   --background: #f6f5ef;
   --surface: #fffefa;
@@ -26,6 +27,7 @@ button,
 a,
 select {
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 button {
   cursor: pointer;
@@ -39,9 +41,7 @@ a {
   color: inherit;
   text-decoration: none;
 }
-button:focus-visible,
-a:focus-visible,
-select:focus-visible {
+:is(button, a, select, input, summary):focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 4px;
 }
@@ -242,7 +242,7 @@ aside .aside-note {
   background: none;
   border: none;
   font-size: 11px;
-  min-height: 32px;
+  min-height: 44px;
 }
 .exercise h2 {
   font-weight: 500;

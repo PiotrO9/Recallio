@@ -28,6 +28,7 @@ export function DemoTrainer() {
   const busy = useRef(false);
   const revealButton = useRef<HTMLButtonElement>(null);
   const firstRating = useRef<HTMLButtonElement>(null);
+  const retryButton = useRef<HTMLButtonElement>(null);
   const card = demoCards[index];
   const face = presentCard(card, direction);
   useEffect(() => {
@@ -53,6 +54,9 @@ export function DemoTrainer() {
       else revealButton.current?.focus();
     }
   }, [started, revealed, index]);
+  useEffect(() => {
+    if (error && !saving) retryButton.current?.focus();
+  }, [error, saving]);
   async function rate(rating: Rating) {
     if (busy.current || !revealed) return;
     busy.current = true;
@@ -86,7 +90,7 @@ export function DemoTrainer() {
         Przejdź do treści
       </a>
       <header>
-        <a className="brand" href="/" aria-label="Recallio — strona główna">
+        <a className="brand" href="/">
           <span className="brand-mark" aria-hidden="true">
             r.
           </span>{" "}
@@ -94,10 +98,12 @@ export function DemoTrainer() {
         </a>
         <nav className="demo-nav" aria-label="Recallio">
           <span className="badge">Wersja demonstracyjna</span>
-          <a className="badge" href="/account">Konto</a>
+          <a className="badge" href="/account">
+            Konto
+          </a>
         </nav>
       </header>
-      <main id="main">
+      <main id="main" tabIndex={-1}>
         <div className="intro">
           <span className="eyebrow">MAŁY KROK. KAŻDEGO DNIA.</span>
           <h1>Chwila dla Twojej pamięci.</h1>
@@ -218,6 +224,7 @@ export function DemoTrainer() {
                 {error}
                 {pending.current && (
                   <button
+                    ref={retryButton}
                     disabled={saving}
                     onClick={() => rate(pending.current!.rating)}
                   >

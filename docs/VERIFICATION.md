@@ -73,6 +73,10 @@ OpenNext buduje aplikację za pomocą Next.js, a Playwright uruchamia lokalny ru
 
 OpenNext zgłasza ograniczone wsparcie Windows. Przy problemach z narzędziami budowania użyj Linuxa lub WSL. `npm audit --omit=dev` nie zgłosił podatności. Pełny audyt zgłosił podatności w drzewie narzędzi OpenNext, których `npm audit fix` bez wymuszonych zmian wersji nie rozwiązuje.
 
+## Dostępność
+
+`e2e/demo.spec.ts` sprawdza link pomijający nawigację oraz przejście klawiaturą z rozpoczęcia nauki do oceny w demie, a także fokus w logowaniu. `e2e/study-flow.spec.ts` sprawdza odsłonięcie fiszki, ocenę i ponowienie błędnego zapisu z klawiatury oraz komunikat o nieprawidłowym CSV. Axe analizuje demo, logowanie, trening, zestawy i podgląd importu pod kątem wybranych reguł WCAG A i AA. Testy kontrolują brak przewijania w poziomie przy 320 px. Oba profile Chromium przeszły lokalnie w Next.js i Wranglerze. Testy nie obejmują rzeczywistych czytników ekranu.
+
 ## Wymagane scenariusze następnych etapów
 
 - Atomiczność: błąd przy każdym store → zero częściowego postępu/outbox.

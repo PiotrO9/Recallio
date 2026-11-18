@@ -10,17 +10,20 @@ export function AuthFrame({
   children: ReactNode;
 }) {
   return (
-    <main className={styles.shell}>
+    <div className={styles.shell}>
+      <a className="skip-link" href="#main">
+        Przejdź do treści
+      </a>
       <Link className="brand" href="/">
         <span className="brand-mark" aria-hidden="true">
           r.
         </span>
         recallio
       </Link>
-      <section className={styles.panel}>
+      <main id="main" tabIndex={-1} className={styles.panel}>
         <h1>{title}</h1>
         {children}
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }

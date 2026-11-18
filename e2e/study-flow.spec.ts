@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { expect, test, type BrowserContext } from "@playwright/test";
+import { expectAccessible } from "./accessibility";
 
 test.skip(
   process.env.RECALLIO_RUN_SYNC_TESTS !== "1",
@@ -15,6 +16,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
   isMobile,
   hasTouch,
 }) => {
+  test.setTimeout(60_000);
   const secret = process.env.RECALLIO_TEST_SERVICE_ROLE_KEY;
   expect(secret).toBeTruthy();
   const headers = { apikey: secret!, authorization: `Bearer ${secret}` };
@@ -38,7 +40,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
   async function device(account: Awaited<ReturnType<typeof createAccount>>) {
     const context = await browser.newContext({
       baseURL,
-      viewport,
+      viewport: isMobile ? { width: 320, height: 720 } : viewport,
       isMobile,
       hasTouch,
     });
@@ -110,6 +112,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
     const page = await primary.newPage();
     await page.goto("/study");
     await expect(page.getByRole("heading", { name: "pies" })).toBeVisible();
+    await expectAccessible(page);
     const manifestResponse = await request.get("/manifest.webmanifest");
     expect(manifestResponse.ok()).toBe(true);
     const manifest = await manifestResponse.json();
@@ -161,8 +164,12 @@ test("a review survives an offline reload and synchronizes once to a second devi
     const update = page.getByRole("button", { name: "Zaktualizuj aplikację" });
     await expect(update).toBeVisible();
     await primary.setOffline(true);
-    await page.getByRole("button", { name: "Pokaż odpowiedź" }).click();
+    await page.getByRole("button", { name: "Pokaż odpowiedź" }).focus();
+    await page.keyboard.press("Space");
     await expect(page.getByText("dog", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Nie pamiętam" }),
+    ).toBeFocused();
     await expect(update).toHaveCount(0);
     await page.evaluate(() => {
       const add = IDBObjectStore.prototype.add;
@@ -177,12 +184,15 @@ test("a review survives an offline reload and synchronizes once to a second devi
         return request;
       };
     });
-    await page.getByRole("button", { name: "Dobrze" }).click();
+    await page.keyboard.press("3");
     await expect(
       page.getByText("Nie udało się zapisać oceny.", { exact: true }),
     ).toBeVisible();
     await expect(page.getByText("dog", { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Ponów zapis" }).click();
+    await expect(
+      page.getByRole("button", { name: "Ponów zapis" }),
+    ).toBeFocused();
+    await page.keyboard.press("Enter");
     await expect(page.getByText("Zapisany postęp: 1")).toBeVisible();
     const attempts = await page.evaluate(
       () => Reflect.get(window, "recallioTestAttempts") as string[],
@@ -255,6 +265,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
     await expect(otherPage.getByText("Zapisany postęp: 1")).toHaveCount(0);
     await page.goto("/decks");
     await expect(page.getByRole("heading", { name: "Nauka" })).toBeVisible();
+    await expectAccessible(page);
     const search = page.getByRole("searchbox", { name: "Wyszukaj zestaw" });
     await search.fill("brak dopasowania");
     await expect(
@@ -346,6 +357,14 @@ test("a review survives an offline reload and synchronizes once to a second devi
       { status: "conflict", error: "entity_deleted" },
     ]);
     await page.goto("/import");
+    await page.getByLabel("Plik CSV").setInputFiles({
+      name: "nieprawidlowy.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from("foo;bar\ncat;kot"),
+    });
+    await expect(
+      page.getByRole("alert").filter({ hasText: /separatora lub nagłówków/i }),
+    ).toBeVisible();
     await page
       .getByRole("textbox", { name: "Nazwa zestawu" })
       .fill("Z pliku CSV");
@@ -358,6 +377,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
       ),
     });
     await expect(page.getByText("Wiersz 3 · Duplikat")).toBeVisible();
+    await expectAccessible(page);
     await page.getByLabel("Pomiń duplikaty").check();
     await expect(
       page.getByText("Separator: średnik. Do zapisu: 2 z 3."),
@@ -376,6 +396,14 @@ test("a review survives an offline reload and synchronizes once to a second devi
     expect(output).toContain("side_a,side_b,example_a,example_b");
     expect(output.match(/kot,cat,,/g)).toHaveLength(1);
     expect(output).toContain("dom,house,,");
+    await expect
+      .poll(async () =>
+        (await changes()).some(
+          (change: { entity: string; payload?: { sideA?: string } }) =>
+            change.entity === "card" && change.payload?.sideA === "dom",
+        ),
+      )
+      .toBe(true);
     await primary.clearCookies();
     await primary.setOffline(true);
     await page.goto("/study");

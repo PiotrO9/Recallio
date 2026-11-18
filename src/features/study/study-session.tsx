@@ -110,6 +110,9 @@ function StudyBoard({
   const extra = useRef<{ day: string; count: number } | null>(null);
   const revealButton = useRef<HTMLButtonElement>(null);
   const firstGrade = useRef<HTMLButtonElement>(null);
+  const retryButton = useRef<HTMLButtonElement>(null);
+  const restartButton = useRef<HTMLButtonElement>(null);
+  const moveToCard = useRef(false);
   const active = useRef<Candidate | null>(null);
   const timezone = useRef<string | null>(null);
   const previousCard = useRef<string | null>(null);
@@ -370,6 +373,7 @@ function StudyBoard({
       selectedRating.current = null;
       returns.current = recordSessionAnswer(returns.current, command.event);
       previousCard.current = selected.card.id;
+      moveToCard.current = true;
       active.current = null;
       setCandidate(null);
       setSessionCount((value) => value + 1);
@@ -463,52 +467,22 @@ function StudyBoard({
 
   function restart() {
     endedRef.current = false;
+    moveToCard.current = true;
     setEnded(false);
     setSessionCount(0);
     void refresh(true).catch(() => setSyncState("failed"));
   }
 
   useEffect(() => {
-    if (revealed) firstGrade.current?.focus();
-    else if (candidate && document.activeElement === document.body)
+    if (busy) return;
+    if (ended) restartButton.current?.focus();
+    else if (saveError) retryButton.current?.focus();
+    else if (revealed) firstGrade.current?.focus();
+    else if (candidate && moveToCard.current) {
+      moveToCard.current = false;
       revealButton.current?.focus();
-  }, [candidate, revealed]);
-
-  useEffect(() => {
-    function shortcut(event: KeyboardEvent) {
-      if (
-        !candidate ||
-        updating ||
-        saveError ||
-        event.repeat ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.altKey ||
-        (event.target instanceof HTMLElement &&
-          event.target.closest(
-            "input, textarea, select, a, summary, [contenteditable]",
-          ))
-      )
-        return;
-      if (
-        !revealed &&
-        event.key === " " &&
-        !(event.target instanceof HTMLElement && event.target.closest("button"))
-      ) {
-        event.preventDefault();
-        setRevealed(true);
-      }
-      if (revealed) {
-        const grade = grades.find(([value]) => String(value) === event.key);
-        if (grade) {
-          event.preventDefault();
-          void rate(grade[0]);
-        }
-      }
     }
-    window.addEventListener("keydown", shortcut);
-    return () => window.removeEventListener("keydown", shortcut);
-  });
+  }, [busy, candidate, ended, revealed, saveError]);
 
   const status = {
     idle: "",
@@ -615,7 +589,7 @@ function StudyBoard({
       {ended ? (
         <div className={styles.card}>
           <p>Sesja zakończona.</p>
-          <button className="primary" onClick={restart}>
+          <button ref={restartButton} className="primary" onClick={restart}>
             Rozpocznij nową sesję
           </button>
         </div>
@@ -626,26 +600,33 @@ function StudyBoard({
               ? candidate.card.sideA
               : candidate.card.sideB}
           </h2>
-          {revealed ? (
-            <>
-              <p>
-                {candidate.direction === "a-b"
-                  ? candidate.card.sideB
-                  : candidate.card.sideA}
-              </p>
-              {(candidate.direction === "a-b"
-                ? candidate.card.exampleB
-                : candidate.card.exampleA) && (
+          <div className={styles.answer} aria-live="polite">
+            {revealed && (
+              <>
                 <p>
                   {candidate.direction === "a-b"
-                    ? candidate.card.exampleB
-                    : candidate.card.exampleA}
+                    ? candidate.card.sideB
+                    : candidate.card.sideA}
                 </p>
-              )}
+                {(candidate.direction === "a-b"
+                  ? candidate.card.exampleB
+                  : candidate.card.exampleA) && (
+                  <p>
+                    {candidate.direction === "a-b"
+                      ? candidate.card.exampleB
+                      : candidate.card.exampleA}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+          {revealed ? (
+            <>
               {saveError ? (
                 <>
                   <p role="alert">Nie udało się zapisać oceny.</p>
                   <button
+                    ref={retryButton}
                     className="primary"
                     disabled={busy}
                     onClick={() => {
@@ -657,11 +638,32 @@ function StudyBoard({
                   </button>
                 </>
               ) : (
-                <div className={styles.grades}>
+                <div
+                  className={styles.grades}
+                  role="group"
+                  aria-label="Ocena odpowiedzi"
+                  onKeyDown={(event) => {
+                    if (
+                      event.repeat ||
+                      event.ctrlKey ||
+                      event.metaKey ||
+                      event.altKey ||
+                      event.shiftKey
+                    )
+                      return;
+                    const grade = grades.find(
+                      ([value]) => String(value) === event.key,
+                    );
+                    if (!grade) return;
+                    event.preventDefault();
+                    void rate(grade[0]);
+                  }}
+                >
                   {grades.map(([value, label], index) => (
                     <button
                       className="primary"
                       key={value}
+                      aria-keyshortcuts={String(value)}
                       ref={index === 0 ? firstGrade : undefined}
                       disabled={busy}
                       onClick={() => void rate(value)}

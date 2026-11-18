@@ -13,6 +13,19 @@ npm run dev
 
 Otwórz http://localhost:3000. Produkcja lokalna: `npm run build`, potem `npm start`.
 
+## Przygotowanie połączenia Supabase
+
+Wzór `.env.example` opisuje wymagane wartości i miejsca, z których je skopiować.
+Utwórz jego kopię jako `.env.local` (nie nadpisuj istniejącej konfiguracji),
+a następnie uzupełnij `NEXT_PUBLIC_SUPABASE_URL` oraz
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` danymi swojego projektu.
+`.env.local` jest ignorowany przez Git.
+
+Obecne demo nie używa jeszcze tych zmiennych. Po ich uzupełnieniu można
+zaimplementować integrację. Do tworzenia tabel i migracji agent potrzebuje
+osobno autoryzowanego połączenia Supabase MCP, ograniczonego do tego projektu.
+Nie umieszczaj w publicznych zmiennych klucza secret/service_role ani hasła bazy.
+
 ## Co już działa
 
 - Next.js App Router, React, TypeScript i zwykły CSS.

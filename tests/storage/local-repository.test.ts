@@ -72,6 +72,60 @@ test("failure rolls back and retry preserves ID; leases expire; account database
   other.close();
 });
 
+test("different concurrent reviews compare the full local projection and retry the same event", async () => {
+  const user = "00000000-0000-4000-8000-000000000071";
+  const first = repo(user),
+    second = repo(user);
+  await first.commitReview(command);
+  const base = await first.readProgress(card, "a-b");
+  assert.ok(base);
+  const make = (n: number): PreparedReview => {
+    const nextId = `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+    const nextPayload = {
+      ...payload,
+      clientSeq: String(n),
+      observedProgressRevision: "1",
+      observedMode: "due" as const,
+    };
+    return {
+      event: { id: nextId, cardId: card, deviceId: device, ...nextPayload },
+      operation: {
+        id: nextId,
+        type: "review.record",
+        entityId: card,
+        payload: nextPayload,
+      },
+      progress: { ...command.progress, dueAt: `2026-11-${n}T12:00:00.000Z` },
+    };
+  };
+  const a = make(20),
+    b = make(21);
+  await assert.rejects(first.commitReview(a), /Lokalny postęp/);
+  const results = await Promise.allSettled([
+    first.commitReviewFrom(a, base),
+    second.commitReviewFrom(b, base),
+  ]);
+  assert.equal(
+    results.filter((result) => result.status === "fulfilled").length,
+    1,
+  );
+  assert.equal(
+    results.filter((result) => result.status === "rejected").length,
+    1,
+  );
+  const losing = results[0].status === "rejected" ? a : b;
+  const updated = await first.readProgress(card, "a-b");
+  assert.ok(updated);
+  const recalculated = {
+    ...losing,
+    progress: { ...updated, dueAt: "2026-11-25T12:00:00.000Z" },
+  };
+  await first.commitReviewFrom(recalculated, updated);
+  assert.equal((await first.lease("sync", 0, 10, 10)).length, 3);
+  first.close();
+  second.close();
+});
+
 test("snapshot pages switch atomically and rebase pending reviews", async () => {
   const user = "00000000-0000-4000-8000-000000000021";
   const deck = "00000000-0000-4000-8000-000000000022";

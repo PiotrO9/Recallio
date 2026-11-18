@@ -93,6 +93,14 @@ export function createLocalRepository(
   ): Promise<void>;
   activateSnapshot(token: string, rebase: RebaseSnapshot): Promise<void>;
   getCursor(): Promise<string | undefined>;
+  readProgress(
+    cardId: string,
+    direction: Progress["direction"],
+  ): Promise<Progress | null>;
+  commitReviewFrom(
+    command: PreparedReview,
+    expected: Progress | null,
+  ): Promise<CommitReceipt>;
   close(): void;
 } {
   const userId = uuidSchema.parse(options.userId);
@@ -164,9 +172,19 @@ export function createLocalRepository(
   };
   return {
     async commitReview(command) {
+      // The shared port carries no local base. Accept only the first review;
+      // subsequent callers must use the local compare-and-swap extension.
+      return this.commitReviewFrom(command, null);
+    },
+    async readProgress(cardId, direction) {
+      const db = await connect();
+      return (await db.get("progress", [cardId, direction])) ?? null;
+    },
+    async commitReviewFrom(command, expected) {
       reviewEventSchema.parse(command.event);
       progressSchema.parse(command.progress);
       operationSchema.parse(command.operation);
+      if (expected !== null) progressSchema.parse(expected);
       const { event, progress, operation } = command;
       const p = operation.payload;
       if (
@@ -196,6 +214,10 @@ export function createLocalRepository(
         const previous = await tx
           .objectStore("progress")
           .get([event.cardId, event.direction]);
+        if (canonical(previous ?? null) !== canonical(expected))
+          throw new Error(
+            "Lokalny postęp zmienił się; przelicz projekcję tej samej oceny",
+          );
         if (
           (previous?.revision ?? null) !== event.observedProgressRevision ||
           (previous && previous.epoch !== event.epoch)

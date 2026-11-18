@@ -30,7 +30,7 @@
   margin: 0;
 }
 
-.panel input {
+.panel input:not([type="checkbox"]) {
   background: var(--background);
   border: 1px solid var(--line);
   border-radius: 8px;

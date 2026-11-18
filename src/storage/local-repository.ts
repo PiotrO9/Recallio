@@ -41,6 +41,12 @@ export type OutboxItem = {
   leaseOwner?: string;
   leaseUntil?: number;
 };
+
+export class ReviewProjectionConflict extends Error {
+  constructor() {
+    super("Lokalny postęp zmienił się; przelicz projekcję tej samej oceny");
+  }
+}
 interface Schema extends DBSchema {
   cards: { key: string; value: Card };
   progress: { key: [string, string]; value: Progress };
@@ -415,14 +421,12 @@ export function createLocalRepository(
         const version = await tx
           .objectStore("progressVersions")
           .get([event.cardId, event.direction]);
-        if (!deleted && (version?.version ?? "0") !== localVersion)
-          throw new Error(
-            "Lokalny postęp zmienił się; przelicz projekcję tej samej oceny",
-          );
-        if (!deleted && canonical(previous ?? null) !== canonical(expected))
-          throw new Error(
-            "Lokalny postęp zmienił się; przelicz projekcję tej samej oceny",
-          );
+        if (
+          !deleted &&
+          ((version?.version ?? "0") !== localVersion ||
+            canonical(previous ?? null) !== canonical(expected))
+        )
+          throw new ReviewProjectionConflict();
         if (
           !deleted &&
           ((!previous && event.observedProgressRevision !== null) ||

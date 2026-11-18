@@ -107,8 +107,31 @@ test("a review survives an offline reload and synchronizes once to a second devi
     await primary.setOffline(true);
     await page.getByRole("button", { name: "Pokaż odpowiedź" }).click();
     await expect(page.getByText("dog", { exact: true })).toBeVisible();
+    await page.evaluate(() => {
+      const add = IDBObjectStore.prototype.add;
+      const attempts: string[] = [];
+      Reflect.set(window, "recallioTestAttempts", attempts);
+      IDBObjectStore.prototype.add = function (value, key) {
+        if (this.name !== "outbox") return add.call(this, value, key);
+        attempts.push(value.operation.id);
+        const request = add.call(this, value, key);
+        if (attempts.length === 1) this.transaction.abort();
+        else IDBObjectStore.prototype.add = add;
+        return request;
+      };
+    });
     await page.getByRole("button", { name: "Dobrze" }).click();
+    await expect(
+      page.getByText("Nie udało się zapisać oceny.", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("dog", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Ponów zapis" }).click();
     await expect(page.getByText("Zapisany postęp: 1")).toBeVisible();
+    const attempts = await page.evaluate(
+      () => Reflect.get(window, "recallioTestAttempts") as string[],
+    );
+    expect(attempts).toHaveLength(2);
+    expect(attempts[0]).toBe(attempts[1]);
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.getByText("Zapisany postęp: 1")).toBeVisible();
     await expect(page.getByRole("heading", { name: "pies" })).toBeVisible();
@@ -130,6 +153,14 @@ test("a review survives an offline reload and synchronizes once to a second devi
     const secondPage = await secondary.newPage();
     await secondPage.goto("/study");
     await expect(secondPage.getByText("Zapisany postęp: 1")).toBeVisible();
+    await secondPage.getByRole("button", { name: "Zakończ sesję" }).click();
+    await expect(secondPage.getByText("Sesja zakończona.")).toBeVisible();
+    await secondPage
+      .getByRole("button", { name: "Rozpocznij nową sesję" })
+      .click();
+    await expect(
+      secondPage.getByRole("button", { name: "Pokaż odpowiedź" }),
+    ).toBeVisible();
 
     const otherDevice = await device(unrelated);
     const otherPage = await otherDevice.newPage();

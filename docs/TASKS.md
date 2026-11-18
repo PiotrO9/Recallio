@@ -16,11 +16,12 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | FLOW-01 | DONE | SYNC-02, QUEUE-01 | Dodaj minimalną ścieżkę jednej fiszki i możliwość odświeżenia jej bez sieci w lokalnym środowisku integracyjnym. Ocena przeżywa odświeżenie i trafia dokładnie raz na drugie urządzenie, a drugie konto pozostaje odizolowane. |
 | FLOW-02 | BLOCKED | FLOW-01, PLATFORM-01 | Potwierdź ścieżkę na środowisku testowym Supabase i Workers. Wymaga dostępu i zgody na operacje zdalne. Zapisz dowody dla synchronizacji, callbacku Auth i dwóch kont. |
 | DECK-01 | DONE | FLOW-01 | Dodaj zarządzanie zestawami i fiszkami. Sprawdź kierunek, zachowanie postępu po edycji, jawny reset i usunięcie wygrywające ze starą edycją. |
-| TRAIN-01 | TODO | DECK-01, QUEUE-01 | Podłącz produkcyjny trening i ustawienia. Sprawdź oba kierunki, limit, zamrożoną fiszkę, zapis przed przejściem dalej i retry bez podwójnej oceny. Domyślny limit i polityka zmiany strefy wymagają decyzji produktu. |
+| TRAIN-01 | DONE | DECK-01, QUEUE-01 | Podłącz trening i ustawienia wybierane przez użytkownika. Sprawdź oba kierunki, limit, zamrożoną fiszkę, zapis przed przejściem dalej i retry bez podwójnej oceny. |
+| SETTINGS-01 | TODO | TRAIN-01 | Ustal domyślny limit nowych fiszek i regułę zmiany strefy dla istniejącego profilu. Wdróż po rozstrzygnięciu produktowym, z testami granicy dnia i istniejących wprowadzeń. |
 | IMPORT-01 | TODO | DECK-01 | Dodaj podgląd, wybór akcji, trwały plan zapisu i eksport. Sprawdź wykrywanie duplikatów, zmianę rewizji, wznowienie po błędzie i roundtrip. |
 | PWA-01 | TODO | FLOW-01, TRAIN-01 | Dodaj przygotowanie zestawu offline i aktualizację bez utraty outbox. Sprawdź na buildzie produkcyjnym reload po przerwaniu sieci, quota, aktualizację klienta i izolację cache. |
 | UX-01 | TODO | TRAIN-01, IMPORT-01, PWA-01 | Zweryfikuj klawiaturę, fokus, kontrast, małe ekrany i stany błędów. Usuń wykryte niezgodności i sprawdź pełne ścieżki użytkownika. |
-| RELEASE-01 | TODO | UX-01, FLOW-02 | Powiąż kryteria MVP z wynikami testów, sprawdź kopię i przywracanie bazy oraz smoke test w środowisku docelowym. Publikacja produkcyjna wymaga osobnego zlecenia. |
+| RELEASE-01 | TODO | UX-01, FLOW-02, SETTINGS-01 | Powiąż kryteria MVP z wynikami testów, sprawdź kopię i przywracanie bazy oraz smoke test w środowisku docelowym. Publikacja produkcyjna wymaga osobnego zlecenia. |
 
 ## Wyniki i blokady
 
@@ -38,3 +39,4 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `FLOW-01` — podłączono trening dla wcześniej przygotowanych danych konta oraz minimalną stronę offline. Scenariusz E2E przeszedł na desktop i mobile w Next.js oraz lokalnym Wranglerze. Ocena przeżyła przeładowanie bez sieci, została wysłana raz, pojawiła się na drugim urządzeniu i pozostała prywatna. Przeszły też typecheck, 73 testy i test IndexedDB w Chromium.
 - `FLOW-02` — lokalny odpowiednik przeszedł w Next.js i Wranglerze. Zakres bieżącego zlecenia obejmuje Git i lokalne środowisko. Odbiór chmurowy można wznowić po otrzymaniu wskazanych środowisk testowych Supabase i Cloudflare oraz osobnego zlecenia na ich konfigurację i wykonanie testu. `RELEASE-01` czeka na ten dowód.
 - `DECK-01` — dodano wyszukiwanie i edycję zestawów i fiszek, wybór kierunku, potwierdzanie usunięcia i reset zakresu kierunku. E2E na obu profilach potwierdziły zachowanie postępu po edycji i odrzucenie późnej edycji usuniętej fiszki. Przeszły typecheck, 73 testy, build i scenariusze dema.
+- `TRAIN-01` — dodano jawny wybór limitu i pierwszej strefy, opcjonalne liczniki, dodawanie nowych kart na życzenie, skróty i zakończenie sesji. Symulowany błąd transakcji w E2E zostawia odkrytą fiszkę, a ponowienie wykorzystuje tę samą ocenę. Przeszły typecheck, 73 testy, build i 12 E2E.

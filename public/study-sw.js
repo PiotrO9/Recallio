@@ -1,9 +1,6 @@
-const shellCache = "recallio-study-shell-v1";
+const cachePrefix = "recallio-study-shell-";
+const shellCache = cachePrefix + "v2";
 const offlineShell = "/study/offline";
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(self.skipWaiting());
-});
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
@@ -37,7 +34,14 @@ async function prepare() {
 }
 
 self.addEventListener("message", (event) => {
-  if (event.data === "prepare-study" && event.ports[0]) {
+  if (event.data === "activate-update" && event.ports[0]) {
+    event.waitUntil(
+      prepare().then(
+        () => self.skipWaiting(),
+        () => event.ports[0].postMessage("unavailable"),
+      ),
+    );
+  } else if (event.data === "prepare-study" && event.ports[0]) {
     event.waitUntil(
       prepare().then(
         () => event.ports[0].postMessage("study-ready"),
@@ -47,6 +51,18 @@ self.addEventListener("message", (event) => {
   }
 });
 
+async function matchShell(request) {
+  const current = await caches.match(request, { cacheName: shellCache });
+  if (current) return current;
+  const previous = (await caches.keys())
+    .filter((name) => name.startsWith(cachePrefix) && name !== shellCache)
+    .reverse();
+  for (const cacheName of previous) {
+    const match = await caches.match(request, { cacheName });
+    if (match) return match;
+  }
+}
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
@@ -54,21 +70,14 @@ self.addEventListener("fetch", (event) => {
   if (event.request.mode === "navigate" && url.pathname === "/study") {
     event.respondWith(
       fetch(event.request).catch(
-        async () =>
-          (await caches.match(offlineShell, { cacheName: shellCache })) ??
-          Response.error(),
+        async () => (await matchShell(offlineShell)) ?? Response.error(),
       ),
     );
   } else if (isStatic(url)) {
     event.respondWith(
-      (async () => {
-        const cache = await caches.open(shellCache);
-        const cached = await cache.match(event.request);
-        if (cached) return cached;
-        const response = await fetch(event.request);
-        if (response.ok) await cache.put(event.request, response.clone());
-        return response;
-      })(),
+      matchShell(event.request).then(
+        (cached) => cached ?? fetch(event.request),
+      ),
     );
   }
 });

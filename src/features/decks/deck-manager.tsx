@@ -53,9 +53,9 @@ export function DeckManager({ userId }: { userId: string }) {
     [repository, userId],
   );
 
-  async function sync() {
+  async function sync(afterWrite = false) {
     try {
-      setStatus(await controller.run());
+      setStatus(await (afterWrite ? controller.flush() : controller.run()));
       setData(await repository.readWorkspace());
     } catch {
       setStatus("failed");
@@ -65,7 +65,7 @@ export function DeckManager({ userId }: { userId: string }) {
     void repository
       .readWorkspace()
       .then(setData)
-      .then(sync)
+      .then(() => sync())
       .catch(() => setStatus("failed"));
     const online = () => void sync();
     const offline = () => setStatus("offline");
@@ -94,7 +94,7 @@ export function DeckManager({ userId }: { userId: string }) {
     try {
       await action();
       setData(await repository.readWorkspace());
-      void sync();
+      void sync(true);
     } catch {
       setError(true);
     } finally {

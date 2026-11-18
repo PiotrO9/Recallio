@@ -18,7 +18,7 @@ MVP obejmuje pełny zakres z briefu: konta, prywatne zestawy, CSV, dwa kierunki,
 | D04 | Zdalne zapisy danych przez Route Handlers i RPC                      | Auth używa SDK Supabase                                                          |
 | D05 | Historia zdarzeń + materializowany postęp per kierunek               | Robocza, obowiązkowa dla synchronizacji                                          |
 | D06 | FSRS-6 z wersjonowanym profilem                                      | [Decyzja o schedulerze](decisions/learning-scheduler.md). Implementacja w planie |
-| D07 | PWA przez jawnie wersjonowany service worker                         | Otwarte: ocenić Serwist i mały własny SW                                         |
+| D07 | PWA przez jawnie wersjonowany service worker                         | Własny service worker w `public/study-sw.js`                                     |
 | D08 | Workers: sprawdzić adapter OpenNext i aktualną ścieżkę Cloudflare    | Zgodność z runtime Workers do weryfikacji                                        |
 | D09 | Przykład po odsłonięciu, po stronie odpowiedzi                       | Przyjęta roboczo, demo wdrożone                                                  |
 | D10 | Limit nowych = unikalne cardId w lokalnym dniu, oba kierunki wspólne | Domyślna liczba do ustalenia przed ustawieniami                                  |

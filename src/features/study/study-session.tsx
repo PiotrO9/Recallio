@@ -26,7 +26,12 @@ import {
   type SnapshotData,
 } from "@/storage/local-repository";
 import { createSyncController, type SyncStatus } from "@/sync/controller";
-import { prepareStudyShell, savedOfflineAccount } from "./offline";
+import {
+  activateStudyUpdate,
+  prepareStudyShell,
+  registerStudyWorker,
+  savedOfflineAccount,
+} from "./offline";
 import { StudySettings } from "./study-settings";
 import styles from "./study.module.css";
 
@@ -67,18 +72,38 @@ export function StudySession({
     );
   const selected = deckId ?? offlineDeck;
   return (
-    <StudyBoard key={`${id}:${selected ?? ""}`} userId={id} deckId={selected} />
+    <StudyBoard
+      key={`${id}:${selected ?? ""}`}
+      userId={id}
+      deckId={selected}
+      offlineShell={!accountId}
+    />
   );
 }
 
-function StudyBoard({ userId, deckId }: { userId: string; deckId?: string }) {
+function StudyBoard({
+  userId,
+  deckId,
+  offlineShell,
+}: {
+  userId: string;
+  deckId?: string;
+  offlineShell: boolean;
+}) {
   const [workspace, setWorkspace] = useState<SnapshotData>();
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [syncState, setSyncState] = useState<SyncStatus>("idle");
-  const [offlineReady, setOfflineReady] = useState(false);
+  const [offlineDecks, setOfflineDecks] = useState<readonly string[]>([]);
+  const [preparingOffline, setPreparingOffline] = useState(false);
+  const [offlineError, setOfflineError] = useState(false);
+  const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(
+    null,
+  );
+  const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState(false);
   const [ended, setEnded] = useState(false);
   const [sessionCount, setSessionCount] = useState(0);
   const endedRef = useRef(false);
@@ -92,6 +117,8 @@ function StudyBoard({ userId, deckId }: { userId: string; deckId?: string }) {
   const prepared = useRef<PreparedReview | null>(null);
   const selectedRating = useRef<Rating | null>(null);
   const saving = useRef(false);
+  const offlinePending = useRef(false);
+  const updatingRef = useRef(false);
 
   const repository = useMemo(
     () =>
@@ -123,14 +150,21 @@ function StudyBoard({ userId, deckId }: { userId: string; deckId?: string }) {
     [repository, userId],
   );
 
-  function choose(data: SnapshotData) {
-    if (endedRef.current) return null;
-    const deck = data.decks.find(
+  const availableOffline = useRef<readonly string[]>([]);
+
+  function selectDeck(data: SnapshotData) {
+    return data.decks.find(
       (item) =>
         !item.deletedAt &&
         (!deckId || item.id === deckId) &&
+        (!offlineShell || availableOffline.current.includes(item.id)) &&
         data.cards.some((card) => card.deckId === item.id && !card.deletedAt),
     );
+  }
+
+  function choose(data: SnapshotData) {
+    if (endedRef.current) return null;
+    const deck = selectDeck(data);
     if (!deck || !data.settings) return null;
     const now = new Date().toISOString();
     const day = getStudyDay(now, data.settings.timezone);
@@ -154,7 +188,12 @@ function StudyBoard({ userId, deckId }: { userId: string; deckId?: string }) {
   }
 
   async function refresh(advance: boolean) {
-    const data = await repository.readWorkspace();
+    const [data, decks] = await Promise.all([
+      repository.readWorkspace(),
+      repository.readOfflineDecks(),
+    ]);
+    availableOffline.current = decks;
+    setOfflineDecks(decks);
     setWorkspace(data);
     timezone.current = data.settings?.timezone ?? null;
     if (advance || (!active.current && !saving.current)) {
@@ -165,9 +204,10 @@ function StudyBoard({ userId, deckId }: { userId: string; deckId?: string }) {
     }
   }
 
-  async function synchronize() {
+  async function synchronize(afterWrite = false) {
+    if (updatingRef.current) return;
     try {
-      setSyncState(await sync.run());
+      setSyncState(await (afterWrite ? sync.flush() : sync.run()));
       await refresh(false);
     } catch {
       setSyncState("failed");
@@ -178,7 +218,6 @@ function StudyBoard({ userId, deckId }: { userId: string; deckId?: string }) {
     void refresh(false)
       .then(() => synchronize())
       .catch(() => setSyncState("failed"));
-    if (navigator.onLine) void prepareStudyShell().then(setOfflineReady);
     const online = () => {
       void synchronize();
     };
@@ -200,9 +239,83 @@ function StudyBoard({ userId, deckId }: { userId: string; deckId?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repository, sync]);
 
+  useEffect(() => {
+    let disposed = false;
+    let registration: ServiceWorkerRegistration | undefined;
+    let installing: ServiceWorker | null = null;
+    const report = () => setWaitingWorker(registration?.waiting ?? null);
+    function watchInstall() {
+      installing?.removeEventListener("statechange", report);
+      installing = registration?.installing ?? null;
+      installing?.addEventListener("statechange", report);
+      report();
+    }
+    void registerStudyWorker()
+      .then((registered) => {
+        if (disposed || !registered) return;
+        registration = registered;
+        registration.addEventListener("updatefound", watchInstall);
+        navigator.serviceWorker.addEventListener("controllerchange", report);
+        watchInstall();
+        if (navigator.onLine) void registration.update().catch(() => {});
+      })
+      .catch(() => {});
+    return () => {
+      disposed = true;
+      registration?.removeEventListener("updatefound", watchInstall);
+      installing?.removeEventListener("statechange", report);
+      if (registration)
+        navigator.serviceWorker.removeEventListener("controllerchange", report);
+    };
+  }, []);
+
+  async function prepareOffline(id: string) {
+    if (offlinePending.current) return;
+    offlinePending.current = true;
+    setPreparingOffline(true);
+    setOfflineError(false);
+    try {
+      const status = await sync.run(true);
+      setSyncState(status);
+      if (status !== "idle" || !(await prepareStudyShell()))
+        throw new Error("Offline preparation failed");
+      await repository.markOfflineDeck(id);
+      await refresh(false);
+    } catch {
+      setOfflineError(true);
+    } finally {
+      offlinePending.current = false;
+      setPreparingOffline(false);
+    }
+  }
+
+  async function applyUpdate() {
+    if (
+      !waitingWorker ||
+      revealed ||
+      saving.current ||
+      offlinePending.current ||
+      updatingRef.current
+    )
+      return;
+    updatingRef.current = true;
+    setUpdating(true);
+    setUpdateError(false);
+    try {
+      await sync.whenIdle();
+      if (!(await activateStudyUpdate(waitingWorker)))
+        throw new Error("Update unavailable");
+      window.location.reload();
+    } catch {
+      updatingRef.current = false;
+      setUpdateError(true);
+      setUpdating(false);
+    }
+  }
+
   async function rate(rating: Rating) {
     const selected = active.current;
-    if (!selected || saving.current) return;
+    if (!selected || saving.current || updatingRef.current) return;
     saving.current = true;
     selectedRating.current ??= rating;
     setBusy(true);
@@ -261,7 +374,7 @@ function StudyBoard({ userId, deckId }: { userId: string; deckId?: string }) {
       setCandidate(null);
       setSessionCount((value) => value + 1);
       await refresh(true);
-      void synchronize();
+      void synchronize(true);
     } catch (error) {
       if (saved) setSyncState("failed");
       else {
@@ -365,6 +478,7 @@ function StudyBoard({ userId, deckId }: { userId: string; deckId?: string }) {
     function shortcut(event: KeyboardEvent) {
       if (
         !candidate ||
+        updating ||
         saveError ||
         event.repeat ||
         event.metaKey ||
@@ -405,9 +519,12 @@ function StudyBoard({ userId, deckId }: { userId: string; deckId?: string }) {
     failed: "Synchronizacja jest chwilowo niedostępna.",
   }[syncState];
   const settings = workspace?.settings;
-  const currentDeck = workspace?.decks.find(
-    (item) => !item.deletedAt && item.id === (candidate?.card.deckId ?? deckId),
-  );
+  const currentDeck =
+    workspace?.decks.find(
+      (item) =>
+        !item.deletedAt && item.id === (candidate?.card.deckId ?? deckId),
+    ) ??
+    (workspace && selectDeck(workspace));
   const now = new Date().toISOString();
   const dueToday =
     settings && workspace && (settings.showDue || sessionCount > 0)
@@ -440,15 +557,51 @@ function StudyBoard({ userId, deckId }: { userId: string; deckId?: string }) {
     <div className={styles.board}>
       <div role="status">
         {status && <p>{status}</p>}
-        {offlineReady &&
-          workspace?.settings &&
-          workspace.cards.some((card) => !card.deletedAt) && (
-            <p>Możesz odświeżyć stronę bez internetu.</p>
-          )}
         {workspace?.progress.length ? (
           <p>Zapisany postęp: {workspace.progress.length}</p>
         ) : null}
       </div>
+      {currentDeck &&
+        workspace?.settings &&
+        (offlineDecks.includes(currentDeck.id) ? (
+          <p role="status">Zestaw jest dostępny offline.</p>
+        ) : (
+          !offlineShell && (
+            <button
+              type="button"
+              disabled={preparingOffline || updating || syncState === "offline"}
+              onClick={() => void prepareOffline(currentDeck.id)}
+            >
+              {preparingOffline
+                ? "Przygotowywanie zestawu…"
+                : "Przygotuj zestaw offline"}
+            </button>
+          )
+        ))}
+      {offlineError && (
+        <p role="alert">
+          Nie udało się przygotować zestawu offline. Sprawdź połączenie i wolne
+          miejsce, a następnie ponów próbę.
+        </p>
+      )}
+      {waitingWorker && !revealed && !busy && !saveError && (
+        <button
+          type="button"
+          disabled={preparingOffline || updating}
+          onClick={() => void applyUpdate()}
+        >
+          {updating ? "Aktualizowanie aplikacji…" : "Zaktualizuj aplikację"}
+        </button>
+      )}
+      {updateError && (
+        <p role="alert">
+          Nie udało się zaktualizować aplikacji. Spróbuj ponownie po odzyskaniu
+          połączenia.
+        </p>
+      )}
+      {offlineShell && workspace && !selectDeck(workspace) && (
+        <p>Ten zestaw wymaga przygotowania z dostępem do internetu.</p>
+      )}
       {settings?.showDue && dueToday !== null && (
         <p>Powtórki na dziś: {dueToday}</p>
       )}
@@ -523,6 +676,7 @@ function StudyBoard({ userId, deckId }: { userId: string; deckId?: string }) {
             <button
               ref={revealButton}
               className="primary"
+              disabled={updating}
               onClick={() => setRevealed(true)}
             >
               Pokaż odpowiedź

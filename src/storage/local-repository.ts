@@ -153,6 +153,8 @@ export function createLocalRepository(
     getDeviceId(generate: () => string): Promise<string>;
     reserveReviewSequence(): Promise<string>;
     readWorkspace(): Promise<SnapshotData>;
+    readOfflineDecks(): Promise<readonly string[]>;
+    markOfflineDeck(deckId: string): Promise<void>;
     readImport(): Promise<StoredImport | null>;
     startImport(
       plan: Pick<StoredImport, "id" | "deckId"> & {
@@ -985,6 +987,39 @@ export function createLocalRepository(
         introductions,
         settings: settings ?? null,
       };
+    },
+    async readOfflineDecks() {
+      const db = await connect();
+      return (
+        ((await db.get("meta", "offlineDecks")) as string[] | undefined) ?? []
+      );
+    },
+    async markOfflineDeck(deckId) {
+      const db = await connect();
+      const tx = db.transaction(
+        ["decks", "cards", "settings", "meta"],
+        "readwrite",
+      );
+      const [deck, cards, settings] = await Promise.all([
+        tx.objectStore("decks").get(deckId),
+        tx.objectStore("cards").getAll(),
+        tx.objectStore("settings").get("current"),
+      ]);
+      if (
+        !deck ||
+        deck.deletedAt ||
+        !settings ||
+        !cards.some((card) => card.deckId === deckId && !card.deletedAt)
+      ) {
+        await tx.done;
+        throw new Error("Deck unavailable for offline study");
+      }
+      const meta = tx.objectStore("meta");
+      const prepared =
+        ((await meta.get("offlineDecks")) as string[] | undefined) ?? [];
+      if (!prepared.includes(deckId))
+        await meta.put([...prepared, deckId], "offlineDecks");
+      await tx.done;
     },
     async readImport() {
       const db = await connect();

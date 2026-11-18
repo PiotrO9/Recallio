@@ -11,6 +11,9 @@ test("a review survives an offline reload and synchronizes once to a second devi
   browser,
   request,
   baseURL,
+  viewport,
+  isMobile,
+  hasTouch,
 }) => {
   const secret = process.env.RECALLIO_TEST_SERVICE_ROLE_KEY;
   expect(secret).toBeTruthy();
@@ -33,7 +36,12 @@ test("a review survives an offline reload and synchronizes once to a second devi
     return { ...account, id: id as string };
   }
   async function device(account: Awaited<ReturnType<typeof createAccount>>) {
-    const context = await browser.newContext({ baseURL });
+    const context = await browser.newContext({
+      baseURL,
+      viewport,
+      isMobile,
+      hasTouch,
+    });
     devices.push(context);
     const response = await context.request.post("/auth/actions", {
       headers: { origin: baseURL! },
@@ -102,12 +110,60 @@ test("a review survives an offline reload and synchronizes once to a second devi
     const page = await primary.newPage();
     await page.goto("/study");
     await expect(page.getByRole("heading", { name: "pies" })).toBeVisible();
+    const manifestResponse = await request.get("/manifest.webmanifest");
+    expect(manifestResponse.ok()).toBe(true);
+    const manifest = await manifestResponse.json();
+    expect(manifest.start_url).toBe("/study");
+    for (const icon of manifest.icons) {
+      expect((await request.get(icon.src)).headers()["content-type"]).toBe(
+        "image/png",
+      );
+    }
+    const devtools = await primary.newCDPSession(page);
+    const prepare = page.getByRole("button", {
+      name: "Przygotuj zestaw offline",
+    });
+    const ready = page.getByText("Zestaw jest dostępny offline.");
+    await devtools.send("Storage.overrideQuotaForOrigin", {
+      origin: baseURL!,
+      quotaSize: 1,
+    });
+    await prepare.click();
     await expect(
-      page.getByText("Możesz odświeżyć stronę bez internetu."),
+      page.getByRole("alert").filter({
+        hasText: "Nie udało się przygotować zestawu offline.",
+      }),
     ).toBeVisible();
+    await expect(ready).toHaveCount(0);
+    await devtools.send("Storage.overrideQuotaForOrigin", { origin: baseURL! });
+    await devtools.detach();
+    await prepare.click();
+    await expect(ready).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller))
+      .toBe(true);
+    const cachedPaths = await page.evaluate(async () => {
+      const cache = await caches.open("recallio-study-shell-v2");
+      return (await cache.keys()).map((entry) => new URL(entry.url).pathname);
+    });
+    expect(cachedPaths).toContain("/study/offline");
+    expect(
+      cachedPaths.every(
+        (path) =>
+          path === "/study/offline" || path.startsWith("/_next/static/"),
+      ),
+    ).toBe(true);
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.register("/study-sw.js?test-update", {
+        updateViaCache: "none",
+      });
+    });
+    const update = page.getByRole("button", { name: "Zaktualizuj aplikację" });
+    await expect(update).toBeVisible();
     await primary.setOffline(true);
     await page.getByRole("button", { name: "Pokaż odpowiedź" }).click();
     await expect(page.getByText("dog", { exact: true })).toBeVisible();
+    await expect(update).toHaveCount(0);
     await page.evaluate(() => {
       const add = IDBObjectStore.prototype.add;
       const attempts: string[] = [];
@@ -137,6 +193,30 @@ test("a review survives an offline reload and synchronizes once to a second devi
     await expect(page.getByText("Zapisany postęp: 1")).toBeVisible();
     await expect(page.getByRole("heading", { name: "pies" })).toBeVisible();
 
+    const pushRoute = "**/api/v1/sync/push";
+    await page.route(pushRoute, (route) => route.fulfill({ status: 503 }));
+    await primary.setOffline(false);
+    await expect(update).toBeVisible();
+    await Promise.all([page.waitForEvent("load"), update.click()]);
+    await expect
+      .poll(() =>
+        page.evaluate(() => navigator.serviceWorker.controller?.scriptURL),
+      )
+      .toContain("?test-update");
+    await expect(
+      page.getByText("Synchronizacja zaczeka na połączenie."),
+    ).toBeVisible();
+    await primary.setOffline(true);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByText("Zapisany postęp: 1")).toBeVisible();
+    await page.goto(`/study?deck=${randomUUID()}`);
+    await expect(
+      page.getByText(
+        "Ten zestaw wymaga przygotowania z dostępem do internetu.",
+      ),
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "pies" })).toHaveCount(0);
+    await page.unroute(pushRoute);
     await primary.setOffline(false);
     await expect
       .poll(async () => {
@@ -296,6 +376,15 @@ test("a review survives an offline reload and synchronizes once to a second devi
     expect(output).toContain("side_a,side_b,example_a,example_b");
     expect(output.match(/kot,cat,,/g)).toHaveLength(1);
     expect(output).toContain("dom,house,,");
+    await primary.clearCookies();
+    await primary.setOffline(true);
+    await page.goto("/study");
+    await expect(
+      page.getByText(
+        "Połącz się z internetem i zaloguj, aby przygotować naukę offline.",
+      ),
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "pies" })).toHaveCount(0);
   } finally {
     await Promise.all(devices.map((context) => context.close()));
     await Promise.all(

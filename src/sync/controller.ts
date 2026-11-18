@@ -184,14 +184,18 @@ export function createSyncController(options: SyncOptions) {
     }
   }
 
+  function run(forceSnapshot = false): Promise<SyncStatus> {
+    if (active) return forceSnapshot ? active.then(() => run(true)) : active;
+    active = synchronize(forceSnapshot).finally(() => {
+      active = undefined;
+    });
+    return active;
+  }
+
   return {
-    run(forceSnapshot = false): Promise<SyncStatus> {
-      if (!active)
-        active = synchronize(forceSnapshot).finally(() => {
-          active = undefined;
-        });
-      return active;
-    },
+    run,
+    flush: () => (active ? active.then(() => run()) : run()),
+    whenIdle: () => active,
     retryAt: () => nextAttempt,
   };
 }

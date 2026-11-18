@@ -52,6 +52,12 @@ npm run test:e2e
 
 Na środowisku wdrożeniowym wpisz dokładny adres `/auth/confirm` na listę przekierowań i skonfiguruj SMTP oraz szablony wiadomości z `supabase/templates/`. Oddziel klucze testowe od kluczy wdrożenia.
 
+### Serwer synchronizacji
+
+Ustaw `RECALLIO_DATABASE_URL` jako serwerową zmienną połączenia PostgreSQL. Login backendu powinien mieć prawo `SET ROLE recallio_backend` i nie potrzebuje roli administracyjnej. Na Workers alternatywą jest binding Hyperdrive `RECALLIO_DB`. Route Handlers weryfikują sesję przed otwarciem transakcji, a każda transakcja ustala bieżące konto i rolę bazodanową.
+
+Na lokalnym Supabase uruchom `npx --yes supabase@3.2.0 migration up`. Z tym samym środowiskiem E2E ustaw `RECALLIO_RUN_SYNC_TESTS=1` i wczytaj lokalny `SERVICE_ROLE_KEY` do `RECALLIO_TEST_SERVICE_ROLE_KEY` dla tworzenia i usuwania testowych kont. Uruchom `npm run test:e2e -- e2e/sync-api.spec.ts`. Klucz serwisowy jest potrzebny wyłącznie w testach.
+
 ## Lokalny runtime Workers
 
 ```powershell

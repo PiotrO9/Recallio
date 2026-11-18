@@ -52,7 +52,7 @@ PreparedReview zawiera lokalną wersję bazowej projekcji, oddzielną od rewizji
 
 ## API
 
-Wszystkie poniższe endpointy prywatne, JSON, no-store. Supabase Auth realizuje operacje tożsamości. Brak zaufania do userId w body.
+Wszystkie poniższe endpointy są prywatne, zwracają JSON i mają `Cache-Control: private, no-store`. Serwer weryfikuje sesję Supabase Auth i używa wyłącznie identyfikatora z tej sesji. Dla pierwszego wprowadzenia fiszki konto musi mieć zapis ustawień ze strefą IANA. Brak ustawień daje `dependency_pending`, aby ponowić to samo zdarzenie po zapisaniu ustawień.
 
 | Endpoint                             | Wejście                                 | Wynik                                                 |
 | ------------------------------------ | --------------------------------------- | ----------------------------------------------------- |

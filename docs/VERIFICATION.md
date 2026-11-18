@@ -58,6 +58,8 @@ Ustaw `RECALLIO_DATABASE_URL` jako serwerową zmienną połączenia PostgreSQL. 
 
 Na lokalnym Supabase uruchom `npx --yes supabase@3.2.0 migration up`. Z tym samym środowiskiem E2E ustaw `RECALLIO_RUN_SYNC_TESTS=1` i wczytaj lokalny `SERVICE_ROLE_KEY` do `RECALLIO_TEST_SERVICE_ROLE_KEY` dla tworzenia i usuwania testowych kont. Uruchom `npm run test:e2e -- e2e/sync-api.spec.ts`. Klucz serwisowy jest potrzebny wyłącznie w testach.
 
+Polecenie `npm run test:e2e -- e2e/study-flow.spec.ts` używa tych samych ustawień. Sprawdza pobranie fiszki, zapis i odświeżenie bez sieci, pojedyncze zdarzenie po synchronizacji, postęp na drugim urządzeniu oraz izolację drugiego konta.
+
 ## Lokalny runtime Workers
 
 ```powershell

@@ -1,0 +1,21 @@
+.board {
+  display: grid;
+  gap: 12px;
+}
+
+.card {
+  display: grid;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+
+.card h2,
+.card p {
+  margin: 0;
+}
+
+.grades {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}

@@ -4,6 +4,7 @@ import {
   privateCache,
   verifiedIdentity,
 } from "./server/auth/client";
+import { offlineAccountCookie } from "./features/study/offline";
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -20,11 +21,18 @@ export async function proxy(request: NextRequest) {
     },
     request.nextUrl.protocol === "https:",
   );
-  await verifiedIdentity(client);
+  const identity = await verifiedIdentity(client);
+  if (identity) {
+    response.cookies.set(offlineAccountCookie, identity.id, {
+      sameSite: "lax",
+      path: "/",
+      secure: request.nextUrl.protocol === "https:",
+    });
+  }
   response.headers.set("Cache-Control", privateCache);
   return response;
 }
 
 export const config = {
-  matcher: ["/account/:path*", "/auth/new-password"],
+  matcher: ["/account/:path*", "/auth/new-password", "/study"],
 };

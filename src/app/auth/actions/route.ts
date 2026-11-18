@@ -7,6 +7,7 @@ import {
 } from "@/server/auth/client";
 
 import { authRedirect, requestOrigin } from "@/server/auth/request";
+import { offlineAccountCookie } from "@/features/study/offline";
 
 const emailSchema = z.email().max(254);
 const passwordSchema = z.string().min(8).max(128);
@@ -35,7 +36,9 @@ export async function POST(request: NextRequest) {
       return authRedirect("/auth?status=session");
     }
     const { error } = await client.auth.signOut({ scope: "local" });
-    return authRedirect(error ? "/account?status=logout" : "/auth");
+    const response = authRedirect(error ? "/account?status=logout" : "/auth");
+    if (!error) response.cookies.delete(offlineAccountCookie);
+    return response;
   }
   if (intent === "update-password") {
     if (!(await verifiedIdentity(client)))

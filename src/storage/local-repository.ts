@@ -133,6 +133,8 @@ export function createLocalRepository(
     acknowledge(result: OperationResult): Promise<void>;
     listBlocked(): Promise<OutboxItem[]>;
     getDeviceId(generate: () => string): Promise<string>;
+    reserveReviewSequence(): Promise<string>;
+    readWorkspace(): Promise<SnapshotData>;
     applyPullPage(expected: string, page: PullResponse): Promise<boolean>;
     clearForLogout(discardPending: boolean): Promise<number>;
     discardBlocked(operationId: string): Promise<void>;
@@ -882,6 +884,40 @@ export function createLocalRepository(
       if (existing === undefined) await tx.store.put(id, "deviceId");
       await tx.done;
       return id;
+    },
+    async reserveReviewSequence() {
+      const db = await connect();
+      const tx = db.transaction("meta", "readwrite");
+      const previous = revisionSchema.parse(
+        (await tx.store.get("reviewSequence")) ?? "0",
+      );
+      const sequence = revisionSchema.parse((BigInt(previous) + 1n).toString());
+      await tx.store.put(sequence, "reviewSequence");
+      await tx.done;
+      return sequence;
+    },
+    async readWorkspace() {
+      const db = await connect();
+      const tx = db.transaction(
+        ["decks", "cards", "progress", "introductions", "settings"],
+        "readonly",
+      );
+      const [decks, cards, progress, introductions, settings] =
+        await Promise.all([
+          tx.objectStore("decks").getAll(),
+          tx.objectStore("cards").getAll(),
+          tx.objectStore("progress").getAll(),
+          tx.objectStore("introductions").getAll(),
+          tx.objectStore("settings").get("current"),
+        ]);
+      await tx.done;
+      return {
+        decks,
+        cards,
+        progress,
+        introductions,
+        settings: settings ?? null,
+      };
     },
     async applyPullPage(expected, input) {
       const page = pullResponseSchema.parse(input);

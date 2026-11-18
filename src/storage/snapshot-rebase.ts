@@ -105,6 +105,11 @@ export function createSnapshotRebaser(
             throw new Error("Konflikt rewizji ustawień");
           settings = {
             ...operation.payload,
+            // The server schedules timezone changes using its own clock.
+            timezone: settings?.timezone ?? operation.payload.timezone,
+            ...(settings?.timezoneChanges && {
+              timezoneChanges: settings.timezoneChanges,
+            }),
             revision: settings?.revision ?? "0",
           };
           break;

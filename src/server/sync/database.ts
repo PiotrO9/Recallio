@@ -1,6 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { Socket } from "node:net";
 import { Client } from "pg";
+import { settingsSchema, type Settings } from "../../contracts";
 
 export const account = "recallio_private.account_id()";
 
@@ -83,8 +84,19 @@ export const cardFields = `id, deck_id as "deckId", side_a as "sideA", side_b as
 export const progressFields = `card_id as "cardId", direction, epoch::text, due_at as "dueAt",
   last_effective_at as "lastEffectiveAt", scheduler_state as "schedulerState",
   algorithm_version as "algorithmVersion", revision::text`;
-export const settingsFields = `timezone, new_limit as "newLimit", show_due as "showDue",
-  show_session as "showSession", revision::text`;
+export async function getSettings(db: Client): Promise<Settings | null> {
+  const { rows } = await db.query(
+    `select timezone, new_limit as "newLimit", show_due as "showDue",
+       show_session as "showSession", revision::text, timezone_changes as "timezoneChanges"
+       from public.user_settings where user_id=${account}`,
+  );
+  if (!rows[0]) return null;
+  const { timezoneChanges, ...settings } = rows[0];
+  return settingsSchema.parse({
+    ...settings,
+    ...(timezoneChanges && { timezoneChanges }),
+  });
+}
 export const introductionFields = `card_id as "cardId", first_effective_at as "firstEffectiveAt",
   study_day::text as "studyDay"`;
 

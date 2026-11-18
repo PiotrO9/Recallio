@@ -2,11 +2,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { Card, QueuePolicy, ReviewEvent } from "../src/contracts";
 import {
-  getStudyDay,
   recordSessionAnswer,
   remainingNewForDay,
   studyQueue,
 } from "../src/domain/learning/queue";
+import {
+  getStudyDay,
+  getStudyPeriod,
+  scheduleStudyTimezone,
+  studyTimezoneAt,
+} from "../src/domain/learning/study-time";
 import {
   FSRS_VERSION,
   fsrsScheduler,
@@ -167,18 +172,100 @@ test("daily limits use the profile's day and count unique cards through DST", ()
   assert.equal(
     remainingNewForDay(
       [introduction, introduction],
-      beforeMidnight,
-      timezone,
+      getStudyPeriod(beforeMidnight, { timezone }),
       2,
     ),
     1,
   );
   assert.equal(
-    remainingNewForDay([introduction], afterMidnight, timezone, 2),
+    remainingNewForDay(
+      [introduction],
+      getStudyPeriod(afterMidnight, { timezone }),
+      2,
+    ),
     2,
   );
   assert.equal(
-    remainingNewForDay([introduction], beforeMidnight, timezone, 0),
+    remainingNewForDay(
+      [introduction],
+      getStudyPeriod(beforeMidnight, { timezone }),
+      0,
+    ),
     0,
+  );
+});
+
+test("a westward change preserves today's allowance until the old reset, even when the calendar date repeats", () => {
+  const timezone = "Europe/Warsaw";
+  const newTimezone = "Pacific/Honolulu";
+  const beforeReset = "2026-03-29T21:59:00.000Z";
+  const atReset = "2026-03-29T22:00:00.000Z";
+  const timezoneChanges = scheduleStudyTimezone(
+    { timezone },
+    newTimezone,
+    beforeReset,
+  );
+  const settings = { timezone, timezoneChanges };
+  assert.deepEqual(timezoneChanges, [
+    { timezone: newTimezone, effectiveAt: atReset },
+  ]);
+  const introductions = Array.from({ length: 7 }, (_, index) => ({
+    cardId: String(index),
+    firstEffectiveAt: beforeReset,
+    studyDay: "2026-03-29",
+  }));
+  assert.equal(
+    remainingNewForDay(
+      introductions,
+      getStudyPeriod(beforeReset, settings),
+      20,
+    ),
+    13,
+  );
+  assert.equal(
+    remainingNewForDay(introductions, getStudyPeriod(atReset, settings), 20),
+    20,
+  );
+  assert.equal(studyTimezoneAt(atReset, settings).timezone, newTimezone);
+  assert.equal(getStudyDay(atReset, newTimezone), introductions[0].studyDay);
+  assert.deepEqual(getStudyPeriod(atReset, settings), {
+    start: Date.parse(atReset),
+    end: Date.parse("2026-03-30T10:00:00.000Z"),
+  });
+});
+
+test("a second request before the reset can replace or cancel the pending change", () => {
+  const timezone = "Europe/Warsaw";
+  const now = "2026-10-25T10:00:00.000Z";
+  const timezoneChanges = scheduleStudyTimezone(
+    { timezone },
+    "Pacific/Honolulu",
+    now,
+  );
+  const settings = { timezone, timezoneChanges };
+  assert.equal(
+    getStudyPeriod(now, settings).start,
+    Date.parse("2026-10-24T22:00:00.000Z"),
+  );
+  assert.deepEqual(scheduleStudyTimezone(settings, "Asia/Tokyo", now), [
+    { timezone: "Asia/Tokyo", effectiveAt: "2026-10-25T23:00:00.000Z" },
+  ]);
+  assert.equal(scheduleStudyTimezone(settings, timezone, now), undefined);
+  assert.equal(
+    scheduleStudyTimezone(settings, "Pacific/Honolulu", now),
+    timezoneChanges,
+  );
+  const later = scheduleStudyTimezone(
+    settings,
+    "Asia/Tokyo",
+    "2026-10-26T03:00:00.000Z",
+  );
+  assert.deepEqual(later, [
+    { timezone: "Pacific/Honolulu", effectiveAt: "2026-10-25T23:00:00.000Z" },
+    { timezone: "Asia/Tokyo", effectiveAt: "2026-10-26T10:00:00.000Z" },
+  ]);
+  assert.equal(
+    studyTimezoneAt(now, { timezone, timezoneChanges: later }).timezone,
+    timezone,
   );
 });

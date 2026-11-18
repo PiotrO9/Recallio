@@ -7,7 +7,11 @@ import type {
   Progress,
   Settings,
 } from "../../contracts";
-import { getStudyDay } from "../../domain/learning/queue";
+import {
+  getStudyDay,
+  scheduleStudyTimezone,
+  studyTimezoneAt,
+} from "../../domain/learning/study-time";
 import {
   FSRS_VERSION,
   fsrsScheduler,
@@ -19,7 +23,7 @@ import {
   cardFields,
   deckFields,
   progressFields,
-  settingsFields,
+  getSettings,
   toJsonRecord,
 } from "./database";
 
@@ -163,13 +167,6 @@ async function cardMutation(
   ];
 }
 
-async function getSettings(db: Client) {
-  const { rows } = await db.query<Settings>(
-    `select ${settingsFields} from public.user_settings where user_id=${account}`,
-  );
-  return rows[0] ?? null;
-}
-
 async function saveProgress(db: Client, next: Progress) {
   await db.query(
     `insert into public.progress (user_id,card_id,direction,epoch,due_at,last_effective_at,scheduler_state,algorithm_version,revision)
@@ -235,7 +232,10 @@ async function reviewMutation(
       introduction = {
         cardId: card.id,
         firstEffectiveAt: effectiveAt,
-        studyDay: getStudyDay(effectiveAt, settings.timezone),
+        studyDay: getStudyDay(
+          effectiveAt,
+          studyTimezoneAt(effectiveAt, settings).timezone,
+        ),
       };
     }
   }
@@ -357,21 +357,40 @@ export async function mutate(
       if ((current?.revision ?? "0") !== operation.baseRevision) {
         return { error: "revision_conflict", current: current ?? undefined };
       }
-      const { timezone, newLimit, showDue, showSession } = operation.payload;
+      const requested = operation.payload.timezone;
+      const timezone = current?.timezone ?? requested;
+      const timezoneChanges =
+        current && scheduleStudyTimezone(current, requested, now);
+      const { newLimit, showDue, showSession } = operation.payload;
       const revision = (BigInt(operation.baseRevision) + 1n).toString();
+      const settings: Settings = {
+        timezone,
+        newLimit,
+        showDue,
+        showSession,
+        revision,
+        ...(timezoneChanges && { timezoneChanges }),
+      };
       await db.query(
-        `insert into public.user_settings (user_id,timezone,new_limit,show_due,show_session,revision)
-         values (${account},$1,$2,$3,$4,$5) on conflict (user_id) do update set
-         timezone=excluded.timezone,new_limit=excluded.new_limit,show_due=excluded.show_due,
-         show_session=excluded.show_session,revision=excluded.revision`,
-        [timezone, newLimit, showDue, showSession, revision],
+        `insert into public.user_settings (user_id,timezone,new_limit,show_due,show_session,revision,timezone_changes)
+         values (${account},$1,$2,$3,$4,$5,$6) on conflict (user_id) do update set
+         new_limit=excluded.new_limit,show_due=excluded.show_due,show_session=excluded.show_session,
+         revision=excluded.revision,timezone_changes=excluded.timezone_changes`,
+        [
+          timezone,
+          newLimit,
+          showDue,
+          showSession,
+          revision,
+          timezoneChanges ? JSON.stringify(timezoneChanges) : null,
+        ],
       );
       return [
         {
           entity: "settings",
           id: userId,
           revision,
-          payload: { ...operation.payload, revision },
+          payload: settings,
         },
       ];
     }

@@ -10,11 +10,15 @@ import {
   type Settings,
 } from "@/contracts";
 import {
-  getStudyDay,
   recordSessionAnswer,
   remainingNewForDay,
   studyQueue,
 } from "@/domain/learning/queue";
+import {
+  getStudyDay,
+  getStudyPeriod,
+  studyTimezoneAt,
+} from "@/domain/learning/study-time";
 import {
   FSRS_VERSION,
   fsrsScheduler,
@@ -107,14 +111,14 @@ function StudyBoard({
   const [ended, setEnded] = useState(false);
   const [sessionCount, setSessionCount] = useState(0);
   const endedRef = useRef(false);
-  const extra = useRef<{ day: string; count: number } | null>(null);
+  const extra = useRef<{ dayStart: number; count: number } | null>(null);
   const revealButton = useRef<HTMLButtonElement>(null);
   const firstGrade = useRef<HTMLButtonElement>(null);
   const retryButton = useRef<HTMLButtonElement>(null);
   const restartButton = useRef<HTMLButtonElement>(null);
   const moveToCard = useRef(false);
   const active = useRef<Candidate | null>(null);
-  const timezone = useRef<string | null>(null);
+  const studySettings = useRef<Settings | null>(null);
   const previousCard = useRef<string | null>(null);
   const returns = useRef<readonly SessionReturn[]>([]);
   const prepared = useRef<PreparedReview | null>(null);
@@ -129,11 +133,15 @@ function StudyBoard({
         userId,
         now: () => new Date(),
         introduction(event) {
-          if (!timezone.current) throw new Error("Brak strefy nauki");
+          if (!studySettings.current) throw new Error("Brak strefy nauki");
+          const { timezone } = studyTimezoneAt(
+            event.occurredAt,
+            studySettings.current,
+          );
           return {
             cardId: event.cardId,
             firstEffectiveAt: event.occurredAt,
-            studyDay: getStudyDay(event.occurredAt, timezone.current),
+            studyDay: getStudyDay(event.occurredAt, timezone),
           };
         },
       }),
@@ -170,7 +178,7 @@ function StudyBoard({
     const deck = selectDeck(data);
     if (!deck || !data.settings) return null;
     const now = new Date().toISOString();
-    const day = getStudyDay(now, data.settings.timezone);
+    const period = getStudyPeriod(now, data.settings);
     return studyQueue.next({
       cards: data.cards.filter((card) => card.deckId === deck.id),
       progress: data.progress,
@@ -181,10 +189,9 @@ function StudyBoard({
       introducedCardIds: new Set(data.introductions.map((item) => item.cardId)),
       remainingNew: remainingNewForDay(
         data.introductions,
-        now,
-        data.settings.timezone,
+        period,
         data.settings.newLimit +
-          (extra.current?.day === day ? extra.current.count : 0),
+          (extra.current?.dayStart === period.start ? extra.current.count : 0),
       ),
       random: Math.random,
     });
@@ -198,7 +205,7 @@ function StudyBoard({
     availableOffline.current = decks;
     setOfflineDecks(decks);
     setWorkspace(data);
-    timezone.current = data.settings?.timezone ?? null;
+    studySettings.current = data.settings;
     if (advance || (!active.current && !saving.current)) {
       const next = choose(data);
       active.current = next;
@@ -419,7 +426,7 @@ function StudyBoard({
     }
   }
 
-  async function saveSettings(next: Settings) {
+  async function saveSettings(next: Omit<Settings, "timezoneChanges">) {
     const { revision, ...payload } = next;
     await repository.commitContent(
       {
@@ -438,10 +445,11 @@ function StudyBoard({
   function addNew() {
     const settings = workspace?.settings;
     if (!settings) return;
-    const day = getStudyDay(new Date().toISOString(), settings.timezone);
+    const dayStart = getStudyPeriod(new Date().toISOString(), settings).start;
     extra.current = {
-      day,
-      count: (extra.current?.day === day ? extra.current.count : 0) + 1,
+      dayStart,
+      count:
+        (extra.current?.dayStart === dayStart ? extra.current.count : 0) + 1,
     };
     void refresh(false).catch(() => setSyncState("failed"));
   }
@@ -502,31 +510,33 @@ function StudyBoard({
   const now = new Date().toISOString();
   const dueToday =
     settings && workspace && (settings.showDue || sessionCount > 0)
-      ? workspace.progress.filter((item) => {
-          if (
-            currentDeck &&
-            currentDeck.directionMode !== "mixed" &&
-            currentDeck.directionMode !== item.direction
-          )
-            return false;
-          if (fsrsScheduler.classify(item, now) === "introduction")
-            return false;
-          return (
-            workspace.cards.some(
-              (card) =>
-                card.id === item.cardId &&
-                !card.deletedAt &&
-                (currentDeck
-                  ? card.deckId === currentDeck.id
-                  : workspace.decks.some(
-                      (deck) => deck.id === card.deckId && !deck.deletedAt,
-                    )),
-            ) &&
-            getStudyDay(item.dueAt, settings.timezone) <=
-              getStudyDay(now, settings.timezone)
-          );
-        }).length
+      ? countDueToday(getStudyPeriod(now, settings).end)
       : null;
+
+  function countDueToday(end: number) {
+    if (!workspace) return 0;
+    return workspace.progress.filter((item) => {
+      if (
+        currentDeck &&
+        currentDeck.directionMode !== "mixed" &&
+        currentDeck.directionMode !== item.direction
+      )
+        return false;
+      if (fsrsScheduler.classify(item, now) === "introduction") return false;
+      return (
+        workspace.cards.some(
+          (card) =>
+            card.id === item.cardId &&
+            !card.deletedAt &&
+            (currentDeck
+              ? card.deckId === currentDeck.id
+              : workspace.decks.some(
+                  (deck) => deck.id === card.deckId && !deck.deletedAt,
+                )),
+        ) && Date.parse(item.dueAt) < end
+      );
+    }).length;
+  }
   return (
     <div className={styles.board}>
       <div role="status">
@@ -713,7 +723,11 @@ function StudyBoard({
           </div>
         )}
       {workspace && (
-        <StudySettings settings={workspace.settings} save={saveSettings} />
+        <StudySettings
+          settings={workspace.settings}
+          now={now}
+          save={saveSettings}
+        />
       )}
     </div>
   );

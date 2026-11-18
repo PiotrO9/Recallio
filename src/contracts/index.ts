@@ -316,6 +316,14 @@ export const progressSchema = z
   );
 export const settingsSchema = z.strictObject({
   timezone: z.string().min(1).max(100),
+  timezoneChanges: z
+    .array(
+      z.strictObject({
+        timezone: z.string().min(1).max(100),
+        effectiveAt: instantSchema,
+      }),
+    )
+    .optional(),
   newLimit: z.number().int().min(0).max(10000),
   showDue: z.boolean(),
   showSession: z.boolean(),

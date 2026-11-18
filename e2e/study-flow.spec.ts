@@ -146,7 +146,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
       .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller))
       .toBe(true);
     const cachedPaths = await page.evaluate(async () => {
-      const cache = await caches.open("recallio-study-shell-v2");
+      const cache = await caches.open("recallio-study-shell-v3");
       return (await cache.keys()).map((entry) => new URL(entry.url).pathname);
     });
     expect(cachedPaths).toContain("/study/offline");
@@ -291,6 +291,40 @@ test("a review survives an offline reload and synchronizes once to a second devi
     await expect.poll(syncedLimit).toBe(0);
     await otherPage.reload();
     await expect(otherPage.locator('input[name="newLimit"]')).toHaveValue("0");
+    const openSettings = otherPage.getByText("Ustawienia nauki", {
+      exact: true,
+    });
+    await openSettings.click();
+    await otherPage
+      .getByLabel("Strefa nauki", { exact: true })
+      .fill("Pacific/Honolulu");
+    await saveSettings.click();
+    await expect(
+      otherPage.getByText("Obecna strefa nauki: Europe/Warsaw"),
+    ).toBeVisible();
+    const scheduled = otherPage
+      .getByRole("status")
+      .filter({ hasText: "Strefa Pacific/Honolulu zacznie obowiązywać" });
+    await expect(scheduled).toBeVisible();
+    const effectiveAt = await scheduled
+      .locator("time")
+      .getAttribute("datetime");
+    expect(effectiveAt).toBeTruthy();
+    const snapshot = await otherDevice.request.get("/api/v1/sync/snapshot");
+    expect(snapshot.ok()).toBe(true);
+    expect((await snapshot.json()).settings).toMatchObject({
+      timezone: "Europe/Warsaw",
+      timezoneChanges: [{ timezone: "Pacific/Honolulu", effectiveAt }],
+      newLimit: 0,
+    });
+    await otherPage.clock.setFixedTime(new Date(effectiveAt!));
+    await otherPage.reload();
+    await expect(otherPage.locator('input[name="newLimit"]')).toHaveValue("0");
+    await openSettings.click();
+    await expect(
+      otherPage.getByText("Obecna strefa nauki: Pacific/Honolulu"),
+    ).toBeVisible();
+    await expect(scheduled).toHaveCount(0);
     await page.goto("/decks");
     await expect(page.getByRole("heading", { name: "Nauka" })).toBeVisible();
     await expectAccessible(page);

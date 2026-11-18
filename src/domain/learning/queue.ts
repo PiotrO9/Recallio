@@ -8,6 +8,7 @@ import {
   type SessionReturn,
 } from "../../contracts";
 import { fsrsScheduler } from "./scheduler";
+import type { getStudyPeriod } from "./study-time";
 
 const directions = ["a-b", "b-a"] as const;
 
@@ -36,30 +37,17 @@ export function recordSessionAnswer(
   return rating === 1 ? [...others, { cardId, direction, epoch }] : others;
 }
 
-export function getStudyDay(now: string, timezone: string): string {
-  const parts = new Intl.DateTimeFormat("en", {
-    timeZone: timezone,
-    calendar: "iso8601",
-    numberingSystem: "latn",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date(now));
-  const part = (type: "year" | "month" | "day") =>
-    parts.find((entry) => entry.type === type)?.value;
-  return `${part("year")}-${part("month")}-${part("day")}`;
-}
-
 export function remainingNewForDay(
   introductions: readonly Introduction[],
-  now: string,
-  timezone: string,
+  period: ReturnType<typeof getStudyPeriod>,
   limit: number,
 ): number {
-  const day = getStudyDay(now, timezone);
   const counted = new Set(
     introductions
-      .filter((item) => item.studyDay === day)
+      .filter((item) => {
+        const introducedAt = Date.parse(item.firstEffectiveAt);
+        return introducedAt >= period.start && introducedAt < period.end;
+      })
       .map((item) => item.cardId),
   );
   return Math.max(0, limit - counted.size);

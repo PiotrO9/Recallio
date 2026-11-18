@@ -137,7 +137,7 @@ Jedna fiszka, brak timera i punktów. Semantyczne nagłówki, label dla kontrole
 2. Zaimplementować Scheduler i QueuePolicy zgodnie z decyzją o FSRS. Ustalić kontrakt kolejki powrotów, stan po resecie i schemat wersjonowanego stanu schedulera.
 3. Podłączyć Auth, zapis lokalny oraz push, pull i snapshot. Lokalnie sprawdzić pobranie jednej fiszki, ocenę bez sieci, przeładowanie, synchronizację i odczyt na drugim urządzeniu oraz izolację dwóch kont. Weryfikacja tej ścieżki na Supabase i Workers jest warunkiem odbioru wydania.
 4. Rozbudować zarządzanie zestawami i kartami, trening obu kierunków oraz import i eksport CSV. Import wymaga podglądu, jawnych rozstrzygnięć oraz trwałego planu i ID operacji do wznowienia po błędzie. Przed zapisem ponownie zweryfikować cel i rewizję. Klasyfikator zwraca do 20 dopasowań danej kategorii, więc podgląd powinien obsłużyć ucięte wyniki.
-5. Dodać PWA, przygotowanie zestawów offline, aktualizację aplikacji z zachowaniem outbox, ustawienia i dostępność. Przed dodaniem zmiany strefy ustalić jej wpływ na licznik dnia.
+5. Dodać PWA, przygotowanie zestawów offline, aktualizację aplikacji z zachowaniem outbox, ustawienia i dostępność.
 6. Zweryfikować kryteria odbioru z [briefu](PRODUCT-BRIEF.md), instrukcję kopii i przywracania bazy oraz smoke test w docelowym środowisku.
 
 Do weryfikacji chmurowej potrzebne są projekt Supabase, konfiguracja SMTP i przekierowań oraz konto Cloudflare.

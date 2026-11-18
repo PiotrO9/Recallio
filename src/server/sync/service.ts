@@ -11,7 +11,6 @@ import {
   type OperationResult,
   type Progress,
   type PullResponse,
-  type Settings,
   type SnapshotResponse,
 } from "../../contracts";
 import {
@@ -21,7 +20,7 @@ import {
   deckFields,
   introductionFields,
   progressFields,
-  settingsFields,
+  getSettings,
   SyncFailure,
   toJsonRecord,
   withDatabase,
@@ -198,12 +197,7 @@ async function capture(db: Client): Promise<PageContent[]> {
       )
     ).rows,
   };
-  const settings =
-    (
-      await db.query<Settings>(
-        `select ${settingsFields} from public.user_settings where user_id=${account}`,
-      )
-    ).rows[0] ?? null;
+  const settings = await getSettings(db);
   const empty = (): PageContent => ({
     decks: [],
     cards: [],
@@ -212,8 +206,8 @@ async function capture(db: Client): Promise<PageContent[]> {
     settings: null,
   });
   const pages = [empty()];
-  let bytes = 0;
-  let total = 0;
+  let bytes = Buffer.byteLength(JSON.stringify(settings), "utf8");
+  let total = bytes;
   pages[0].settings = settings;
   for (const collection of Object.keys(rows) as Collection[]) {
     for (const row of rows[collection]) {

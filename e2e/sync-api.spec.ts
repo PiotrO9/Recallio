@@ -53,6 +53,10 @@ test("sync receipts, pagination, projection and account isolation", async ({
     const unauthenticated = await request.get("/api/v1/sync/snapshot");
     expect(unauthenticated.status()).toBe(401);
     expect(unauthenticated.headers()["cache-control"]).toContain("no-store");
+    const switched = await second.api.get("/api/v1/sync/pull", {
+      headers: { "X-Recallio-Account": first.id },
+    });
+    expect(switched.status()).toBe(401);
 
     const deviceId = randomUUID();
     async function push(operations: unknown[]) {

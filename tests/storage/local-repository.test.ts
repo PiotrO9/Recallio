@@ -884,7 +884,7 @@ test("versionchange closes the existing connection and calls the owner", async (
     blocking: () => called++,
   });
   await local.snapshot(card);
-  const upgraded = await openDB(`recallio-user-${user}`, 7);
+  const upgraded = await openDB(`recallio-user-${user}`, 8);
   assert.equal(called, 1);
   upgraded.close();
   local.close();

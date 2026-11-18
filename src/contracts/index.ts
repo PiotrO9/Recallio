@@ -277,6 +277,13 @@ export const reviewEventSchema = z.strictObject({
   epoch: revisionSchema,
   algorithmVersion: z.string().min(1).max(100),
 });
+export const syncedReviewSchema = z.strictObject({
+  event: reviewEventSchema,
+  receivedAt: instantSchema,
+  effectiveAt: instantSchema.nullable(),
+  canonicalMode: reviewModeSchema.nullable(),
+  disposition: z.enum(["applied", "ignored_deleted", "ignored_old_epoch"]),
+});
 // Each scheduler version defines the structure of its JSON state.
 export const jsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
   z.union([

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createLocalRepository } from "@/storage/local-repository";
+import { createSyncController } from "@/sync/controller";
 
 export function AccountPanel({ accountId }: { accountId: string }) {
   const [pending, setPending] = useState<number | null>(null);
@@ -12,7 +13,7 @@ export function AccountPanel({ accountId }: { accountId: string }) {
 
   useEffect(() => setReady(true), []);
 
-  async function logout(discardPending = false) {
+  async function logout(mode: "check" | "discard" | "sync" = "check") {
     if (signingOut.current) return;
     signingOut.current = true;
     setBusy(true);
@@ -25,7 +26,20 @@ export function AccountPanel({ accountId }: { accountId: string }) {
       },
     });
     try {
-      const count = await repository.clearForLogout(discardPending);
+      if (mode === "sync") {
+        const sync = createSyncController({
+          userId: accountId,
+          repository,
+          fetch: (input, init) => globalThis.fetch(input, init),
+          now: Date.now,
+          random: Math.random,
+          id: () => crypto.randomUUID(),
+          online: () => navigator.onLine,
+        });
+        if ((await sync.run()) !== "idle")
+          throw new Error("Synchronizacja nie została zakończona");
+      }
+      const count = await repository.clearForLogout(mode === "discard");
       if (count) {
         setPending(count);
         return;
@@ -45,7 +59,12 @@ export function AccountPanel({ accountId }: { accountId: string }) {
 
   return (
     <div className="auth-form">
-      {error && <p role="alert">Nie udało się wylogować. Spróbuj ponownie.</p>}
+      {error && (
+        <p role="alert">
+          Nie udało się zakończyć wylogowania. Sprawdź połączenie i spróbuj
+          ponownie.
+        </p>
+      )}
       {pending === null ? (
         <button
           className="primary"
@@ -63,7 +82,14 @@ export function AccountPanel({ accountId }: { accountId: string }) {
           <button
             className="primary"
             disabled={busy}
-            onClick={() => void logout(true)}
+            onClick={() => void logout("sync")}
+          >
+            Synchronizuj i wyloguj się
+          </button>
+          <button
+            className="auth-secondary"
+            disabled={busy}
+            onClick={() => void logout("discard")}
           >
             Odrzuć zmiany i wyloguj się
           </button>

@@ -101,9 +101,12 @@ export function createSnapshotRebaser(
           break;
         }
         case "settings.update": {
-          if (!settings || settings.revision !== operation.baseRevision)
+          if ((settings?.revision ?? "0") !== operation.baseRevision)
             throw new Error("Konflikt rewizji ustawień");
-          settings = { ...settings, ...operation.payload };
+          settings = {
+            ...operation.payload,
+            revision: settings?.revision ?? "0",
+          };
           break;
         }
         case "progress.reset": {

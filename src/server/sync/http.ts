@@ -16,6 +16,10 @@ export async function serveSync(
     );
     if (!identity)
       throw new SyncFailure(401, "unauthorized", "Sesja jest wymagana");
+    const expectedAccount = request.headers.get("X-Recallio-Account");
+    if (expectedAccount !== null && expectedAccount !== identity.id) {
+      throw new SyncFailure(401, "unauthorized", "Sesja dotyczy innego konta");
+    }
     if (
       request.method === "POST" &&
       (!request.headers.get("origin") ||

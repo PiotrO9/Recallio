@@ -9,7 +9,13 @@ import {
   revisionSchema,
   introductionSchema,
   snapshotResponseSchema,
+  pullResponseSchema,
+  deckSchema,
+  cardSchema,
+  settingsSchema,
+  syncedReviewSchema,
   type SnapshotResponse,
+  type PullResponse,
   type Operation,
   type OperationResult,
   type Card,
@@ -23,6 +29,7 @@ import {
   type Progress,
   type ReviewEvent,
 } from "../contracts";
+import type { z } from "zod";
 
 export type OutboxItem = {
   operation: Operation;
@@ -55,6 +62,7 @@ interface Schema extends DBSchema {
     };
   };
   introductions: { key: string; value: Introduction };
+  syncedReviews: { key: string; value: z.infer<typeof syncedReviewSchema> };
   outbox: { key: string; value: OutboxItem };
   meta: { key: string; value: unknown };
   decks: { key: string; value: SnapshotResponse["decks"][number] };
@@ -119,10 +127,13 @@ export function createLocalRepository(
       now: number,
       duration: number,
       limit: number,
+      rebaseUnsent?: boolean,
     ): Promise<OutboxItem[]>;
     releaseLease(owner: string): Promise<void>;
     acknowledge(result: OperationResult): Promise<void>;
     listBlocked(): Promise<OutboxItem[]>;
+    getDeviceId(generate: () => string): Promise<string>;
+    applyPullPage(expected: string, page: PullResponse): Promise<boolean>;
     clearForLogout(discardPending: boolean): Promise<number>;
     discardBlocked(operationId: string): Promise<void>;
     readContent(
@@ -170,7 +181,7 @@ export function createLocalRepository(
   let connection: Promise<IDBPDatabase<Schema>> | undefined;
   const connect = () => {
     if (!connection) {
-      const opened = openDB<Schema>(`recallio-user-${userId}`, 6, {
+      const opened = openDB<Schema>(`recallio-user-${userId}`, 7, {
         upgrade(db, oldVersion, _newVersion, tx) {
           void tx.done.catch(() => {});
           if (oldVersion < 1) {
@@ -182,6 +193,9 @@ export function createLocalRepository(
             db.createObjectStore("introductions", { keyPath: "cardId" });
             db.createObjectStore("outbox", { keyPath: "operation.id" });
             db.createObjectStore("meta");
+          }
+          if (oldVersion < 7) {
+            db.createObjectStore("syncedReviews", { keyPath: "event.id" });
           }
           if (oldVersion < 2) {
             tx.objectStore("reviews").createIndex(
@@ -701,7 +715,7 @@ export function createLocalRepository(
         throw error;
       }
     },
-    async lease(owner, now, duration, limit) {
+    async lease(owner, now, duration, limit, rebaseUnsent = false) {
       if (
         !owner ||
         !Number.isFinite(now) ||
@@ -726,6 +740,34 @@ export function createLocalRepository(
         if (selected.length === limit) break;
       }
       for (const item of selected) {
+        const operation = item.operation;
+        if (
+          rebaseUnsent &&
+          !item.deliveryUnknown &&
+          !item.receipt &&
+          "baseRevision" in operation
+        ) {
+          const kind = operation.type.split(".")[0];
+          if (kind === "deck" || kind === "card" || kind === "settings") {
+            const predecessor = all.findLast(
+              (candidate) =>
+                candidate.state === "acknowledged" &&
+                candidate.sequence < item.sequence &&
+                candidate.operation.entityId === operation.entityId &&
+                candidate.operation.type.split(".")[0] === kind,
+            );
+            const prior = predecessor?.operation;
+            const revision = predecessor?.receipt?.revision;
+            if (
+              prior &&
+              revision &&
+              operation.baseRevision ===
+                ("baseRevision" in prior ? prior.baseRevision : "0")
+            ) {
+              item.operation = { ...operation, baseRevision: revision };
+            }
+          }
+        }
         item.state = "leased";
         item.deliveryUnknown = true;
         item.leaseOwner = owner;
@@ -828,6 +870,141 @@ export function createLocalRepository(
       return (await db.getAll("outbox"))
         .filter((item) => item.state === "blocked")
         .sort((a, b) => a.sequence - b.sequence);
+    },
+    async getDeviceId(generate) {
+      const db = await connect();
+      const tx = db.transaction("meta", "readwrite");
+      const existing = await tx.store.get("deviceId");
+      const id =
+        existing === undefined
+          ? uuidSchema.parse(generate())
+          : uuidSchema.parse(existing);
+      if (existing === undefined) await tx.store.put(id, "deviceId");
+      await tx.done;
+      return id;
+    },
+    async applyPullPage(expected, input) {
+      const page = pullResponseSchema.parse(input);
+      let cursor = BigInt(revisionSchema.parse(expected));
+      for (const change of page.changes) {
+        if (BigInt(change.sequence) !== ++cursor)
+          throw new Error("Niespójny kursor zmian");
+      }
+      if (
+        page.nextCursor !== cursor.toString() ||
+        (page.hasMore && !page.changes.length)
+      ) {
+        throw new Error("Niespójna strona zmian");
+      }
+      const db = await connect();
+      const tx = db.transaction(
+        [
+          "cards",
+          "decks",
+          "progress",
+          "progressVersions",
+          "introductions",
+          "settings",
+          "syncedReviews",
+          "meta",
+          "outbox",
+        ],
+        "readwrite",
+      );
+      const meta = tx.objectStore("meta");
+      const outbox = tx.objectStore("outbox");
+      try {
+        const items = await outbox.getAll();
+        if (
+          ((await meta.get("cursor")) ?? "0") !== expected ||
+          items.some((item) => item.state !== "acknowledged")
+        ) {
+          await tx.done;
+          return false;
+        }
+        for (const change of page.changes) {
+          switch (change.entity) {
+            case "deck": {
+              const deck = deckSchema.parse(change.payload);
+              if (
+                deck.id !== change.entityId ||
+                deck.revision !== change.revision
+              )
+                throw new Error("Niespójny zestaw");
+              await tx.objectStore("decks").put(deck);
+              break;
+            }
+            case "card": {
+              const card = cardSchema.parse(change.payload);
+              if (
+                card.id !== change.entityId ||
+                card.contentRevision !== change.revision
+              )
+                throw new Error("Niespójna fiszka");
+              await tx.objectStore("cards").put(card);
+              break;
+            }
+            case "progress":
+            case "reset": {
+              const progress = progressSchema.parse(change.payload);
+              if (
+                progress.cardId !== change.entityId ||
+                progress.revision !== change.revision
+              )
+                throw new Error("Niespójny postęp");
+              const versions = tx.objectStore("progressVersions");
+              const current = await versions.get([
+                progress.cardId,
+                progress.direction,
+              ]);
+              await versions.put({
+                cardId: progress.cardId,
+                direction: progress.direction,
+                version: (BigInt(current?.version ?? "0") + 1n).toString(),
+              });
+              await tx.objectStore("progress").put(progress);
+              break;
+            }
+            case "introduction": {
+              const introduction = introductionSchema.parse(change.payload);
+              if (introduction.cardId !== change.entityId)
+                throw new Error("Niespójne wprowadzenie");
+              await tx.objectStore("introductions").put(introduction);
+              break;
+            }
+            case "review": {
+              const review = syncedReviewSchema.parse(change.payload);
+              if (review.event.id !== change.entityId)
+                throw new Error("Niespójna ocena");
+              await tx.objectStore("syncedReviews").put(review);
+              break;
+            }
+            case "settings": {
+              const settings = settingsSchema.parse(change.payload);
+              if (
+                change.entityId !== userId ||
+                settings.revision !== change.revision
+              )
+                throw new Error("Niespójne ustawienia");
+              await tx.objectStore("settings").put(settings, "current");
+              break;
+            }
+          }
+        }
+        for (const item of items) {
+          if (item.receiptCursor && BigInt(item.receiptCursor) <= cursor)
+            await outbox.delete(item.operation.id);
+        }
+        await meta.put(page.nextCursor, "cursor");
+        await tx.done;
+        return true;
+      } catch (error) {
+        try {
+          tx.abort();
+        } catch {}
+        await tx.done.catch(() => {});
+        throw error;
+      }
     },
     async clearForLogout(discardPending) {
       const db = await connect();

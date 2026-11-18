@@ -64,6 +64,7 @@ type StagedSnapshot = {
   nextPage: string | null;
   pages: SnapshotResponse[];
   receiptGeneration: number;
+  totalBytes?: number;
 };
 export type SnapshotData = Pick<
   SnapshotResponse,
@@ -87,6 +88,7 @@ export interface LocalOptions {
   userId: string;
   now: () => Date;
   introduction: (event: ReviewEvent) => Introduction;
+  maxSnapshotBytes?: number;
   blocked?: () => void;
   blocking?: () => void;
 }
@@ -109,6 +111,7 @@ export function createLocalRepository(
     requestGeneration?: number,
   ): Promise<void>;
   beginSnapshot(): Promise<number>;
+  discardSnapshot(token: string): Promise<void>;
   activateSnapshot(token: string, rebase: RebaseSnapshot): Promise<void>;
   getCursor(): Promise<string | undefined>;
   readProgress(
@@ -127,6 +130,9 @@ export function createLocalRepository(
   close(): void;
 } {
   const userId = uuidSchema.parse(options.userId);
+  const maxSnapshotBytes = options.maxSnapshotBytes ?? 32 * 1024 * 1024;
+  if (!Number.isSafeInteger(maxSnapshotBytes) || maxSnapshotBytes <= 0)
+    throw new Error("Nieprawidłowy limit snapshotu");
   let connection: Promise<IDBPDatabase<Schema>> | undefined;
   const connect = () => {
     if (!connection) {
@@ -313,7 +319,7 @@ export function createLocalRepository(
             "Lokalny postęp zmienił się; przelicz projekcję tej samej oceny",
           );
         if (
-          (previous?.revision ?? null) !== event.observedProgressRevision ||
+          (!previous && event.observedProgressRevision !== null) ||
           (previous && previous.epoch !== event.epoch)
         )
           throw new Error("Nieaktualny postęp");
@@ -479,6 +485,9 @@ export function createLocalRepository(
     },
     async stageSnapshot(pageToken, input, requestGeneration) {
       const page = snapshotResponseSchema.parse(input);
+      const pageBytes = new TextEncoder().encode(
+        JSON.stringify(page),
+      ).byteLength;
       const db = await connect();
       const tx = db.transaction(["staging", "meta"], "readwrite");
       const store = tx.objectStore("staging");
@@ -497,12 +506,15 @@ export function createLocalRepository(
             throw new Error(
               "Snapshot musi być zamówiony po rozliczeniu potwierdzeń",
             );
+          if (pageBytes > maxSnapshotBytes)
+            throw new Error("Snapshot przekracza lokalny limit rozmiaru");
           await store.add({
             token: page.snapshotToken,
             watermark: page.watermark,
             nextPage: page.nextPage,
             pages: [page],
             receiptGeneration,
+            totalBytes: pageBytes,
           });
         } else {
           const priorIndex =
@@ -530,8 +542,18 @@ export function createLocalRepository(
               staged.pages.some((p) => p.nextPage === page.nextPage))
           )
             throw new Error("Powtarzający się token strony");
+          const totalBytes =
+            staged.totalBytes ??
+            staged.pages.reduce(
+              (sum, item) =>
+                sum + new TextEncoder().encode(JSON.stringify(item)).byteLength,
+              0,
+            );
+          if (totalBytes + pageBytes > maxSnapshotBytes)
+            throw new Error("Snapshot przekracza lokalny limit rozmiaru");
           staged.pages.push(page);
           staged.nextPage = page.nextPage;
+          staged.totalBytes = totalBytes + pageBytes;
           await store.put(staged);
         }
         await tx.done;
@@ -542,6 +564,10 @@ export function createLocalRepository(
         await tx.done.catch(() => {});
         throw error;
       }
+    },
+    async discardSnapshot(token) {
+      const db = await connect();
+      await db.delete("staging", token);
     },
     async activateSnapshot(token, rebase) {
       const db = await connect();
@@ -563,6 +589,15 @@ export function createLocalRepository(
         const staged = await tx.objectStore("staging").get(token);
         if (!staged || staged.nextPage !== null)
           throw new Error("Snapshot nie jest kompletny");
+        const stagedBytes =
+          staged.totalBytes ??
+          staged.pages.reduce(
+            (sum, item) =>
+              sum + new TextEncoder().encode(JSON.stringify(item)).byteLength,
+            0,
+          );
+        if (stagedBytes > maxSnapshotBytes)
+          throw new Error("Snapshot przekracza lokalny limit rozmiaru");
         const receiptGeneration = Number(
           (await tx.objectStore("meta").get("receiptGeneration")) ?? 0,
         );

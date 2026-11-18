@@ -271,6 +271,132 @@ test("snapshot replacement invalidates stale local version even if progress is i
   local.close();
 });
 
+test("snapshot size limit aborts oversized page without losing outbox or partial generation", async () => {
+  const page: SnapshotResponse = {
+    snapshotToken: "bounded",
+    watermark: "0",
+    decks: [],
+    cards: [],
+    progress: [],
+    introductions: [],
+    settings: null,
+    nextPage: "page-2",
+  };
+  const second: SnapshotResponse = { ...page, nextPage: null };
+  const bytes = (value: SnapshotResponse) =>
+    new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  const local = createLocalRepository({
+    userId: "00000000-0000-4000-8000-000000000080",
+    now: () => new Date(at),
+    introduction: () => ({
+      cardId: card,
+      firstEffectiveAt: at,
+      studyDay: "2026-11-17",
+    }),
+    maxSnapshotBytes: bytes(page) + bytes(second),
+  });
+  await local.commitReview(command);
+  const generation = await local.beginSnapshot();
+  await local.stageSnapshot(null, page, generation);
+  await local.stageSnapshot(null, page, generation);
+  const tooLarge = {
+    ...second,
+    decks: [
+      {
+        id: "00000000-0000-4000-8000-000000000099",
+        name: "Duży zestaw",
+        directionMode: "mixed" as const,
+        revision: "1",
+        deletedAt: null,
+      },
+    ],
+  };
+  await assert.rejects(
+    local.stageSnapshot("page-2", tooLarge),
+    /limit rozmiaru/,
+  );
+  await assert.rejects(
+    local.activateSnapshot("bounded", (data) => ({
+      data,
+      handledOperationIds: [],
+    })),
+    /nie jest kompletny/,
+  );
+  await local.stageSnapshot("page-2", second);
+  await local.activateSnapshot("bounded", (data, pending) => ({
+    data,
+    handledOperationIds: pending.map((item) => item.operation.id),
+  }));
+  assert.equal((await local.lease("check", 0, 10, 1)).length, 1);
+  const stale = { ...page, snapshotToken: "discard-me" };
+  await local.releaseLease("check");
+  await assert.rejects(local.beginSnapshot(), /Nieznany wynik/);
+  await local.acknowledge({ operationId: id, status: "duplicate" }, "0");
+  await stageFirst(local, stale);
+  await local.discardSnapshot("discard-me");
+  await assert.rejects(
+    local.activateSnapshot("discard-me", (data) => ({
+      data,
+      handledOperationIds: [],
+    })),
+    /nie jest kompletny/,
+  );
+  local.close();
+});
+
+test("conflict re-prepares projection on newer server revision while preserving the event", async () => {
+  const local = repo("00000000-0000-4000-8000-000000000084");
+  await local.commitReview(command);
+  const before = await local.readProgressVersion(card, "a-b");
+  const nextId = "00000000-0000-4000-8000-000000000085";
+  const nextPayload = {
+    ...payload,
+    clientSeq: "2",
+    observedProgressRevision: "1",
+    observedMode: "due" as const,
+  };
+  const next: PreparedReview = {
+    event: { id: nextId, cardId: card, deviceId: device, ...nextPayload },
+    operation: {
+      id: nextId,
+      type: "review.record",
+      entityId: card,
+      payload: nextPayload,
+    },
+    progress: command.progress,
+  };
+  const fresh = { ...command.progress, revision: "2" };
+  const page: SnapshotResponse = {
+    snapshotToken: "newer-revision",
+    watermark: "2",
+    decks: [],
+    cards: [],
+    progress: [fresh],
+    introductions: [],
+    settings: null,
+    nextPage: null,
+  };
+  await stageFirst(local, page);
+  await local.activateSnapshot(page.snapshotToken, (data, pending) => ({
+    data,
+    handledOperationIds: pending.map((item) => item.operation.id),
+  }));
+  await assert.rejects(
+    local.commitReviewFrom(next, before.progress, before.localVersion),
+    /Lokalny postęp/,
+  );
+  const after = await local.readProgressVersion(card, "a-b");
+  const reprepared = {
+    ...next,
+    progress: { ...fresh, dueAt: "2026-11-18T12:00:00.000Z" },
+  };
+  await local.commitReviewFrom(reprepared, after.progress, after.localVersion);
+  assert.deepEqual(reprepared.event, next.event);
+  assert.deepEqual(reprepared.operation, next.operation);
+  assert.equal((await local.lease("sync", 0, 10, 10)).length, 2);
+  local.close();
+});
+
 test("upgrade preserves pending operations", async () => {
   const user = "00000000-0000-4000-8000-000000000031";
   const name = `recallio-user-${user}`;

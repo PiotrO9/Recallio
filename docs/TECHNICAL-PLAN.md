@@ -4,7 +4,7 @@ Plan opisuje architekturę MVP. Bieżący stan funkcji i odbioru środowiska doc
 
 ## 1. Zakres pierwszego przyrostu
 
-Wykonano szkielet Next.js oraz demonstrację bez konta. Repozytorium lokalnej historii używa idb/IndexedDB. Dane demonstracyjne są stałe; kolejka cykliczna nie jest algorytmem powtórek. Postęp przechowywany obecnie oznacza historię ocen, nie harmonogram. Ten zakres celowo nie wymaga Supabase, Cloudflare ani konfiguracji kont.
+Wejście do aplikacji prowadzi do logowania albo do prywatnej biblioteki zestawów. Trening korzysta z FSRS-6 i historii ocen przechowywanej lokalnie w IndexedDB.
 
 MVP obejmuje pełny zakres z briefu: konta, prywatne zestawy, CSV, dwa kierunki, planowanie, offline/PWA i synchronizację. Brak publicznego katalogu, multimediów, AI, płatności i aplikacji natywnych.
 
@@ -13,16 +13,15 @@ MVP obejmuje pełny zakres z briefu: konta, prywatne zestawy, CSV, dwa kierunki,
 | ID  | Decyzja                                                              | Status / warunek                                                                 |
 | --- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | D01 | Next.js App Router + React + TS strict + CSS, npm                    | Przyjęta; wersje w lockfile                                                      |
-| D02 | Dane demo w oddzielnej bazie `recallio-demo-v1`                      | Wdrożona; brak migracji do kont                                                  |
-| D03 | idb jako cienka warstwa IndexedDB                                    | Używana przez demo i repozytorium konta                                          |
+| D03 | idb jako cienka warstwa IndexedDB                                    | Używana przez repozytorium konta                                          |
 | D04 | Zapisy przez Route Handlers i transakcje PostgreSQL                  | Auth używa SDK Supabase, synchronizacja ograniczonej roli bazy                   |
 | D05 | Historia zdarzeń i materializowany postęp per kierunek               | Wdrożone w treningu i synchronizacji                                             |
 | D06 | FSRS-6 z wersjonowanym profilem                                      | Wdrożony wg [decyzji o schedulerze](decisions/learning-scheduler.md)              |
 | D07 | PWA przez jawnie wersjonowany service worker                         | Własny service worker w `public/study-sw.js`                                     |
 | D08 | Workers przez OpenNext                                               | Weryfikacja lokalna w Wranglerze, odbiór wdrożenia w kolejce                      |
-| D09 | Przykład po odsłonięciu, po stronie odpowiedzi                       | Przyjęta roboczo, demo wdrożone                                                  |
+| D09 | Przykład po odsłonięciu, po stronie odpowiedzi                       | Dostępny w treningu                                                  |
 | D10 | Limit nowych = unikalne cardId w lokalnym dniu, oba kierunki wspólne | Domyślnie 20 dziennie, zmieniane w ustawieniach                                  |
-| D11 | Licznik sesji = zaakceptowane odpowiedzi, domyślnie ukryty w MVP     | Robocza; licznik demo to łączna historia urządzenia                              |
+| D11 | Licznik sesji = zaakceptowane odpowiedzi, domyślnie ukryty w MVP     | Dostępny w ustawieniach treningu                              |
 | D12 | Wylogowanie usuwa cache konta po sync lub świadomym odrzuceniu       | Robocza; szczegóły poniżej                                                       |
 
 Zmianę decyzji zapisz w krótkim ADR w `docs/decisions/NNN-temat.md`. Uwzględnij kontekst, rozważone opcje, decyzję oraz wpływ na kontrakty, migracje i testy.
@@ -38,7 +37,7 @@ app → features → domain
 
 Domena nie importuje adapterów. UI nie wykonuje SQL ani requestów Supabase. Serwer nie przyjmuje wyliczonego przez klienta postępu jako zaufanego. Kontrakty nie importują komponentów. Auth jest osobnym adapterem, z weryfikacją tożsamości w każdym prywatnym handlerze. Prywatne odpowiedzi HTTP mają `Cache-Control: no-store`.
 
-Docelowe moduły: `domain/learning`, `features/training`, `features/decks`, `features/import`, `features/auth`, `features/settings`, `storage`, `sync`, `contracts`, `server`, `components/ui`. Obecne `features/demo` i `storage/demo-repository` pozostają odseparowane; wspólny silnik treningu zastąpi prostą kolejkę po wdrożeniu schedulera i kolejki.
+Docelowe moduły: `domain/learning`, `features/training`, `features/decks`, `features/import`, `features/auth`, `features/settings`, `storage`, `sync`, `contracts`, `server`, `components/ui`.
 
 ## 4. Model danych chmurowych
 
@@ -64,7 +63,7 @@ RLS na wszystkich tabelach z danymi użytkownika. Własność `(select auth.uid(
 
 ## 5. IndexedDB i atomowość
 
-Repozytorium konta używa osobnej bazy `recallio-user-{userId}`, numer schematu niezależny od wersji aplikacji. Stores: decks, cards, progress, reviewEvents, introductions, outbox, meta, conflicts. Klucze zawierają tożsamość lub baza stanowi twardą granicę konta. Demo jest osobne.
+Repozytorium konta używa osobnej bazy `recallio-user-{userId}`, numer schematu niezależny od wersji aplikacji. Stores: decks, cards, progress, reviewEvents, introductions, outbox, meta, conflicts. Klucze zawierają tożsamość lub baza stanowi twardą granicę konta.
 
 Ocena: przygotuj niezmienne zdarzenie z ID → oblicz projekcję → jedna transakcja readwrite zapisuje event, progress, introduction i outbox → czekaj na tx.done → dopiero następna fiszka. Błąd dowolnego zapisu wycofuje wszystko. Retry nie zmienia rating, czasu ani ID. Przycisk blokowany synchronicznie, nie tylko stanem React.
 
@@ -127,7 +126,7 @@ Import zatwierdza wszystkie wybory przed zapisem. Wiersz ma stabilne operationId
 
 ## 10. Dostępność i UX
 
-Jedna fiszka, brak timera i punktów. Semantyczne nagłówki, label dla kontrolek, widoczny fokus, komunikaty aria-live. Ocena dopiero po reveal; fokus trafia na pierwszą ocenę, po zapisie wraca na reveal. Dotyk >=44px. Kontrast WCAG AA, 200% zoom, 320px szerokości, reduced-motion. Skróty klawiszowe tylko poza input/select i bez event.repeat. Własny zestaw wymaga konta, demo wyraźnie podpisane. Błędy zapisu nie znikają razem z fiszką.
+Jedna fiszka, brak timera i punktów. Semantyczne nagłówki, label dla kontrolek, widoczny fokus, komunikaty aria-live. Ocena dopiero po reveal; fokus trafia na pierwszą ocenę, po zapisie wraca na reveal. Dotyk >=44px. Kontrast WCAG AA, 200% zoom, 320px szerokości, reduced-motion. Skróty klawiszowe tylko poza input/select i bez event.repeat. Własny zestaw wymaga konta. Błędy zapisu nie znikają razem z fiszką.
 
 ## 11. Etapy i kryteria przejścia
 

@@ -22,7 +22,6 @@ export default async function AccountPage({
       <nav aria-label="Nauka">
         <Link href="/decks">Moje zestawy</Link>
         <a href="/study">Przejdź do nauki</a>
-        <Link href="/">Wróć do dema</Link>
       </nav>
     </AuthFrame>
   );

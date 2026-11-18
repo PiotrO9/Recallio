@@ -23,6 +23,7 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | PWA-01 | DONE | FLOW-01, TRAIN-01 | Dodaj przygotowanie zestawu offline i aktualizację bez utraty outbox. Sprawdź na buildzie produkcyjnym reload po przerwaniu sieci, quota, aktualizację klienta i izolację cache. |
 | UX-01 | DONE | TRAIN-01, IMPORT-01, PWA-01 | Zweryfikuj klawiaturę, fokus, kontrast, małe ekrany i stany błędów. Usuń wykryte niezgodności i sprawdź pełne ścieżki użytkownika. |
 | RELEASE-LOCAL | DONE | UX-01 | Powiąż kryteria MVP z lokalnymi wynikami i odtwórz testową kopię danych w osobnej bazie. Sprawdź zachowanie fiszki, jej oceny, kursora i izolacji kont. |
+| ENTRY-01 | DONE | AUTH-01, DECK-01 | Wejście do aplikacji prowadzi do logowania lub własnych zestawów. Usunięto publiczny trening przykładowy. |
 | RELEASE-01 | TODO | RELEASE-LOCAL, FLOW-02, SETTINGS-LIMIT, SETTINGS-01 | Uzupełnij dowody dla środowiska docelowego, w tym próbę kopii i odtworzenia oraz test działania aplikacji. Publikacja produkcyjna wymaga osobnego zlecenia. |
 
 ## Wyniki i blokady
@@ -48,3 +49,4 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `PWA-01` — dodano manifest i ikony, przygotowanie wybranego zestawu po pełnym snapshocie oraz aktualizację workera z zachowaniem kolejki ocen. Przeszły typecheck, 74 testy, test IndexedDB i scenariusz PWA na obu profilach Chromium w Next.js i lokalnym Wranglerze. Test objął brak miejsca, udane ponowienie, aktualizację z niewysłaną oceną i izolację cache.
 - `UX-01` — poprawiono kontrast, fokus, link pomijający nawigację i rozmiary pól dotyku. Ocenianie klawiszami 1–4 działa po przejściu fokusem do ocen. Przeszły typecheck, 74 testy, oba buildy i po 14 E2E z audytem axe oraz kontrolą układu przy 320 px.
 - `RELEASE-LOCAL` — [powiązano kryteria MVP z testami](VERIFICATION.md#odbiór-mvp) i odtworzono syntetyczną kopię PostgreSQL w osobnej bazie. Zachowano fiszkę, ocenę, potwierdzenie, kursor i izolację dwóch kont. `RELEASE-01` czeka na `FLOW-02`.
+- `ENTRY-01` — sprawdzono wejście gościa, bibliotekę po zalogowaniu i potwierdzenie konta. Przeszły typecheck, 73 testy, build i 10 E2E.

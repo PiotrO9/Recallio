@@ -12,9 +12,9 @@ npm run test:storage:browser
 npm run test:e2e
 ```
 
-`npm test` obejmuje demo, kontrakty, zapis konta i CSV. Testy zapisu sprawdzają atomowość, retry, migracje, izolację kont, snapshot i rebase outbox. `npm run test:storage:browser` sprawdza również IndexedDB w headless Chromium.
+`npm test` obejmuje trening, kontrakty, zapis konta i CSV. Testy zapisu sprawdzają atomowość, retry, migracje, izolację kont, snapshot i rebase outbox. `npm run test:storage:browser` sprawdza również IndexedDB w headless Chromium.
 
-E2E uruchamia `next start` na 127.0.0.1:3210 i testuje demo w desktopowym Chromium oraz emulacji iPhone'a w Chromium. Scenariusze obejmują zmianę kierunku, zapis i odczyt historii po odświeżeniu oraz błąd IndexedDB. Po błędzie fiszka zostaje na ekranie, a ponowienie zapisuje jedną odpowiedź. Zrzuty trafiają do `test-results/`.
+E2E uruchamia `next start` na porcie 3210 i sprawdza wejście do aplikacji w desktopowym i mobilnym Chromium. Testy kont i treningu wymagają konfiguracji lokalnego Supabase opisanej poniżej.
 
 ## Lokalna baza Supabase
 
@@ -69,19 +69,19 @@ npm run test:e2e
 Remove-Item Env:RECALLIO_E2E_RUNTIME
 ```
 
-OpenNext buduje aplikację za pomocą Next.js, a Playwright uruchamia lokalny runtime Wrangler na porcie 3211. Testy sprawdzają `/api/health` oraz działanie dema w Chromium. W czasie wdrażania konfiguracji dodatkowa lokalna sonda potwierdziła odczyt ciasteczka w Route Handlerze i referencyjną projekcję FSRS. Odbiór środowiska chmurowego jest w `FLOW-02`.
+OpenNext buduje aplikację za pomocą Next.js, a Playwright uruchamia lokalny runtime Wrangler na porcie 3211. Testy sprawdzają `/api/health` oraz wejście do aplikacji w Chromium. W czasie wdrażania konfiguracji dodatkowa lokalna sonda potwierdziła odczyt ciasteczka w Route Handlerze i referencyjną projekcję FSRS. Odbiór środowiska chmurowego jest w `FLOW-02`.
 
 OpenNext zgłasza ograniczone wsparcie Windows. Przy problemach z narzędziami budowania użyj Linuxa lub WSL. `npm audit --omit=dev` nie zgłosił podatności. Pełny audyt zgłosił podatności w drzewie narzędzi OpenNext, których `npm audit fix` bez wymuszonych zmian wersji nie rozwiązuje.
 
 ## Dostępność
 
-`e2e/demo.spec.ts` sprawdza link pomijający nawigację oraz przejście klawiaturą z rozpoczęcia nauki do oceny w demie, a także fokus w logowaniu. `e2e/study-flow.spec.ts` sprawdza odsłonięcie fiszki, ocenę i ponowienie błędnego zapisu z klawiatury oraz komunikat o nieprawidłowym CSV. Axe analizuje demo, logowanie, trening, zestawy i podgląd importu pod kątem wybranych reguł WCAG A i AA. Testy kontrolują brak przewijania w poziomie przy 320 px. Oba profile Chromium przeszły lokalnie w Next.js i Wranglerze. Testy nie obejmują rzeczywistych czytników ekranu.
+`e2e/entry.spec.ts` sprawdza wejście do aplikacji i obsługę logowania klawiaturą. `e2e/study-flow.spec.ts` sprawdza odsłonięcie fiszki, ocenę i ponowienie błędnego zapisu z klawiatury oraz komunikat o nieprawidłowym CSV. Axe analizuje logowanie, trening, zestawy i podgląd importu pod kątem wybranych reguł WCAG A i AA. Testy kontrolują brak przewijania w poziomie przy 320 px. Oba profile Chromium przeszły lokalnie w Next.js i Wranglerze. Testy nie obejmują rzeczywistych czytników ekranu.
 
 ## Odbiór MVP
 
 | Kryteria briefu | Lokalny dowód | Co wymaga dalszego sprawdzenia |
 | --- | --- | --- |
-| Rejestracja i reset hasła, demo bez konta | [Auth E2E](../e2e/auth.spec.ts) z lokalną pocztą, [demo E2E](../e2e/demo.spec.ts) | Dostarczenie poczty i callback HTTPS na testowym środowisku |
+| Rejestracja i reset hasła, wejście bez sesji | [Auth E2E](../e2e/auth.spec.ts) z lokalną pocztą, [wejście do aplikacji](../e2e/entry.spec.ts) | Dostarczenie poczty i callback HTTPS na testowym środowisku |
 | Zestawy ręczne, czytelne błędy CSV, pomijanie duplikatów, zachowanie treści i postępu, eksport bez utraty treści | [Ścieżka użytkownika](../e2e/study-flow.spec.ts), [testy CSV](../tests/import/csv.test.ts) i [test transakcji importu](../tests/storage/content-repository.test.ts) | Pełny eksport i ponowny import z interfejsu na środowisku testowym. Roundtrip samych danych jest sprawdzony jednostkowo |
 | Dwa niezależne kierunki, ciągły trening, odporność na szybkie oceny, zmiana strefy od zaplanowanego resetu | [Scheduler](../tests/learning-scheduler.test.ts), [kolejka](../tests/learning-queue.test.ts) i [ścieżka treningu](../e2e/study-flow.spec.ts) | Pomiar długiej prywatnej sesji z ponownym otwarciem aplikacji |
 | Trwały zapis, offline po przygotowaniu, instalacja PWA | [Test IndexedDB](../tests/storage/browser.test.mjs) i [E2E z odświeżeniem oraz aktualizacją workera](../e2e/study-flow.spec.ts) | Instalacja i pełne zamknięcie oraz ponowne uruchomienie na rzeczywistych urządzeniach z wdrożeniem HTTPS |
@@ -108,4 +108,4 @@ W odtworzonej bazie właściciel odczytał swoją fiszkę i ocenę, a drugie kon
 - Trening: małe zestawy, mixed, limit nowych, dodatkowe ćwiczenie i błąd.
 - Dostępność: pełna obsługa klawiaturą, widoczny fokus, kontrast, czytelne etykiety, duże pola dotyku, brak przewijania poziomego przy szerokości 320 px.
 
-Nie oznaczać tych testów jako zaliczonych przez istniejące testy demo. Wyniki chmurowe wymagają rzeczywistego środowiska Supabase/Workers. Do testów auth używać kont testowych, nie rzeczywistych danych użytkownika.
+Wyniki chmurowe wymagają rzeczywistego środowiska Supabase/Workers. Do testów auth używać kont testowych, nie rzeczywistych danych użytkownika.

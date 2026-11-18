@@ -1,10 +1,10 @@
 # Recallio
 
-Aplikacja do nauki fiszek z publicznym demem i prywatnym treningiem dla zalogowanych użytkowników. Pełną ścieżkę konta zweryfikowano lokalnie z Supabase, Next.js oraz Wranglerem.
+Aplikacja do nauki fiszek z prywatnym treningiem dla zalogowanych użytkowników. Pełną ścieżkę konta zweryfikowano lokalnie z Supabase, Next.js oraz Wranglerem.
 
 ## Uruchomienie
 
-Wymagania: Node.js >=22.12 i npm. Demo działa bez kont i usług zewnętrznych.
+Wymagania: Node.js >=22.12 i npm. Skonfiguruj Supabase według sekcji o kontach.
 
 ```sh
 npm ci
@@ -14,14 +14,6 @@ npm run dev
 Otwórz http://localhost:3000. Produkcja lokalna: `npm run build`, potem `npm start`.
 
 ## Co już działa
-
-- Polski, responsywny ekran w stylistyce Rachmistrza.
-- Gotowy zestaw sześciu fiszek, wybór A → B lub B → A przed rozpoczęciem.
-- Odsłanianie odpowiedzi i przykładu, cztery oceny, ciągła kolejka demonstracyjna.
-- Historia ocen w IndexedDB; odświeżenie zachowuje zapisane odpowiedzi.
-- Ochrona przed ponowionym zapisem tego samego zdarzenia; błąd zapisu zatrzymuje fiszkę.
-
-Demo nie wylicza terminów, nie odtwarza pozycji sesji po odświeżeniu, nie synchronizuje danych i nie zapewnia otwarcia strony offline. IndexedDB nie jest kopią zapasową: wyczyszczenie danych witryny usuwa historię. Demo ma osobną bazę i nigdy nie migruje jej do konta.
 
 Po skonfigurowaniu konta dostępne są prywatne zestawy, import i eksport CSV, trening z FSRS-6 i osobnym postępem dla obu kierunków oraz synchronizacja zapisów między urządzeniami. Użytkownik wybiera zestawy, które chce przygotować do nauki offline. Stan odbioru środowiska docelowego jest w [kolejce zadań](docs/TASKS.md).
 

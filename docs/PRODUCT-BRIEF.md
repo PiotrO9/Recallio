@@ -63,7 +63,6 @@ Zawartość repozytorium wymaga jeszcze zweryfikowania. Publiczna próba odczytu
 
 Pierwsza wersja obejmuje:
 
-- Demonstrację bez konta.
 - Konta użytkowników.
 - Prywatne zestawy fiszek.
 - Ręczne dodawanie, edytowanie i usuwanie treści.
@@ -100,16 +99,7 @@ Poza zakresem pierwszej wersji:
 - Pierwsze logowanie i pobranie danych wymagają internetu.
 - Dokładne zasady przygotowania zestawów do pracy offline zostaną dopracowane w projekcie technicznym.
 
-## 5. Konta i demonstracja
-
-### Demonstracja
-
-- Dostępna bez logowania.
-- Korzysta z gotowego zestawu.
-- Nie umożliwia tworzenia ani importowania własnych zestawów.
-- Postęp demonstracji nie jest przenoszony na konto.
-
-Propozycja: demonstracja korzysta z tego samego mechanizmu treningu co właściwa aplikacja.
+## 5. Konta
 
 ### Konto użytkownika
 
@@ -335,7 +325,6 @@ Dokładna definicja licznika sesji — odpowiedzi czy unikalne fiszki — pozost
 
 ### Planowane widoki
 
-- Demonstracja.
 - Rejestracja i logowanie.
 - Reset hasła.
 - Lista zestawów.
@@ -546,7 +535,6 @@ Celem jest wczesna weryfikacja połączenia Next.js, Cloudflare, Supabase i offl
 
 ### Etap 6 — dopracowanie produktu
 
-- Demonstracja.
 - Ustawienia.
 - Opcjonalne liczniki.
 - Responsywność i dostępność.
@@ -578,7 +566,7 @@ Celem jest wczesna weryfikacja połączenia Next.js, Cloudflare, Supabase i offl
 Pierwsza wersja jest gotowa, gdy:
 
 - Użytkownik potrafi samodzielnie założyć konto i zresetować hasło.
-- Demonstracja działa bez konta.
+- Strona startowa prowadzi do logowania lub prywatnych zestawów.
 - Można utworzyć zestaw ręcznie i zaimportować CSV.
 - Niepoprawny import daje czytelne informacje.
 - Duplikaty można zbiorczo pominąć.

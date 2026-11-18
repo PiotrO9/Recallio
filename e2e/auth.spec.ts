@@ -49,6 +49,10 @@ async function login(page: Page, email: string, password: string) {
   await page.getByLabel("Hasło").fill(password);
   await page.getByRole("button", { name: "Zaloguj się" }).click();
   await expect(
+    page.getByRole("heading", { name: "Moje zestawy" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Moje konto" }).click();
+  await expect(
     page.getByRole("heading", { name: "Twoje konto" }),
   ).toBeVisible();
   await expect(page.getByText(email, { exact: true })).toBeVisible();
@@ -127,6 +131,10 @@ test("account requires a verified session, sign-up and reset links stay on the l
   const confirmation = await emailLink(request, email, "email");
   expect(new URL(confirmation).origin).toBe(baseURL);
   await page.goto(confirmation);
+  await expect(
+    page.getByRole("heading", { name: "Moje zestawy" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Moje konto" }).click();
   await expect(
     page.getByRole("heading", { name: "Twoje konto" }),
   ).toBeVisible();

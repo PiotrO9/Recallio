@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     if (client) {
       const { error } = await client.auth.verifyOtp({ token_hash: hash, type });
       if (!error)
-        path = type === "recovery" ? "/auth/new-password" : "/account";
+        path = type === "recovery" ? "/auth/new-password" : "/decks";
     }
   }
   return authRedirect(path);

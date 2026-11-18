@@ -77,5 +77,5 @@ export async function POST(request: NextRequest) {
     email: email.data,
     password: password.data,
   });
-  return authRedirect(error ? "/auth?status=credentials" : "/account");
+  return authRedirect(error ? "/auth?status=credentials" : "/decks");
 }

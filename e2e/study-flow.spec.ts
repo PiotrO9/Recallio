@@ -54,7 +54,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
       },
       maxRedirects: 0,
     });
-    expect(response.headers().location).toBe("/account");
+    expect(response.headers().location).toBe("/decks");
     return context;
   }
 
@@ -110,6 +110,8 @@ test("a review survives an offline reload and synchronizes once to a second devi
     ).toEqual(["applied", "applied", "applied"]);
 
     const page = await primary.newPage();
+    await page.goto("/");
+    await expect(page).toHaveURL(/\/decks$/);
     await page.goto("/study");
     await expect(page.getByRole("heading", { name: "pies" })).toBeVisible();
     await expectAccessible(page);

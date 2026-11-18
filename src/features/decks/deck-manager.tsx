@@ -462,10 +462,14 @@ export function DeckManager({ userId }: { userId: string }) {
           {!cards.length && <p>W zestawie nie ma fiszek.</p>}
         </section>
       ) : (
-        <p>{data ? "Nie masz jeszcze zestawów." : "Wczytywanie zestawów…"}</p>
+        <p>
+          {data
+            ? "Utwórz pierwszy zestaw lub zaimportuj fiszki z pliku CSV."
+            : "Wczytywanie zestawów…"}
+        </p>
       )}
       <Link className={styles.link} href="/account">
-        Wróć do konta
+        Moje konto
       </Link>
     </div>
   );

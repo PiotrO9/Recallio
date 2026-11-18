@@ -134,7 +134,7 @@ export interface LocalOptions {
   blocking?: () => void;
 }
 
-/** A separate database per authenticated account; it is never the demo database. */
+/** A separate database per authenticated account. */
 export function createLocalRepository(
   options: LocalOptions,
 ): LearningRepository &

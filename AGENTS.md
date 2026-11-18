@@ -2,7 +2,7 @@
 
 ## Dokumentacja według zadania
 
-- Uruchomienie i stan dema — [README](README.md).
+- Uruchomienie aplikacji — [README](README.md).
 - Zakres funkcji i [kryteria odbioru](docs/PRODUCT-BRIEF.md#20-kryteria-gotowości-pierwszej-wersji) — [brief produktu](docs/PRODUCT-BRIEF.md).
 - Dane i synchronizacja — [kontrakty v1](docs/CONTRACTS.md), w tym sekcje [API](docs/CONTRACTS.md#api) i [CSV](docs/CONTRACTS.md#csv-v1).
 - Architektura i [kolejność prac](docs/TECHNICAL-PLAN.md#11-etapy-i-kryteria-przejścia) — [plan techniczny](docs/TECHNICAL-PLAN.md).
@@ -13,7 +13,7 @@ W razie konfliktu pierwszeństwo ma jawna instrukcja użytkownika, potem brief p
 
 ## Stan projektu
 
-Demo i prywatny trening zweryfikowano lokalnie, w tym FSRS-6, synchronizację i naukę offline po przygotowaniu zestawu. Stan odbioru chmurowego i pozostałych decyzji jest w [kolejce](docs/TASKS.md). Demo zachowuje osobną historię ocen.
+Prywatny trening zweryfikowano lokalnie, w tym FSRS-6, synchronizację i naukę offline po przygotowaniu zestawu. Stan odbioru chmurowego i pozostałych decyzji jest w [kolejce](docs/TASKS.md).
 
 ## Technologia i granice
 

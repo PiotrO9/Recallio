@@ -1,6 +1,6 @@
 # Kontrakty v1
 
-[`src/contracts/index.ts`](../src/contracts/index.ts) zawiera współdzielone typy oraz walidatory push, pull i snapshotu. Endpointy pozostają do zaimplementowania. Typy w `src/domain/cards.ts` obsługują demo.
+[`src/contracts/index.ts`](../src/contracts/index.ts) zawiera współdzielone typy oraz walidatory push, pull i snapshotu.
 
 ## Wspólny język
 

@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Recallio — odrobinę każdego dnia",
   description:
-    "Spokojna nauka fiszek we własnym tempie. Pierwsza demonstracja Recallio.",
+    "Spokojna nauka fiszek we własnym tempie. Twórz własne zestawy i wracaj do zaplanowanych powtórek.",
 };
 export default function RootLayout({
   children,

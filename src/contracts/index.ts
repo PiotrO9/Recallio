@@ -131,13 +131,21 @@ export const operationErrorSchema = z.enum([
   "id_reuse",
   "dependency_pending",
 ]);
-export const operationResultSchema = z.strictObject({
-  operationId: uuidSchema,
-  status: z.enum(["applied", "duplicate", "conflict", "rejected"]),
-  revision: revisionSchema.optional(),
-  entity: z.unknown().optional(),
-  error: operationErrorSchema.optional(),
-});
+export const operationResultSchema = z
+  .strictObject({
+    operationId: uuidSchema,
+    status: z.enum(["applied", "duplicate", "conflict", "rejected"]),
+    commitCursor: revisionSchema.optional(),
+    revision: revisionSchema.optional(),
+    entity: z.unknown().optional(),
+    error: operationErrorSchema.optional(),
+  })
+  .refine(
+    (value) =>
+      (value.status === "applied" || value.status === "duplicate") ===
+      (value.commitCursor !== undefined),
+    "Kursor jest wymagany dla zapisanej operacji i niedozwolony dla niezapisanej",
+  );
 export const pushResponseSchema = z.strictObject({
   results: z.array(operationResultSchema),
   serverTime: instantSchema,
@@ -146,6 +154,11 @@ export type Direction = z.infer<typeof directionSchema>;
 export type DirectionMode = z.infer<typeof directionModeSchema>;
 export type Rating = z.infer<typeof ratingSchema>;
 export type Operation = z.infer<typeof operationSchema>;
+export type ContentOperation = Exclude<
+  Operation,
+  { type: "review.record" | "progress.reset" }
+>;
+export type ResetOperation = Extract<Operation, { type: "progress.reset" }>;
 export type PushEnvelope = z.infer<typeof pushSchema>;
 export type OperationResult = z.infer<typeof operationResultSchema>;
 export interface Card {
@@ -211,6 +224,8 @@ export interface PreparedReview {
   event: ReviewEvent;
   progress: Progress;
   operation: Extract<Operation, { type: "review.record" }>;
+  /** Device-local compare-and-swap version; never sent to the server. */
+  localVersion: string;
 }
 export interface CommitReceipt {
   eventId: string;
@@ -221,6 +236,10 @@ export interface LearningSnapshot {
   progress: readonly Progress[];
 }
 export interface LearningRepository {
+  readProgressVersion(
+    cardId: string,
+    direction: Direction,
+  ): Promise<{ progress: Progress | null; localVersion: string }>;
   commitReview(command: PreparedReview): Promise<CommitReceipt>;
   snapshot(deckId: string): Promise<LearningSnapshot>;
 }
@@ -288,6 +307,27 @@ export const settingsSchema = z.strictObject({
   showSession: z.boolean(),
   revision: revisionSchema,
 });
+export type Deck = z.infer<typeof deckSchema>;
+export type Settings = z.infer<typeof settingsSchema>;
+export type ContentRecord = Deck | Card | Settings | null;
+export interface ContentRepository {
+  readContent(
+    type: "deck" | "card" | "settings",
+    id: string,
+  ): Promise<ContentRecord>;
+  commitContent(
+    operation: ContentOperation,
+    expected: ContentRecord,
+  ): Promise<{ operationId: string; committedAt: string }>;
+}
+export interface ResetRepository {
+  commitReset(
+    operation: ResetOperation,
+    expected: Progress,
+    localVersion: string,
+    reset: (previous: Progress, epoch: string) => Progress,
+  ): Promise<{ operationId: string; committedAt: string }>;
+}
 export const introductionSchema = z.strictObject({
   cardId: uuidSchema,
   firstEffectiveAt: instantSchema,

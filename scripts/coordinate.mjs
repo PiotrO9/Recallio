@@ -143,6 +143,13 @@ export function apply(state, action, options = {}) {
   } else if (action === "resume" && task.status === "BLOCKED") {
     task.status = "IN_PROGRESS";
     delete task.reason;
+  } else if (action === "rework" && task.status === "REVIEW") {
+    if (!options.commit || options.commit !== task.commit)
+      throw new Error("Podaj aktualny commit zgłoszony do przeglądu.");
+    task.previousReview = { commit: task.commit, report: task.report };
+    task.status = "IN_PROGRESS";
+    delete task.commit;
+    delete task.report;
   } else if (
     action === "release" &&
     ["IN_PROGRESS", "BLOCKED"].includes(task.status)

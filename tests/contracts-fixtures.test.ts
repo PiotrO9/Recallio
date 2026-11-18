@@ -186,9 +186,36 @@ test("snapshot requires valid introductions and reviews preserve observed mode",
 test("response and error fixtures", () => {
   for (const status of ["applied", "duplicate", "conflict", "rejected"])
     assert.equal(
-      operationResultSchema.safeParse({ operationId: id, status }).success,
+      operationResultSchema.safeParse({
+        operationId: id,
+        status,
+        ...(status === "applied" || status === "duplicate"
+          ? { commitCursor: "1" }
+          : {}),
+      }).success,
       true,
     );
+  assert.equal(
+    operationResultSchema.safeParse({ operationId: id, status: "applied" })
+      .success,
+    false,
+  );
+  assert.equal(
+    operationResultSchema.safeParse({
+      operationId: id,
+      status: "duplicate",
+      commitCursor: "-1",
+    }).success,
+    false,
+  );
+  assert.equal(
+    operationResultSchema.safeParse({
+      operationId: id,
+      status: "conflict",
+      commitCursor: "1",
+    }).success,
+    false,
+  );
   assert.equal(
     httpErrorSchema.safeParse({
       error: {

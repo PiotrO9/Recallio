@@ -43,6 +43,84 @@ test("dependency and ownership checks protect tasks", () => {
   );
 });
 
+test("review rework requires owner, token and exact reviewed commit", () => {
+  const state = { version: 1, tasks: {} };
+  const { token } = apply(state, "claim", {
+    id: "CORE-01",
+    owner: "agent1",
+    base: "abc",
+  });
+  apply(state, "attach", {
+    id: "CORE-01",
+    owner: "agent1",
+    token,
+    branch: "agent-1",
+    worktree: "worktree",
+  });
+  apply(state, "review", {
+    id: "CORE-01",
+    owner: "agent1",
+    token,
+    commit: "old-commit",
+    report: "report.md",
+  });
+  assert.throws(() =>
+    apply(state, "rework", {
+      id: "CORE-01",
+      owner: "agent2",
+      token,
+      commit: "old-commit",
+    }),
+  );
+  assert.throws(() =>
+    apply(state, "rework", {
+      id: "CORE-01",
+      owner: "agent1",
+      token: "wrong",
+      commit: "old-commit",
+    }),
+  );
+  assert.throws(() =>
+    apply(state, "rework", {
+      id: "CORE-01",
+      owner: "agent1",
+      token,
+      commit: "stale",
+    }),
+  );
+  assert.equal(state.tasks["CORE-01"].status, "REVIEW");
+  const resumed = apply(state, "rework", {
+    id: "CORE-01",
+    owner: "agent1",
+    token,
+    commit: "old-commit",
+  });
+  assert.equal(resumed.status, "IN_PROGRESS");
+  assert.equal(resumed.commit, undefined);
+  assert.deepEqual(resumed.previousReview, {
+    commit: "old-commit",
+    report: "report.md",
+  });
+  assert.throws(() =>
+    apply(state, "rework", {
+      id: "CORE-01",
+      owner: "agent1",
+      token,
+      commit: "old-commit",
+    }),
+  );
+  assert.equal(
+    apply(state, "review", {
+      id: "CORE-01",
+      owner: "agent1",
+      token,
+      commit: "new-commit",
+      report: "new-report.md",
+    }).commit,
+    "new-commit",
+  );
+});
+
 test("two processes racing for one task cannot both claim it", async () => {
   const dir = await mkdtemp(join(tmpdir(), "recallio-registry-"));
   try {

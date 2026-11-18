@@ -270,7 +270,7 @@ export const reviewEventSchema = z.strictObject({
   epoch: revisionSchema,
   algorithmVersion: z.string().min(1).max(100),
 });
-// State is JSON and algorithm-specific; LEARN-01 defines its inner schema.
+// Each scheduler version defines the structure of its JSON state.
 export const jsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
   z.union([
     z.string(),

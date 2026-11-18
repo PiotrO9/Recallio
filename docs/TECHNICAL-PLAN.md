@@ -1,6 +1,6 @@
 # Plan techniczny Recallio
 
-Data: 2026-11-17. Status: fundament wykonany; architektura MVP do realizacji. Dokument zawiera decyzje robocze, które pozwalają rozdzielić pracę. Otwarte decyzje mają jawne bramki — agenci nie wybierają sprzecznych rozwiązań samodzielnie.
+Interfejs udostępnia demo. Kontrakty v1, repozytorium konta w IndexedDB i parser CSV są dostępne w kodzie. Poniższy plan opisuje docelową architekturę MVP.
 
 ## 1. Zakres pierwszego przyrostu
 
@@ -8,24 +8,24 @@ Wykonano szkielet Next.js oraz demonstrację bez konta. Repozytorium lokalnej hi
 
 MVP obejmuje pełny zakres z briefu: konta, prywatne zestawy, CSV, dwa kierunki, planowanie, offline/PWA i synchronizację. Brak publicznego katalogu, multimediów, AI, płatności i aplikacji natywnych.
 
-## 2. Decyzje i bramki
+## 2. Decyzje techniczne
 
-| ID  | Decyzja                                                              | Status / warunek                                                  |
-| --- | -------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| D01 | Next.js App Router + React + TS strict + CSS, npm                    | Przyjęta; wersje w lockfile                                       |
-| D02 | Dane demo w oddzielnej bazie `recallio-demo-v1`                      | Wdrożona; brak migracji do kont                                   |
-| D03 | idb jako cienka warstwa IndexedDB                                    | Wdrożona dla demo; rozszerzyć testami transakcji produkcyjnych    |
-| D04 | Wszystkie zapisy aplikacji przez Route Handlers i RPC                | Robocza, zatwierdzić CORE-01; Auth używa SDK Supabase             |
-| D05 | Historia zdarzeń + materializowany postęp per kierunek               | Robocza, obowiązkowa dla synchronizacji                           |
-| D06 | FSRS jako kandydat, porównanie z SM-2                                | Otwarte LEARN-01; nie implementować losowych mnożników            |
-| D07 | PWA przez jawnie wersjonowany service worker                         | Otwarte PLATFORM-02: ocenić Serwist i mały własny SW              |
-| D08 | Workers: sprawdzić adapter OpenNext i aktualną ścieżkę Cloudflare    | Otwarte PLATFORM-01, nie zmieniać Next.js na inny runtime bez ADR |
-| D09 | Przykład po odsłonięciu, po stronie odpowiedzi                       | Przyjęta roboczo, demo wdrożone                                   |
-| D10 | Limit nowych = unikalne cardId w lokalnym dniu, oba kierunki wspólne | Propozycja produktu; domyślna liczba do ustalenia w LEARN-01      |
-| D11 | Licznik sesji = zaakceptowane odpowiedzi, domyślnie ukryty w MVP     | Robocza; licznik demo to łączna historia urządzenia               |
-| D12 | Wylogowanie usuwa cache konta po sync lub świadomym odrzuceniu       | Robocza; szczegóły poniżej                                        |
+| ID  | Decyzja                                                              | Status / warunek                                                                 |
+| --- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| D01 | Next.js App Router + React + TS strict + CSS, npm                    | Przyjęta; wersje w lockfile                                                      |
+| D02 | Dane demo w oddzielnej bazie `recallio-demo-v1`                      | Wdrożona; brak migracji do kont                                                  |
+| D03 | idb jako cienka warstwa IndexedDB                                    | Używana przez demo i repozytorium konta                                          |
+| D04 | Zdalne zapisy danych przez Route Handlers i RPC                      | Auth używa SDK Supabase                                                          |
+| D05 | Historia zdarzeń + materializowany postęp per kierunek               | Robocza, obowiązkowa dla synchronizacji                                          |
+| D06 | FSRS-6 z wersjonowanym profilem                                      | [Decyzja o schedulerze](decisions/learning-scheduler.md). Implementacja w planie |
+| D07 | PWA przez jawnie wersjonowany service worker                         | Otwarte: ocenić Serwist i mały własny SW                                         |
+| D08 | Workers: sprawdzić adapter OpenNext i aktualną ścieżkę Cloudflare    | Zgodność z runtime Workers do weryfikacji                                        |
+| D09 | Przykład po odsłonięciu, po stronie odpowiedzi                       | Przyjęta roboczo, demo wdrożone                                                  |
+| D10 | Limit nowych = unikalne cardId w lokalnym dniu, oba kierunki wspólne | Domyślna liczba do ustalenia przed ustawieniami                                  |
+| D11 | Licznik sesji = zaakceptowane odpowiedzi, domyślnie ukryty w MVP     | Robocza; licznik demo to łączna historia urządzenia                              |
+| D12 | Wylogowanie usuwa cache konta po sync lub świadomym odrzuceniu       | Robocza; szczegóły poniżej                                                       |
 
-Zmiana decyzji: krótki ADR w `docs/decisions/NNN-temat.md`: kontekst, alternatywy, decyzja, wpływ na kontrakty, migracje, testy. Kontrakty v1 zamraża CORE-01 zanim ruszą zależne implementacje. Obecnie nie ma finalnego schematu SQL ani działającego protokołu synchronizacji.
+Zmiana decyzji: krótki ADR w `docs/decisions/NNN-temat.md`: kontekst, alternatywy, decyzja, wpływ na kontrakty, migracje, testy. Obecnie nie ma finalnego schematu SQL ani działającego protokołu synchronizacji.
 
 ## 3. Warstwy i zależności
 
@@ -38,7 +38,7 @@ app → features → domain
 
 Domena nie importuje adapterów. UI nie wykonuje SQL ani requestów Supabase. Serwer nie przyjmuje wyliczonego przez klienta postępu jako zaufanego. Kontrakty nie importują komponentów. Auth jest osobnym adapterem, z weryfikacją tożsamości w każdym prywatnym handlerze. Prywatne odpowiedzi HTTP mają `Cache-Control: no-store`.
 
-Docelowe moduły: `domain/learning`, `features/training`, `features/decks`, `features/import`, `features/auth`, `features/settings`, `storage`, `sync`, `contracts`, `server`, `components/ui`. Obecne `features/demo` i `storage/demo-repository` pozostają odseparowane; wspólny silnik treningu zastąpi prostą kolejkę dopiero po implementacji LEARN.
+Docelowe moduły: `domain/learning`, `features/training`, `features/decks`, `features/import`, `features/auth`, `features/settings`, `storage`, `sync`, `contracts`, `server`, `components/ui`. Obecne `features/demo` i `storage/demo-repository` pozostają odseparowane; wspólny silnik treningu zastąpi prostą kolejkę po wdrożeniu schedulera i kolejki.
 
 ## 4. Model danych chmurowych
 
@@ -51,24 +51,26 @@ Identyfikatory UUID generowane na urządzeniu. Czas UTC (timestamptz), strefa IA
 | cards              | id, user_id, deck_id, side_a/b, example_a/b, revision, deleted_at                                                                                     | composite FK(user_id,deck_id), A/B 1–4000, przykłady <=8000, index(user_id,deck_id)            |
 | review_events      | id, user_id, card_id, direction, rating, device_id, client_seq, occurred_at, received_at, effective_at, base_revision, algorithm_version, disposition | unique(user_id,id), unique(user_id,device_id,client_seq), rating 1–4, indeks historii kierunku |
 | progress           | user_id, card_id, direction, epoch, state, due_at, last_effective_at, revision, algorithm_version                                                     | PK(user_id,card_id,direction), index(user_id,due_at), composite FK do cards                    |
-| progress_resets    | id, user_id, card_id, epoch, server_order                                                                                                             | jawne resetowanie bez usuwania historii                                                        |
+| progress_resets    | id, user_id, card_id, direction, epoch, server_order                                                                                                  | jawne resetowanie bez usuwania historii                                                        |
 | introductions      | user_id, card_id, first_effective_at, study_day                                                                                                       | unique(user_id,card_id); limit dotyczy obu kierunków                                           |
 | operation_receipts | user_id, operation_id, payload_hash, result, created_at                                                                                               | unique(user_id,operation_id), identyczne ID + inny payload = konflikt                          |
 | sync_heads         | user_id, last_sequence                                                                                                                                | blokada per użytkownik serializuje zapis i przydział kursora                                   |
 | change_log         | user_id, sequence, entity, entity_id, revision, payload/tombstone                                                                                     | unique(user_id,sequence), index(user_id,sequence)                                              |
 | import_batches     | id, user_id, deck_id, status, created_at                                                                                                              | stabilne identyfikatory zaakceptowanych wierszy                                                |
 
-Nie wdrażać migracji z tej tabeli bez DATA-01. Ustalić limity rozmiaru całej operacji i batcha w CORE-01. Soft delete chroni przed odtworzeniem usuniętego materiału przez stare urządzenie. Historia pozostaje w zakresie konta; usunięcie konta usuwa również historię. Tombstone i receipts w pierwszej wersji bez automatycznego TTL; GC dopiero z protokołem pełnej resynchronizacji i polityką retencji.
+Tabela opisuje model roboczy. Przy tworzeniu migracji uwzględnij [kontrakty v1](CONTRACTS.md), w tym limity paczki i reset postępu per kierunek. Soft delete chroni przed odtworzeniem usuniętego materiału przez stare urządzenie. Historia pozostaje w zakresie konta; usunięcie konta usuwa również historię. Tombstone i receipts w pierwszej wersji bez automatycznego TTL; GC dopiero z protokołem pełnej resynchronizacji i polityką retencji.
 
 RLS na wszystkich tabelach z danymi użytkownika. Własność `(select auth.uid()) = user_id`; UPDATE wymaga USING i WITH CHECK. Złożone FK uniemożliwiają podpięcie karty pod cudzy zestaw. Klient nie może arbitralnie zmienić projekcji postępu. Zapisy tylko kontrolowanym RPC; minimalne uprawnienia tabel, funkcje bez publicznego EXECUTE. Jeżeli wymagana SECURITY DEFINER, jawnie sprawdzić auth.uid, search_path, wszystkie FK i uprawnienia. Testować także dostęp bezpośrednim REST/RPC, z pominięciem Next.js. Klucz administracyjny nie jest potrzebny w ścieżce użytkownika.
 
-## 5. IndexedDB i atomiczność
+## 5. IndexedDB i atomowość
 
-Produkcja: osobna baza `recallio-user-{userId}`, numer schematu niezależny od wersji aplikacji. Stores: decks, cards, progress, reviewEvents, introductions, outbox, meta, conflicts. Klucze zawierają tożsamość lub baza stanowi twardą granicę konta. Demo jest osobne.
+Repozytorium konta używa osobnej bazy `recallio-user-{userId}`, numer schematu niezależny od wersji aplikacji. Stores: decks, cards, progress, reviewEvents, introductions, outbox, meta, conflicts. Klucze zawierają tożsamość lub baza stanowi twardą granicę konta. Demo jest osobne.
 
 Ocena: przygotuj niezmienne zdarzenie z ID → oblicz projekcję → jedna transakcja readwrite zapisuje event, progress, introduction i outbox → czekaj na tx.done → dopiero następna fiszka. Błąd dowolnego zapisu wycofuje wszystko. Retry nie zmienia rating, czasu ani ID. Przycisk blokowany synchronicznie, nie tylko stanem React.
 
 Migracje muszą mieć fixture poprzedniej wersji i test przerwania. Nie usuwaj bazy na błędzie. `versionchange` zamyka stare połączenie; blokada aktualizacji pokazuje komunikat o innych kartach. Wiele kart przeglądarki: Web Locks/BroadcastChannel jako optymalizacja, transakcje i unikalne ID jako gwarancja. Outbox ma lease z expiry; po crashu inna karta może ponowić.
+
+Repozytorium konta etapuje snapshot w osobnej generacji, do 32 MiB na generację. Transport i PWA muszą obsłużyć limit miejsca i sprzątanie. Rebase oczekujących operacji zatrzymuje się przy konflikcie rewizji, braku rodzica lub braku właściwej polityki schedulera/resetu. Klient synchronizacji i UI muszą pokazać zablokowaną operację i zachować ją do decyzji użytkownika.
 
 ## 6. Synchronizacja
 
@@ -80,28 +82,28 @@ Migracje muszą mieć fixture poprzedniej wersji i test przerwania. Nie usuwaj b
 6. Pull pobiera zmiany po kursorze z limitem i hasMore. Nowy kursor zapisuj razem z całą stroną zmian w IndexedDB. Nowe zmiany po utworzeniu strony są pobierane w następnym pull.
 7. Rozpoczęta fiszka ma zamrożony snapshot; zmiany synchronizacji obowiązują od kolejnej.
 
-Retry: timeout/5xx/429 → exponential backoff z jitter, Retry-After, limit odstępu; 401 → stan requires-auth bez usuwania outbox; 409 → konflikt do rozstrzygnięcia; 400/422 → błąd trwały zachowany do naprawy; offline → pauza. Synchronizacja przy online, focus i po commit; timer tylko przy aktywnej aplikacji. Background Sync jest dodatkiem, nie warunkiem poprawności.
+Przy timeout, 5xx lub 429 zastosuj wykładniczy backoff z jitterem, limitem odstępu i obsługą Retry-After. HTTP 401 wstrzymuje wysyłkę do ponownego uwierzytelnienia, a 400/422 wymaga zachowania błędu do naprawy. HTTP 409 dotyczy konfliktu całego żądania. Konflikty encji klient odczytuje z wyników poszczególnych operacji. W trybie offline wstrzymaj transport. Synchronizację uruchamiaj po odzyskaniu sieci, po powrocie do aplikacji i po lokalnym zapisie. Background Sync może uzupełniać ten mechanizm.
 
 ### Macierz konfliktów
 
-| Sytuacja                                   | Polityka                                                                                                                     |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| Dwie edycje tej samej treści               | optimistic concurrency po revision; 409 z wersją serwera i kopią lokalną; wybór lokalnej jako nowej operacji albo serwerowej |
-| Edycja i review                            | niezależne rewizje; review odnosi się do wersji oglądanej treści                                                             |
-| Dwa urządzenia ćwiczą kierunek             | zachowaj oba zdarzenia; serwer wylicza kanoniczną projekcję, klient uzgadnia swoją                                           |
-| Delete kontra stara edycja/review          | nie przywracaj karty; review zachowane jako ignored_deleted, nie zmienia progress                                            |
-| Reset kontra późna odpowiedź sprzed resetu | epoch powoduje zachowanie historii bez wpływu na nowy postęp                                                                 |
-| Zły zegar                                  | occurredAt pozostaje dowodem klienta; effectiveAt ograniczony serwerem i monotoniczny dla kierunku                           |
-| Wygasła sesja                              | lokalne odpowiedzi pozostają, wysyłka czeka na to samo konto                                                                 |
-| Podwójna wysyłka                           | receipt i hash zapewniają jeden efekt                                                                                        |
+| Sytuacja                                   | Polityka                                                                                                                                                           |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Dwie edycje tej samej treści               | Kontrola rewizji. Po `revision_conflict` klient pokazuje wersję serwera i kopię lokalną. Użytkownik wybiera wersję serwera albo zapisuje swoją jako nową operację. |
+| Edycja i review                            | niezależne rewizje; review odnosi się do wersji oglądanej treści                                                                                                   |
+| Dwa urządzenia ćwiczą kierunek             | zachowaj oba zdarzenia; serwer wylicza kanoniczną projekcję, klient uzgadnia swoją                                                                                 |
+| Delete kontra stara edycja/review          | nie przywracaj karty; review zachowane jako ignored_deleted, nie zmienia progress                                                                                  |
+| Reset kontra późna odpowiedź sprzed resetu | epoch powoduje zachowanie historii bez wpływu na nowy postęp                                                                                                       |
+| Zły zegar                                  | occurredAt pozostaje dowodem klienta; effectiveAt ograniczony serwerem i monotoniczny dla kierunku                                                                 |
+| Wygasła sesja                              | lokalne odpowiedzi pozostają, wysyłka czeka na to samo konto                                                                                                       |
+| Podwójna wysyłka                           | receipt i hash zapewniają jeden efekt                                                                                                                              |
 
-Proponowana polityka czasu v1: kanoniczny porządek odpowiedzi = kolejność akceptacji serwera (sequence), a effectiveAt = max(lastEffectiveAt, min(occurredAt, receivedAt)). Klient zachowuje raw occurredAt i informację o korekcie. Późne zdarzenia mogą więc mieć zerowy odstęp i muszą przejść przez regułę dodatkowego ćwiczenia. To świadomy kompromis: deterministyczny wynik dla nadanej sekwencji, bez nieograniczonego replay historii. LEARN-01 musi zweryfikować, czy wybrany scheduler obsługuje taki model. Nie obiecywać niezależności wyniku od kolejności dostarczenia. Jeśli wymagany replay chronologiczny, nowy ADR przed SYNC-02.
+Proponowana polityka czasu v1: kanoniczny porządek odpowiedzi = kolejność akceptacji serwera (sequence), a effectiveAt = max(lastEffectiveAt, min(occurredAt, receivedAt)). Klient zachowuje raw occurredAt i informację o korekcie. Późne zdarzenia mogą więc mieć zerowy odstęp i muszą przejść przez regułę dodatkowego ćwiczenia. To świadomy kompromis: deterministyczny wynik dla nadanej sekwencji, bez nieograniczonego replay historii. [Decyzja o schedulerze](decisions/learning-scheduler.md) opisuje wpływ kolejności dostarczenia na projekcję.
 
 ## 7. Trening i planowanie
 
 Dwa porty: Scheduler interpretuje pojedynczą ocenę i czas; QueuePolicy wybiera następny materiał. Żaden nie dotyka UI, sieci ani DB.
 
-LEARN-01 porównuje FSRS i SM-2 według: cztery oceny, pierwszy kontakt, krótki odstęp, błąd podczas dodatkowego ćwiczenia, deterministyczność, licencja, kompatybilność przeglądarka/Workers i stabilny format stanu. Wynik: wersjonowany adapter, parametry wraz z uzasadnieniem, golden fixtures. Nie kopiować wartości z demonstracji (demo nie ma wartości harmonogramu).
+[Decyzja o schedulerze](decisions/learning-scheduler.md) opisuje wersjonowany profil FSRS-6, projekcję czasu i reguły dodatkowych ćwiczeń. Implementację należy sprawdzić na referencyjnych scenariuszach w Node, przeglądarce i docelowym runtime Workers.
 
 Kolejka: zaległe/dzisiejsze → zależnie od interleaving nowe w limicie → dodatkowe ćwiczenie znanych. Unikaj poprzedniego cardId, nie tylko kierunku, o ile istnieje alternatywa. Niepamiętana karta wraca po innych. Gdy zestaw ma jedną kartę, dopuszczaj kolejne ćwiczenie, ale bez traktowania jako odległej powtórki. Osobna akcja „Dodaj więcej nowych” rozszerza dzisiejszy limit świadomie. Koniec planu daje dyskretny komunikat, nie koniec sesji.
 
@@ -119,9 +121,7 @@ SW cache: statyczne zasoby wersjonowane i bezpieczny app shell; brak cache prywa
 
 ## 9. CSV
 
-Kontrakt w CONTRACTS.md. Parser oddzielony od UI i zapisu. Strumień: parse → walidacja → klasyfikacja → plan użytkownika → idempotentny commit. Przed zatwierdzeniem zero mutacji. Preview przechowuje numer fizycznego wiersza i identyfikator logicznego rekordu. Worker przy dużych plikach, limit wstępny 5 MiB / 10 000 rekordów (roboczy, sprawdzić na mobile).
-
-Znormalizowany klucz duplikatu: Unicode NFC + trim krawędzi pól + CRLF→LF; zachowaj wielkość liter i odstępy wewnętrzne. Identyczne 4 pola = duplikat. Te same A/B i inne przykłady = konflikt przykładów. To samo A i inne B = wariant odpowiedzi, do świadomego zachowania jako osobna karta. Sprawdzaj plik i istniejący zestaw. Nigdy nie kasuj automatycznie ani nie resetuj postępu.
+Format, limit parsera i reguły klasyfikacji opisuje [kontrakt CSV v1](CONTRACTS.md#csv-v1). Parser jest oddzielony od UI i zapisu. Po parsowaniu, walidacji i klasyfikacji użytkownik zatwierdza plan, a aplikacja zapisuje go idempotentnie. Podgląd przechowuje numer fizycznego wiersza i identyfikator logicznego rekordu. Przy integracji sprawdź czas parsowania na telefonie i rozważ Web Worker dla dużych plików.
 
 Import zatwierdza wszystkie wybory przed zapisem. Wiersz ma stabilne operationId i docelowe cardId. Przerwanie batcha pozwala wznowić bez kopii. Zmiana zestawu od czasu preview powoduje rewalidację rewizji. Eksport dokładnej treści z cytowaniem CSV; nie otwieraj automatycznie w arkuszu. Opcjonalny bezpieczny eksport arkuszowy z ochroną formuł musi być odrębnym trybem, ponieważ modyfikuje treść.
 
@@ -131,18 +131,37 @@ Jedna fiszka, brak timera i punktów. Semantyczne nagłówki, label dla kontrole
 
 ## 11. Etapy i kryteria przejścia
 
-0. Fundament (obecny): demo, dokumenty, testy lokalne.
-1. CORE-01: zamrożone kontrakty v1 i decyzje blokujące implementację; model testów.
-2. Równolegle: DATA-01 (baza/RLS), LOCAL-01 (IndexedDB), LEARN-01 (scheduler), CSV-01 (parser), PLATFORM-01 (Workers spike). Implementacja na mockach zgodnych z kontraktami.
-3. AUTH-01 + SYNC-01/02: pionowy scenariusz konto → jedna fiszka → offline ocena → sync → drugie urządzenie; RLS dwóch kont zaliczone.
-4. DECK-01 + IMPORT-01 + TRAIN-01: pełna treść i nauka na prawdziwych adapterach.
-5. PLATFORM-02 + UX-01: PWA, aktualizacje, ustawienia, responsywność.
-6. RELEASE-01: wszystkie kryteria briefu odhaczone z dowodami na docelowym hostingu.
+[Kolejka wykonawcza](TASKS.md) rozpisuje etapy na zadania i przechowuje ich aktualny stan.
 
-Nie zaczynać pełnego MVP UI zanim pionowy scenariusz nie potwierdzi spójności danych i kompatybilności hostingu. Do uruchomienia chmury potrzebne będą projekt Supabase, konfiguracja SMTP/redirect i konto Cloudflare; prace lokalne nie są nimi blokowane.
+1. Przygotować migracje Supabase, ograniczenia własności i RLS, transakcyjny zapis z potwierdzeniami operacji oraz konfigurację Auth. Zweryfikować zgodność Next.js z runtime Cloudflare Workers, w tym Route Handlers, cookies, callback Auth i docelowy service worker.
+2. Zaimplementować Scheduler i QueuePolicy zgodnie z decyzją o FSRS. Ustalić kontrakt kolejki powrotów, stan po resecie i schemat wersjonowanego stanu schedulera.
+3. Podłączyć Auth, zapis lokalny oraz push, pull i snapshot. Lokalnie sprawdzić pobranie jednej fiszki, ocenę bez sieci, przeładowanie, synchronizację i odczyt na drugim urządzeniu oraz izolację dwóch kont. Weryfikacja tej ścieżki na Supabase i Workers jest warunkiem odbioru wydania.
+4. Rozbudować zarządzanie zestawami i kartami, trening obu kierunków oraz import i eksport CSV. Import wymaga podglądu, jawnych rozstrzygnięć oraz trwałego planu i ID operacji do wznowienia po błędzie. Przed zapisem ponownie zweryfikować cel i rewizję. Klasyfikator zwraca do 20 dopasowań danej kategorii, więc podgląd powinien obsłużyć ucięte wyniki.
+5. Dodać PWA, przygotowanie zestawów offline, aktualizację aplikacji z zachowaniem outbox, ustawienia i dostępność. Przed ustawieniami ustalić domyślny limit nowych kart i zachowanie po zmianie strefy.
+6. Zweryfikować kryteria odbioru z [briefu](PRODUCT-BRIEF.md), instrukcję kopii i przywracania bazy oraz smoke test w docelowym środowisku.
+
+Do weryfikacji chmurowej potrzebne są projekt Supabase, konfiguracja SMTP i przekierowań oraz konto Cloudflare.
 
 ## 12. Weryfikacja i obserwowalność
 
 Testy jednostkowe: scheduler, kolejka, normalizacja CSV, runtime schema. Integracyjne: IndexedDB atomiczność/retry/migracje; Postgres RPC/RLS; utrata odpowiedzi HTTP po commit. E2E na produkcyjnym buildzie: Chrome desktop/mobile, potem WebKit/iOS i Firefox, offline po reload, 2 konta/2 urządzenia, aktualizacja SW z outbox. Tylko headless.
 
 Logi: requestId, operationId, typ błędu i czas; bez haseł, tokenów i treści fiszek. Metryki: pending count, wiek najstarszej operacji, konflikty, odrzucone schematy, błędy lokalnego zapisu. Użytkownik widzi stan, nie techniczny log. Krytyczne awarie blokują release: utrata oceny, zdublowany efekt, wyciek konta, odtworzenie usuniętej fiszki.
+
+## 13. Referencje
+
+### Rachmistrz
+
+Źródła w `D:/CODE/rachmistrz` to `src/styles/tokens.css`, `src/styles/base.css`, `src/styles/training.css` i `src/training/controller.ts`. Wspólne wzorce to Manrope Variable, kremowe tło, zielony akcent, czytelny trening, widoczny fokus i obsługa reduced motion.
+
+### Next Frontend Starter
+
+Wzorce zastosowane w Recallio obejmują App Router, małe komponenty klienckie, odczyt lokalnych danych po hydratacji i testy E2E na buildzie produkcyjnym. [Repozytorium startera](https://github.com/PiotrO9/next-frontend-starter)
+
+### Dokumentacja zewnętrzna
+
+- [Instalacja Next.js](https://nextjs.org/docs/app/getting-started/installation)
+- [Next.js na Cloudflare Workers](https://developers.cloudflare.com/workers/framework-guides/web-apps/nextjs/)
+- [OpenNext](https://developers.cloudflare.com/workers/framework-guides/web-apps/opennext/)
+- [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security)
+- [Supabase changelog](https://supabase.com/changelog.md)

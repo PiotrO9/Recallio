@@ -1,10 +1,10 @@
 # Recallio
 
-Aplikacja do nauki fiszek. Pierwszy lokalny szkielet, nie gotowa wersja MVP.
+Aplikacja do nauki fiszek. W przeglądarce działa lokalne demo.
 
 ## Uruchomienie
 
-Wymagania: Node.js >=22.12, npm. Bez kont, kluczy i usług zewnętrznych.
+Wymagania: Node.js >=22.12 i npm. Demo działa bez kont i usług zewnętrznych.
 
 ```sh
 npm ci
@@ -13,40 +13,36 @@ npm run dev
 
 Otwórz http://localhost:3000. Produkcja lokalna: `npm run build`, potem `npm start`.
 
-## Przygotowanie połączenia Supabase
-
-Wzór `.env.example` opisuje wymagane wartości i miejsca, z których je skopiować.
-Utwórz jego kopię jako `.env.local` (nie nadpisuj istniejącej konfiguracji),
-a następnie uzupełnij `NEXT_PUBLIC_SUPABASE_URL` oraz
-`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` danymi swojego projektu.
-`.env.local` jest ignorowany przez Git.
-
-Obecne demo nie używa jeszcze tych zmiennych. Po ich uzupełnieniu można
-zaimplementować integrację. Do tworzenia tabel i migracji agent potrzebuje
-osobno autoryzowanego połączenia Supabase MCP, ograniczonego do tego projektu.
-Nie umieszczaj w publicznych zmiennych klucza secret/service_role ani hasła bazy.
-
 ## Co już działa
 
-- Next.js App Router, React, TypeScript i zwykły CSS.
 - Polski, responsywny ekran w stylistyce Rachmistrza.
 - Gotowy zestaw sześciu fiszek, wybór A → B lub B → A przed rozpoczęciem.
 - Odsłanianie odpowiedzi i przykładu, cztery oceny, ciągła kolejka demonstracyjna.
 - Historia ocen w IndexedDB; odświeżenie zachowuje zapisane odpowiedzi.
 - Ochrona przed ponowionym zapisem tego samego zdarzenia; błąd zapisu zatrzymuje fiszkę.
-- Testy domeny/zapisu i scenariusz przeglądarkowy desktop/mobile.
 
 Demo nie wylicza terminów, nie odtwarza pozycji sesji po odświeżeniu, nie synchronizuje danych i nie zapewnia otwarcia strony offline. IndexedDB nie jest kopią zapasową: wyczyszczenie danych witryny usuwa historię. Demo ma osobną bazę i nigdy nie migruje jej do konta.
 
-## Dokumentacja dla kolejnych agentów
+Repozytorium zawiera też kontrakty v1, lokalne repozytorium danych konta i parser CSV. Te moduły czekają na podłączenie do interfejsu.
 
-1. `AGENTS.md` — zasady pracy i granice modułów.
-2. `docs/PRODUCT-BRIEF.md` — oryginalny plan użytkownika, zachowany bez zmian.
-3. `docs/TECHNICAL-PLAN.md` — architektura, model danych, decyzje i etapy.
-4. `docs/CONTRACTS.md` — proponowane kontrakty v1, do zamrożenia w zadaniu CORE-01.
-5. `docs/AGENT-BACKLOG.md` — zadania, zależności, zakresy plików, kryteria odbioru.
-6. `docs/VERIFICATION.md` — polecenia i scenariusze testowe.
-7. `docs/REFERENCES.md` — przegląd Rachmistrza, startera i źródeł technicznych.
+## Dokumentacja
+
+- [Brief produktu](docs/PRODUCT-BRIEF.md)
+- [Plan techniczny i kolejne etapy](docs/TECHNICAL-PLAN.md)
+- [Kolejka zadań](docs/TASKS.md)
+- [Kontrakty v1](docs/CONTRACTS.md)
+- [Weryfikacja](docs/VERIFICATION.md)
+- [Zasady pracy w repozytorium](AGENTS.md)
+
+## Praca z kolejką w Codexie
+
+Uruchom cel w jednym czacie projektu.
+
+```text
+/goal Użyj $recallio-queue i wykonuj kolejno gotowe zadania z docs/TASKS.md. Zacznij od SETUP-01, uwzględniając uzgodnione porządki w repozytorium. Po każdym zadaniu lub zapisaniu jego blokady zrób osobny commit i push na origin/codex/recallio-queue. Po blokadzie przejdź do kolejnego niezależnego zadania. Pracuj, aż wszystkie pozycje będą ukończone i opublikowane albo każda pozostała będzie zablokowana lub będzie czekać na zablokowaną zależność. Wdrożenia i operacje w chmurze wymagają osobnego zlecenia.
+```
+
+Jeśli skill nie pojawia się na liście w otwartym czacie, wskaż bezpośrednio `.agents/skills/recallio-queue/SKILL.md`.
 
 ## Komendy
 
@@ -58,6 +54,8 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-E2E startuje własny produkcyjny serwer na porcie 3210 i zamyka go po testach. Nie otwiera widocznej przeglądarki. `package-lock.json` utrwala zależności; zmienia je jeden integrator.
+Testy E2E uruchamiają lokalny build na porcie 3210 i używają Chromium w trybie headless.
 
-Najbliższa praca: CORE-01 (zamrożenie kontraktów), następnie równolegle DATA-01, LEARN-01, CSV-01 i PLATFORM-01. Żadne wdrożenie ani zasoby chmurowe nie zostały utworzone.
+## Konfiguracja przyszłej integracji
+
+[.env.example](.env.example) dokumentuje wartości Supabase, których użyje integracja. Przy jej uruchamianiu skopiuj wzór do `.env.local` i uzupełnij publiczny adres projektu oraz klucz publishable. `.env.local` jest ignorowany przez Git.

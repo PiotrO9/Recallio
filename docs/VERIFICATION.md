@@ -1,6 +1,6 @@
 # Weryfikacja
 
-## Fundament
+## Testy lokalne
 
 ```sh
 npm ci
@@ -8,12 +8,13 @@ npm run typecheck
 npm test
 npm run build
 npx playwright install chromium
+npm run test:storage:browser
 npm run test:e2e
 ```
 
-Testy jednostkowe: odpowiedni przykład dla rewersu; zapętlenie kolejki i odrzucenie pustego zbioru; równoległe ponowienie tego samego eventu w IndexedDB zapisuje jedną odpowiedź; nowe zdarzenie w przeciwnym kierunku jest osobne. fake-indexeddb sprawdza adapter, nie zastępuje prawdziwej przeglądarki.
+`npm test` obejmuje demo, kontrakty, zapis konta i CSV. Testy zapisu sprawdzają atomowość, retry, migracje, izolację kont, snapshot i rebase outbox. `npm run test:storage:browser` sprawdza również IndexedDB w headless Chromium.
 
-E2E uruchamia własny `next start` na 127.0.0.1:3210, bez ponownego użycia cudzego serwera. Desktop Chrome i emulowany iPhone w Chromium: start, ukryta odpowiedź, reveal, ocena, kolejna karta, reload i trwała historia, zmiana kierunku, brak overflow. Emulacja telefonu nie jest testem Safari/iOS. Zrzuty w ignorowanym test-results/.
+E2E uruchamia `next start` na 127.0.0.1:3210 i testuje demo w desktopowym Chromium oraz emulacji iPhone'a w Chromium. Scenariusze obejmują zmianę kierunku, zapis i odczyt historii po odświeżeniu oraz błąd IndexedDB. Po błędzie fiszka zostaje na ekranie, a ponowienie zapisuje jedną odpowiedź. Zrzuty trafiają do `test-results/`.
 
 ## Wymagane scenariusze następnych etapów
 
@@ -27,9 +28,6 @@ E2E uruchamia własny `next start` na 127.0.0.1:3210, bez ponownego użycia cudz
 - Aktualizacja: stary klient, SW, DB migration z niewysłanym outbox.
 - CSV: polskie znaki, cytaty, multiline, BOM, limit, identyczne wpisy i warianty, roundtrip.
 - Trening: małe zestawy, mixed, limit nowych, dodatkowe ćwiczenie i błąd.
+- Dostępność: pełna obsługa klawiaturą, widoczny fokus, kontrast, czytelne etykiety, duże pola dotyku, brak przewijania poziomego przy szerokości 320 px.
 
 Nie oznaczać tych testów jako zaliczonych przez istniejące testy demo. Wyniki chmurowe wymagają rzeczywistego środowiska Supabase/Workers. Do testów auth używać kont testowych, nie rzeczywistych danych użytkownika.
-
-## Wynik weryfikacji fundamentu (2026-11-17)
-
-Sprawdzone lokalnie: typy TypeScript, 3 testy jednostkowe, produkcyjny build Next.js oraz 4 testy E2E (dwa scenariusze na desktop/mobile). Drugi scenariusz symuluje błąd IndexedDB: fiszka zostaje na ekranie, ponowienie zapisuje jedną odpowiedź. Przejrzano zrzuty desktop i mobile. Brak weryfikacji Supabase, Workers, Safari i pełnego offline — tych funkcji jeszcze nie zaimplementowano.

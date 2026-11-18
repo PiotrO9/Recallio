@@ -21,6 +21,7 @@ import {
   type Card,
   type CommitReceipt,
   type ContentRecord,
+  type ContentOperation,
   type ContentRepository,
   type ResetRepository,
   type Introduction,
@@ -92,6 +93,17 @@ export type SnapshotData = Pick<
   SnapshotResponse,
   "decks" | "cards" | "progress" | "introductions" | "settings"
 >;
+export type StoredImport = {
+  id: string;
+  deckId: string;
+  next: number;
+  total: number;
+};
+export type ImportStep = {
+  operation: ContentOperation;
+  expected: ContentRecord;
+};
+const importKey = (id: string, index: number) => `csvImport:${id}:${index}`;
 export type RebaseSnapshot = (
   snapshot: SnapshotData,
   pending: readonly OutboxItem[],
@@ -141,6 +153,16 @@ export function createLocalRepository(
     getDeviceId(generate: () => string): Promise<string>;
     reserveReviewSequence(): Promise<string>;
     readWorkspace(): Promise<SnapshotData>;
+    readImport(): Promise<StoredImport | null>;
+    startImport(
+      plan: Pick<StoredImport, "id" | "deckId"> & {
+        steps: readonly ImportStep[];
+      },
+      expectedDeck: SnapshotData["decks"][number] | null,
+      expectedCards: readonly Card[],
+    ): Promise<void>;
+    readImportStep(id: string, index: number): Promise<ImportStep>;
+    forgetImport(id: string): Promise<void>;
     applyPullPage(expected: string, page: PullResponse): Promise<boolean>;
     clearForLogout(discardPending: boolean): Promise<number>;
     discardBlocked(operationId: string): Promise<void>;
@@ -151,6 +173,7 @@ export function createLocalRepository(
     commitContent(
       operation: Operation,
       expected: unknown,
+      importStep?: { id: string; index: number },
     ): Promise<{ operationId: string; committedAt: string }>;
     commitReset(
       operation: Operation,
@@ -591,7 +614,11 @@ export function createLocalRepository(
         throw error;
       }
     },
-    async commitContent(input, expected) {
+    async commitContent(
+      input,
+      expected,
+      importStep?: { id: string; index: number },
+    ) {
       const operation = operationSchema.parse(input);
       if (
         operation.type === "review.record" ||
@@ -615,6 +642,7 @@ export function createLocalRepository(
       );
       try {
         const receipts = tx.objectStore("contentOperations");
+        const meta = tx.objectStore("meta");
         const existing = await receipts.get(operation.id);
         if (existing) {
           if (
@@ -630,8 +658,39 @@ export function createLocalRepository(
         }
         if (await tx.objectStore("reviews").get(operation.id))
           throw new Error("Ponowne użycie identyfikatora");
-        const decks = await tx.objectStore("decks").getAll();
-        const cards = await tx.objectStore("cards").getAll();
+        const plan = importStep
+          ? ((await meta.get("csvImport")) as StoredImport | undefined)
+          : undefined;
+        if (
+          importStep &&
+          (plan?.id !== importStep.id ||
+            plan.next !== importStep.index ||
+            canonical(await meta.get(importKey(plan.id, plan.next))) !==
+              canonical({ operation, expected }))
+        )
+          throw new Error("Plan importu zmienił się");
+        const card = operation.type.startsWith("card.")
+          ? await tx.objectStore("cards").get(operation.entityId)
+          : undefined;
+        const parentId =
+          operation.type === "card.create"
+            ? operation.payload.deckId
+            : card?.deckId;
+        const deckKey = operation.type.startsWith("deck.")
+          ? operation.entityId
+          : parentId;
+        const deck = deckKey
+          ? await tx.objectStore("decks").get(deckKey)
+          : undefined;
+        if (
+          plan &&
+          operation.type.startsWith("card.") &&
+          (!deck || deck.deletedAt)
+        ) {
+          throw new Error("Docelowy zestaw importu jest niedostępny");
+        }
+        const decks = deck ? [deck] : [];
+        const cards = card ? [card] : [];
         const settings =
           (await tx.objectStore("settings").get("current")) ?? null;
         const current = operation.type.startsWith("deck.")
@@ -699,7 +758,6 @@ export function createLocalRepository(
             throw new Error("Brak wynikowych ustawień");
           await tx.objectStore("settings").put(result.data.settings, "current");
         }
-        const meta = tx.objectStore("meta");
         const sequence = Number((await meta.get("outboxSequence")) ?? 0) + 1;
         if (!Number.isSafeInteger(sequence))
           throw new Error("Wyczerpano kolejność outbox");
@@ -711,6 +769,11 @@ export function createLocalRepository(
           state: "pending",
         });
         await receipts.add({ operation, expected, committedAt });
+        if (plan)
+          await meta.put(
+            { ...plan, next: plan.next + 1 } satisfies StoredImport,
+            "csvImport",
+          );
         await tx.done;
         return { operationId: operation.id, committedAt };
       } catch (error) {
@@ -922,6 +985,64 @@ export function createLocalRepository(
         introductions,
         settings: settings ?? null,
       };
+    },
+    async readImport() {
+      const db = await connect();
+      return (
+        ((await db.get("meta", "csvImport")) as StoredImport | undefined) ??
+        null
+      );
+    },
+    async startImport(plan, expectedDeck, expectedCards) {
+      const db = await connect();
+      const tx = db.transaction(["meta", "decks", "cards"], "readwrite");
+      const meta = tx.objectStore("meta");
+      if (await meta.get("csvImport")) {
+        await tx.done;
+        throw new Error("Najpierw dokończ bieżący import");
+      }
+      const deck = (await tx.objectStore("decks").get(plan.deckId)) ?? null;
+      const cards = (await tx.objectStore("cards").getAll()).filter(
+        (card) => card.deckId === plan.deckId && !card.deletedAt,
+      );
+      if (
+        canonical(deck) !== canonical(expectedDeck) ||
+        canonical(cards) !== canonical(expectedCards)
+      ) {
+        await tx.done;
+        throw new Error("Zestaw zmienił się od czasu podglądu");
+      }
+      const { id, deckId, steps } = plan;
+      await Promise.all(
+        steps.map((step, index) => meta.put(step, importKey(id, index))),
+      );
+      await meta.put(
+        { id, deckId, next: 0, total: steps.length } satisfies StoredImport,
+        "csvImport",
+      );
+      await tx.done;
+    },
+    async readImportStep(id, index) {
+      const db = await connect();
+      const step = (await db.get("meta", importKey(id, index))) as
+        ImportStep | undefined;
+      if (!step) throw new Error("Brak kroku importu");
+      return step;
+    },
+    async forgetImport(id) {
+      const db = await connect();
+      const tx = db.transaction("meta", "readwrite");
+      const plan = (await tx.store.get("csvImport")) as
+        StoredImport | undefined;
+      if (plan?.id === id) {
+        await Promise.all(
+          Array.from({ length: plan.total }, (_, index) =>
+            tx.store.delete(importKey(id, index)),
+          ),
+        );
+        await tx.store.delete("csvImport");
+      }
+      await tx.done;
     },
     async applyPullPage(expected, input) {
       const page = pullResponseSchema.parse(input);

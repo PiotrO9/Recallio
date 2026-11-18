@@ -10,6 +10,7 @@ import {
   type Deck,
 } from "@/contracts";
 import { resetFsrsProgress } from "@/domain/learning/scheduler";
+import { exportCsv } from "@/domain/import/csv";
 import {
   createLocalRepository,
   type SnapshotData,
@@ -237,6 +238,17 @@ export function DeckManager({ userId }: { userId: string }) {
     });
   }
 
+  function download() {
+    const url = URL.createObjectURL(
+      new Blob([exportCsv(cards)], { type: "text/csv;charset=utf-8" }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "fiszki.csv";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   return (
     <div className={styles.body}>
       {message && <p role="status">{message}</p>}
@@ -260,6 +272,12 @@ export function DeckManager({ userId }: { userId: string }) {
       >
         Dodaj zestaw
       </button>
+      <Link
+        className={styles.link}
+        href={deck ? `/import?deck=${deck.id}` : "/import"}
+      >
+        Importuj CSV
+      </Link>
       {deckForm !== undefined && (
         <form
           className="auth-form"
@@ -338,6 +356,13 @@ export function DeckManager({ userId }: { userId: string }) {
           <a href={`/study?deck=${deck.id}`} className={styles.link}>
             Ucz się z tego zestawu
           </a>
+          <button
+            className="auth-secondary"
+            disabled={!cards.length}
+            onClick={download}
+          >
+            Eksportuj CSV
+          </button>
           <button
             className="primary"
             disabled={busy}

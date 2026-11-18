@@ -224,7 +224,7 @@ export function parseCsv(input: string): {
 }
 
 // Comparison only; never replace the original content with these keys.
-const norm = (s: string | null) =>
+export const normalizeCsvText = (s: string | null) =>
   (s ?? "")
     .normalize("NFC")
     .trim()
@@ -247,12 +247,17 @@ export function classifyRows(
   const byAnswer = new Map<string, Bucket>();
   const byExact = new Map<string, Bucket>();
   const keys = (content: Content) => {
-    const a = norm(content.sideA),
-      b = norm(content.sideB);
+    const a = normalizeCsvText(content.sideA),
+      b = normalizeCsvText(content.sideB);
     return [
       JSON.stringify([a]),
       JSON.stringify([a, b]),
-      JSON.stringify([a, b, norm(content.exampleA), norm(content.exampleB)]),
+      JSON.stringify([
+        a,
+        b,
+        normalizeCsvText(content.exampleA),
+        normalizeCsvText(content.exampleB),
+      ]),
     ];
   };
   const insert = (content: Content, match: Match) => {

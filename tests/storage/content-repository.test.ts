@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createLocalRepository } from "../../src/storage/local-repository";
 import { createSnapshotRebaser } from "../../src/storage/snapshot-rebase";
-import type { Operation } from "../../src/contracts";
+import type { Deck, Operation } from "../../src/contracts";
 const userId = "00000000-0000-4000-8000-000000000201";
 const deckId = "00000000-0000-4000-8000-000000000202";
 const cardId = "00000000-0000-4000-8000-000000000203";
@@ -20,6 +20,67 @@ const local = (account = userId) =>
       studyDay: "2026-11-17",
     }),
   });
+
+test("CSV import stores its cursor atomically, reuses operation IDs and detects changed targets", async () => {
+  const account = "00000000-0000-4000-8000-000000000296";
+  const first = local(account);
+  const resumed = local(account);
+  const otherCard = "00000000-0000-4000-8000-000000000297";
+  const createDeck = {
+    type: "deck.create",
+    id: opId(71),
+    entityId: deckId,
+    payload: { name: "CSV", directionMode: "mixed" },
+  } as const;
+  const createCard = {
+    type: "card.create",
+    id: opId(72),
+    entityId: cardId,
+    payload: {
+      deckId,
+      sideA: "kot",
+      sideB: "cat",
+      exampleA: null,
+      exampleB: null,
+    },
+  } as const;
+  const plan = {
+    id: opId(73),
+    deckId,
+    steps: [
+      { operation: createCard, expected: null },
+      {
+        operation: { ...createCard, id: opId(74), entityId: otherCard },
+        expected: null,
+      },
+    ],
+  };
+  try {
+    await first.commitContent(createDeck, null);
+    const deck = (await first.readContent("deck", deckId)) as Deck;
+    await assert.rejects(
+      first.startImport(plan, { ...deck, revision: "9" }, []),
+      /zmienił się/,
+    );
+    await first.startImport(plan, deck, []);
+    await first.commitContent(createCard, null, { id: plan.id, index: 0 });
+    first.close();
+    assert.equal((await resumed.readImport())?.next, 1);
+    await resumed.commitContent(createCard, null, { id: plan.id, index: 0 });
+    const step = await resumed.readImportStep(plan.id, 1);
+    await resumed.commitContent(step.operation, step.expected, {
+      id: plan.id,
+      index: 1,
+    });
+    assert.equal((await resumed.readImport())?.next, 2);
+    assert.equal((await resumed.readWorkspace()).cards.length, 2);
+    await resumed.forgetImport(plan.id);
+    assert.equal(await resumed.readImport(), null);
+  } finally {
+    first.close();
+    resumed.close();
+  }
+});
 
 test("logout preserves unsent changes until explicitly discarded and isolates the other account", async () => {
   const first = local("00000000-0000-4000-8000-000000000298");

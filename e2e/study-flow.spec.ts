@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { expect, test, type BrowserContext } from "@playwright/test";
 
 test.skip(
@@ -264,6 +265,37 @@ test("a review survives an offline reload and synchronizes once to a second devi
     expect((await stale.json()).results).toMatchObject([
       { status: "conflict", error: "entity_deleted" },
     ]);
+    await page.goto("/import");
+    await page
+      .getByRole("textbox", { name: "Nazwa zestawu" })
+      .fill("Z pliku CSV");
+    await page.getByLabel("Plik CSV").setInputFiles({
+      name: "fiszki.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        "side_a;side_b\nkot;cat\nkot;cat\ndom;house\n",
+        "utf8",
+      ),
+    });
+    await expect(page.getByText("Wiersz 3 · Duplikat")).toBeVisible();
+    await page.getByLabel("Pomiń duplikaty").check();
+    await expect(
+      page.getByText("Separator: średnik. Do zapisu: 2 z 3."),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Zatwierdź import" }).click();
+    await expect(
+      page.getByText("Import zapisany na tym urządzeniu."),
+    ).toBeVisible();
+    await page.getByRole("link", { name: "Wróć do zestawów" }).click();
+    await page
+      .getByRole("button", { name: "Z pliku CSV", exact: true })
+      .click();
+    const downloaded = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Eksportuj CSV" }).click();
+    const output = await readFile(await (await downloaded).path(), "utf8");
+    expect(output).toContain("side_a,side_b,example_a,example_b");
+    expect(output.match(/kot,cat,,/g)).toHaveLength(1);
+    expect(output).toContain("dom,house,,");
   } finally {
     await Promise.all(devices.map((context) => context.close()));
     await Promise.all(

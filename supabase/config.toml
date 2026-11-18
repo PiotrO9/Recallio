@@ -39,8 +39,22 @@ port = 54324
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = [
+  "http://127.0.0.1:3000/auth/confirm",
+  "http://127.0.0.1:3210/auth/confirm",
+  "http://127.0.0.1:3211/auth/confirm",
+]
 enable_anonymous_sign_ins = false
 
 [auth.email]
 enabled = true
 enable_confirmations = true
+secure_password_change = true
+
+[auth.email.template.confirmation]
+subject = "Potwierdź konto Recallio"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Odzyskaj hasło do Recallio"
+content_path = "./supabase/templates/recovery.html"

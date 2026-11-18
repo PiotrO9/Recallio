@@ -36,6 +36,22 @@ Remove-Item Env:RECALLIO_TEST_ANON_KEY, Env:RECALLIO_TEST_SERVICE_ROLE_KEY
 
 Test REST używa lokalnego adresu `127.0.0.1:54321` i usuwa utworzone konta testowe. Publiczne tabele przyznają użytkownikom wyłącznie odczyt własnych wierszy. Tabele kursora, resetów i potwierdzeń są w prywatnym schemacie. Testy produkcyjnych funkcji RPC do synchronizacji należą do `SYNC-01`.
 
+### Konta i wiadomości e-mail
+
+W sesji terminala z uruchomionym lokalnym Supabase ustaw adres API i klucze testowe z `status`. Playwright odczytuje linki potwierdzenia i resetu z lokalnej skrzynki na porcie 54324.
+
+```powershell
+$recallioStatus = npx --yes supabase@3.2.0 status -o json | ConvertFrom-Json
+$env:NEXT_PUBLIC_SUPABASE_URL = 'http://127.0.0.1:54321'
+$env:NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = $recallioStatus.PUBLISHABLE_KEY
+$env:RECALLIO_TEST_JWT_SECRET = $recallioStatus.JWT_SECRET
+$env:RECALLIO_RUN_AUTH_TESTS = '1'
+npm run build
+npm run test:e2e
+```
+
+Na środowisku wdrożeniowym wpisz dokładny adres `/auth/confirm` na listę przekierowań i skonfiguruj SMTP oraz szablony wiadomości z `supabase/templates/`. Oddziel klucze testowe od kluczy wdrożenia.
+
 ## Lokalny runtime Workers
 
 ```powershell

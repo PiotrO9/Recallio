@@ -92,7 +92,10 @@ export function DemoTrainer() {
           </span>{" "}
           recallio
         </a>
-        <span className="badge">Wersja demonstracyjna</span>
+        <nav className="demo-nav" aria-label="Recallio">
+          <span className="badge">Wersja demonstracyjna</span>
+          <a className="badge" href="/account">Konto</a>
+        </nav>
       </header>
       <main id="main">
         <div className="intro">

@@ -1,0 +1,65 @@
+.shell {
+  width: min(100% - 32px, 480px);
+  margin: clamp(28px, 8vh, 100px) auto;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  margin-top: 24px;
+  padding: clamp(22px, 6vw, 44px);
+}
+
+.panel h1 {
+  font-size: clamp(27px, 6vw, 36px);
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  margin: 0 0 25px;
+}
+
+.panel :global(.auth-form) {
+  display: grid;
+  gap: 16px;
+}
+
+.panel label {
+  display: grid;
+  font-size: 14px;
+  gap: 6px;
+  margin: 0;
+}
+
+.panel input {
+  background: var(--background);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font: inherit;
+  min-height: 48px;
+  padding: 8px 12px;
+  width: 100%;
+}
+
+.panel input:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.panel nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+  margin-top: 24px;
+}
+
+.panel nav a {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.panel :global(.auth-secondary) {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}

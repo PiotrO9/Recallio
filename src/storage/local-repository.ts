@@ -1,4 +1,4 @@
-import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import { openDB, type DBSchema, type IDBPDatabase, type StoreNames } from "idb";
 import { createSnapshotRebaser, type ResetProjection } from "./snapshot-rebase";
 import {
   uuidSchema,
@@ -123,6 +123,7 @@ export function createLocalRepository(
     releaseLease(owner: string): Promise<void>;
     acknowledge(result: OperationResult): Promise<void>;
     listBlocked(): Promise<OutboxItem[]>;
+    clearForLogout(discardPending: boolean): Promise<number>;
     discardBlocked(operationId: string): Promise<void>;
     readContent(
       type: "deck" | "card" | "settings",
@@ -827,6 +828,22 @@ export function createLocalRepository(
       return (await db.getAll("outbox"))
         .filter((item) => item.state === "blocked")
         .sort((a, b) => a.sequence - b.sequence);
+    },
+    async clearForLogout(discardPending) {
+      const db = await connect();
+      const names = [...db.objectStoreNames] as StoreNames<Schema>[];
+      const tx = db.transaction(names, "readwrite");
+      const outbox = await tx.objectStore("outbox").getAll();
+      const pending = outbox.filter(
+        (item) => item.state !== "acknowledged",
+      ).length;
+      if (pending && !discardPending) {
+        await tx.done;
+        return pending;
+      }
+      await Promise.all(names.map((name) => tx.objectStore(name).clear()));
+      await tx.done;
+      return 0;
     },
     async beginSnapshot() {
       const db = await connect();

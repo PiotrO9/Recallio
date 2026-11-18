@@ -1,6 +1,6 @@
 # Recallio
 
-Aplikacja do nauki fiszek. W przeglądarce działa lokalne demo.
+Aplikacja do nauki fiszek z lokalnym demem. Po skonfigurowaniu Supabase działa również obsługa kont.
 
 ## Uruchomienie
 
@@ -56,6 +56,6 @@ npm run test:e2e
 
 Testy E2E uruchamiają lokalny build na porcie 3210 i używają Chromium w trybie headless.
 
-## Konfiguracja przyszłej integracji
+## Konfiguracja kont
 
-[.env.example](.env.example) dokumentuje wartości Supabase, których użyje integracja. Przy jej uruchamianiu skopiuj wzór do `.env.local` i uzupełnij publiczny adres projektu oraz klucz publishable. `.env.local` jest ignorowany przez Git.
+Skopiuj [.env.example](.env.example) do `.env.local` i uzupełnij publiczny adres projektu oraz klucz publishable. Konfigurację lokalnej bazy, wiadomości e-mail i testów opisuje [weryfikacja](docs/VERIFICATION.md#konta-i-wiadomości-email).

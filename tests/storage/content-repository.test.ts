@@ -20,6 +20,31 @@ const local = (account = userId) =>
       studyDay: "2026-11-17",
     }),
   });
+
+test("logout preserves unsent changes until explicitly discarded and isolates the other account", async () => {
+  const first = local("00000000-0000-4000-8000-000000000298");
+  const second = local("00000000-0000-4000-8000-000000000299");
+  const create: Operation = {
+    type: "deck.create",
+    id: opId(78),
+    entityId: deckId,
+    payload: { name: "Local changes", directionMode: "mixed" },
+  };
+  try {
+    await first.commitContent(create, null);
+    await second.commitContent(create, null);
+    assert.equal(await first.clearForLogout(false), 1);
+    assert.ok(await first.readContent("deck", deckId));
+    assert.equal(await first.clearForLogout(true), 0);
+    assert.equal(await first.readContent("deck", deckId), null);
+    assert.equal((await first.lease("sync", 0, 10, 10)).length, 0);
+    assert.equal(await second.clearForLogout(false), 1);
+    assert.ok(await second.readContent("deck", deckId));
+  } finally {
+    first.close();
+    second.close();
+  }
+});
 test("content writes and outbox commit together; retries and stale edits are safe", async () => {
   const a = local(),
     b = local();

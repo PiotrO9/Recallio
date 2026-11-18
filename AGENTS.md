@@ -13,7 +13,7 @@ W razie konfliktu pierwszeństwo ma jawna instrukcja użytkownika, potem brief p
 
 ## Stan projektu
 
-Interfejs udostępnia lokalne demo. W kodzie są już kontrakty, repozytorium konta w IndexedDB i parser CSV. Podłączenie tych modułów oraz konta, harmonogram powtórek, synchronizacja, PWA i hosting na Workers pozostają w planie.
+Interfejs udostępnia lokalne demo i obsługę kont po skonfigurowaniu Supabase. Silnik powtórek, kolejka, repozytorium IndexedDB i parser CSV czekają na podłączenie do właściwego treningu. Stan kolejnych etapów jest w [kolejce](docs/TASKS.md).
 
 ## Technologia i granice
 

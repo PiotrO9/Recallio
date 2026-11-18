@@ -198,6 +198,7 @@ export interface Progress {
 export interface Candidate {
   card: Card;
   direction: Direction;
+  epoch: string;
   mode: z.infer<typeof reviewModeSchema>;
 }
 export interface Scheduler {
@@ -211,13 +212,17 @@ export interface Scheduler {
     mode: Candidate["mode"];
   }): Progress;
 }
+export type SessionReturn = Pick<ReviewEvent, "cardId" | "direction" | "epoch">;
+
 export interface QueuePolicy {
   next(input: {
     cards: readonly Card[];
     progress: readonly Progress[];
     now: string;
     direction: DirectionMode;
-    recentCardIds: readonly string[];
+    previousCardId: string | null;
+    sessionReturns: readonly SessionReturn[];
+    introducedCardIds: ReadonlySet<string>;
     remainingNew: number;
     random: () => number;
   }): Candidate | null;

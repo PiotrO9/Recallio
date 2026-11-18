@@ -30,7 +30,9 @@ interface QueuePolicy {
     progress: readonly Progress[];
     now: IsoInstant;
     direction: DirectionMode;
-    recentCardIds: readonly string[];
+    previousCardId: string | null;
+    sessionReturns: readonly SessionReturn[];
+    introducedCardIds: ReadonlySet<string>;
     remainingNew: number;
     random: () => number;
   }): Candidate | null;

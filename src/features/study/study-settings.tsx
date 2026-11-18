@@ -65,7 +65,7 @@ export function StudySettings({
             max={10000}
             step={1}
             required
-            defaultValue={settings?.newLimit}
+            defaultValue={settings?.newLimit ?? 20}
           />
         </label>
         <label>

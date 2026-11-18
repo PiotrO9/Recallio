@@ -263,6 +263,34 @@ test("a review survives an offline reload and synchronizes once to a second devi
       0,
     );
     await expect(otherPage.getByText("Zapisany postęp: 1")).toHaveCount(0);
+    const defaultLimit = otherPage.getByRole("spinbutton", {
+      name: "Dzienny limit nowych fiszek",
+    });
+    const saveSettings = otherPage.getByRole("button", {
+      name: "Zapisz ustawienia",
+    });
+    const syncedLimit = async () => {
+      const response = await otherDevice.request.get(
+        "/api/v1/sync/pull?cursor=0",
+      );
+      if (!response.ok()) return undefined;
+      const { changes } = await response.json();
+      return changes
+        .filter(({ entity }: { entity: string }) => entity === "settings")
+        .at(-1)?.payload.newLimit;
+    };
+    await expect(defaultLimit).toHaveValue("20");
+    await otherPage
+      .getByLabel("Strefa nauki", { exact: true })
+      .fill("Europe/Warsaw");
+    await saveSettings.click();
+    await expect.poll(syncedLimit).toBe(20);
+    await otherPage.getByText("Ustawienia nauki", { exact: true }).click();
+    await defaultLimit.fill("0");
+    await saveSettings.click();
+    await expect.poll(syncedLimit).toBe(0);
+    await otherPage.reload();
+    await expect(otherPage.locator('input[name="newLimit"]')).toHaveValue("0");
     await page.goto("/decks");
     await expect(page.getByRole("heading", { name: "Nauka" })).toBeVisible();
     await expectAccessible(page);

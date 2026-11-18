@@ -6,4 +6,6 @@ Wygaśnięcie sesji nie usuwa outbox. Ponowne uwierzytelnienie wznawia wysyłkę
 
 Rejestrujemy surowy czas klienta i czas serwera. Propozycja effectiveAt = max(lastEffectiveAt, min(occurredAt, receivedAt)), porządek akceptacji serwera. Jest to kompromis zależny od kolejności dostarczenia; [decyzja o schedulerze](learning-scheduler.md) określa zachowanie algorytmu przy takiej kolejności. Reset zwiększa epoch, późny event poprzedniego epoch pozostaje w historii bez modyfikowania nowej projekcji.
 
-Nie ustalono domyślnego limitu nowych kart ani ostatecznej polityki strefy po zmianie przez użytkownika. Te decyzje wymagają osobnego rozstrzygnięcia przed ustawieniami.
+Pierwsza konfiguracja nauki domyślnie ustawia 20 nowych fiszek dziennie. Użytkownik może zmienić limit w ustawieniach. Wartość 0 wyłącza wprowadzanie nowych fiszek w ramach dziennego limitu. Zapisane limity istniejących profili zachowują swoją wartość.
+
+Polityka zmiany strefy w istniejącym profilu pozostaje do ustalenia. Decyzja obejmuje wpływ zmiany na licznik dnia i wcześniejsze wprowadzenia.

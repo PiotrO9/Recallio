@@ -432,7 +432,7 @@ function StudyBoard({
       workspace?.settings ?? null,
     );
     await refresh(false);
-    void synchronize();
+    void synchronize(true);
   }
 
   function addNew() {

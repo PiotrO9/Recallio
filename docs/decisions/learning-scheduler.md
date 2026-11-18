@@ -1,6 +1,6 @@
 # LEARN-01: wybór schedulera i zasady projekcji
 
-Status: propozycja do zatwierdzenia przez integratora, 2026-11-17. Nie implementuje nauki. Wpływ decyzji na zapis jest duży, migracja stanu i odtwarzanie historii są kosztowne; wersja algorytmu i jego parametry muszą być trwałe.
+Status: decyzja zatwierdzona do realizacji, 2026-11-18. Nie implementuje nauki. Przed implementacją należy uzgodnić zależność, kontrakt kolejki i weryfikację środowisk opisane poniżej. Wpływ decyzji na zapis jest duży, migracja stanu i odtwarzanie historii są kosztowne; wersja algorytmu i jego parametry muszą być trwałe.
 
 ## Wybór i porównanie
 
@@ -35,6 +35,6 @@ Paczka została uruchomiona poza repozytorium (`npm install --prefix <temp> --no
 
 ## Scenariusze i bramki
 
-Oczekiwane liczby i wejścia w `tests/fixtures/learning/fsrs6-v1.json`. Wyniki bazowego FSRS wyliczono w paczce 5.4.2, a osłonę i konflikty określa ta decyzja; testy adaptera muszą sprawdzić oba poziomy. Różnice po zmianie wersji są zmianą kontraktu, nie automatyczną aktualizacją fixture. Przed integracją weryfikator zatwierdza politykę practice, regułę trybu, dane i zależność. Potrzebne uzgodnienie kontraktów: zapis/pull zdarzeń musi przenosić observedMode, kanoniczny effectiveAt, disposition i pełny stan, rozróżnić czas ostatniej oceny modelu od `lastEffectiveAt`; obecny `changeSchema.payload` jest ogólnym JSON. Uzgodnić z DATA/SYNC bez zmian wspólnych plików w LEARN-01.
+Oczekiwane liczby i wejścia w `tests/fixtures/learning/fsrs6-v1.json`. Wyniki bazowego FSRS wyliczono w paczce 5.4.2, a osłonę i konflikty określa ta decyzja; testy adaptera muszą sprawdzić oba poziomy. Różnice po zmianie wersji są zmianą kontraktu, nie automatyczną aktualizacją fixture. Przed implementacją integrator uzgadnia zależność i kontrakty: zapis/pull zdarzeń musi przenosić observedMode, kanoniczny effectiveAt, disposition i pełny stan, rozróżnić czas ostatniej oceny modelu od `lastEffectiveAt`; obecny `changeSchema.payload` jest ogólnym JSON. Uzgodnić z DATA/SYNC bez zmian wspólnych plików w LEARN-01.
 
 Fixture v2 zawiera jawne początkowe projekcje, zdarzenia i częściowe oczekiwane projekcje. Identyfikatory są symbolicznymi aliasami: test adaptera powinien mapować je deterministycznie na poprawne UUID. `sessionReturns` jest stanem kontrolera sesji, a nie stanem FSRS. `check-fixtures.mjs` weryfikuje strukturę oraz kilka wartości biblioteki; nie implementuje ani nie testuje zachowania adaptera. LEARN-02 ma uruchomić wszystkie scenariusze wobec rzeczywistego kodu, także różne urządzenia, kolejkę, błąd transakcji i retry.

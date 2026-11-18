@@ -36,6 +36,19 @@ Remove-Item Env:RECALLIO_TEST_ANON_KEY, Env:RECALLIO_TEST_SERVICE_ROLE_KEY
 
 Test REST używa lokalnego adresu `127.0.0.1:54321` i usuwa utworzone konta testowe. Publiczne tabele przyznają użytkownikom wyłącznie odczyt własnych wierszy. Tabele kursora, resetów i potwierdzeń są w prywatnym schemacie. Testy produkcyjnych funkcji RPC do synchronizacji należą do `SYNC-01`.
 
+## Lokalny runtime Workers
+
+```powershell
+npm run workers:build
+$env:RECALLIO_E2E_RUNTIME = 'workers'
+npm run test:e2e
+Remove-Item Env:RECALLIO_E2E_RUNTIME
+```
+
+OpenNext buduje aplikację za pomocą Next.js, a Playwright uruchamia lokalny runtime Wrangler na porcie 3211. Testy sprawdzają `/api/health` oraz działanie dema w Chromium. W czasie wdrażania konfiguracji dodatkowa lokalna sonda potwierdziła odczyt ciasteczka w Route Handlerze i referencyjną projekcję FSRS. Odbiór środowiska chmurowego jest w `FLOW-02`.
+
+OpenNext zgłasza ograniczone wsparcie Windows. Przy problemach z narzędziami budowania użyj Linuxa lub WSL. `npm audit --omit=dev` nie zgłosił podatności. Pełny audyt zgłosił podatności w drzewie narzędzi OpenNext, których `npm audit fix` bez wymuszonych zmian wersji nie rozwiązuje.
+
 ## Wymagane scenariusze następnych etapów
 
 - Atomiczność: błąd przy każdym store → zero częściowego postępu/outbox.

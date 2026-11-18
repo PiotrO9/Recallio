@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "workers:build": "opennextjs-cloudflare build",
+    "workers:preview": "wrangler dev --local",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts tests/storage/*.test.ts tests/import/*.test.ts",
     "test:storage:browser": "node --test tests/storage/*.test.mjs",
@@ -25,6 +27,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "1.20.17",
     "@playwright/test": "1.65.1",
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",
@@ -33,6 +36,7 @@
     "fake-indexeddb": "6.2.8",
     "prettier": "3.10.1",
     "tsx": "4.23.15",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "wrangler": "4.164.0"
   }
 }

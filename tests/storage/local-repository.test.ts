@@ -84,6 +84,7 @@ test("different concurrent reviews reject a stale prepared command without alter
     second = repo(user);
   await first.commitReview(command);
   const base = await first.readProgress(card, "a-b");
+  const { localVersion } = await first.readProgressVersion(card, "a-b");
   assert.ok(base);
   const make = (n: number): PreparedReview => {
     const nextId = `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -108,8 +109,8 @@ test("different concurrent reviews reject a stale prepared command without alter
     b = make(21);
   await assert.rejects(first.commitReview(a), /Lokalny postęp/);
   const results = await Promise.allSettled([
-    first.commitReviewFrom(a, base),
-    second.commitReviewFrom(b, base),
+    first.commitReviewFrom(a, base, localVersion),
+    second.commitReviewFrom(b, base, localVersion),
   ]);
   assert.equal(
     results.filter((result) => result.status === "fulfilled").length,
@@ -122,7 +123,10 @@ test("different concurrent reviews reject a stale prepared command without alter
   const losing = results[0].status === "rejected" ? a : b;
   const updated = await first.readProgress(card, "a-b");
   assert.ok(updated);
-  await assert.rejects(first.commitReviewFrom(losing, base), /Lokalny postęp/);
+  await assert.rejects(
+    first.commitReviewFrom(losing, base, localVersion),
+    /Lokalny postęp/,
+  );
   assert.equal((await first.lease("sync", 0, 10, 10)).length, 2);
   first.close();
   second.close();
@@ -219,6 +223,54 @@ test("snapshot pages switch atomically and rebase pending reviews", async () => 
   local.close();
 });
 
+test("snapshot replacement invalidates stale local version even if progress is identical", async () => {
+  const local = repo("00000000-0000-4000-8000-000000000077");
+  await local.commitReview(command);
+  const before = await local.readProgressVersion(card, "a-b");
+  assert.ok(before.progress);
+  const page: SnapshotResponse = {
+    snapshotToken: "same-value",
+    watermark: "1",
+    decks: [],
+    cards: [],
+    progress: [command.progress],
+    introductions: [],
+    settings: null,
+    nextPage: null,
+  };
+  await stageFirst(local, page);
+  await local.activateSnapshot(page.snapshotToken, (data, pending) => ({
+    data,
+    handledOperationIds: pending.map((item) => item.operation.id),
+  }));
+  const after = await local.readProgressVersion(card, "a-b");
+  assert.deepEqual(after.progress, before.progress);
+  assert.notEqual(after.localVersion, before.localVersion);
+  const nextId = "00000000-0000-4000-8000-000000000078";
+  const nextPayload = {
+    ...payload,
+    clientSeq: "2",
+    observedProgressRevision: "1",
+    observedMode: "due" as const,
+  };
+  const next: PreparedReview = {
+    event: { id: nextId, cardId: card, deviceId: device, ...nextPayload },
+    operation: {
+      id: nextId,
+      type: "review.record",
+      entityId: card,
+      payload: nextPayload,
+    },
+    progress: command.progress,
+  };
+  await assert.rejects(
+    local.commitReviewFrom(next, before.progress, before.localVersion),
+    /Lokalny postęp/,
+  );
+  await local.commitReviewFrom(next, after.progress, after.localVersion);
+  local.close();
+});
+
 test("upgrade preserves pending operations", async () => {
   const user = "00000000-0000-4000-8000-000000000031";
   const name = `recallio-user-${user}`;
@@ -267,14 +319,21 @@ test("lost response prevents stale snapshot activation until receipt and a new s
     /Nieznany wynik/,
   );
   await assert.rejects(
-    local.acknowledge({
-      operationId: id,
-      status: "rejected",
-      error: "invalid_payload",
-    }),
+    local.acknowledge(
+      {
+        operationId: id,
+        status: "rejected",
+        error: "invalid_payload",
+      },
+      "1",
+    ),
   );
-  await local.acknowledge({ operationId: id, status: "duplicate" });
-  await local.acknowledge({ operationId: id, status: "duplicate" });
+  await local.acknowledge({ operationId: id, status: "duplicate" }, "2");
+  await local.acknowledge({ operationId: id, status: "duplicate" }, "2");
+  await assert.rejects(
+    local.acknowledge({ operationId: id, status: "duplicate" }, "3"),
+    /inną pozycję/,
+  );
   await assert.rejects(
     local.stageSnapshot(
       null,
@@ -299,6 +358,15 @@ test("lost response prevents stale snapshot activation until receipt and a new s
     watermark: "2",
     progress: [command.progress],
   };
+  const tooOld = { ...after, snapshotToken: "older-watermark", watermark: "1" };
+  await stageFirst(reopened, tooOld);
+  await assert.rejects(
+    reopened.activateSnapshot(tooOld.snapshotToken, (data) => ({
+      data,
+      handledOperationIds: [],
+    })),
+    /Watermark/,
+  );
   await stageFirst(reopened, after);
   const originalDelete = IDBObjectStore.prototype.delete;
   IDBObjectStore.prototype.delete = function (...args) {
@@ -336,14 +404,14 @@ test("receipt write failure rolls back without dropping the pending operation", 
   };
   try {
     await assert.rejects(
-      local.acknowledge({ operationId: id, status: "applied" }),
+      local.acknowledge({ operationId: id, status: "applied" }, "1"),
     );
   } finally {
     IDBObjectStore.prototype.put = original;
   }
   const retried = await local.lease("retry", 10, 10, 1);
   assert.equal(retried[0].operation.id, id);
-  await local.acknowledge({ operationId: id, status: "duplicate" });
+  await local.acknowledge({ operationId: id, status: "duplicate" }, "1");
   local.close();
 });
 
@@ -387,6 +455,43 @@ test("v2 outbox migration conservatively treats delivery as unknown", async () =
   };
   await assert.rejects(local.beginSnapshot(), /Nieznany wynik/);
   assert.equal((await local.lease("retry", 0, 10, 1))[0].operation.id, id);
+  local.close();
+});
+
+test("v3 acknowledged receipts without a commit cursor are retried after upgrade", async () => {
+  const user = "00000000-0000-4000-8000-000000000079";
+  const name = `recallio-user-${user}`;
+  const old = await openDB(name, 3, {
+    upgrade(db) {
+      db.createObjectStore("cards", { keyPath: "id" });
+      db.createObjectStore("progress", { keyPath: ["cardId", "direction"] });
+      db.createObjectStore("reviews", { keyPath: "event.id" }).createIndex(
+        "deviceSequence",
+        ["event.deviceId", "event.clientSeq"],
+        { unique: true },
+      );
+      db.createObjectStore("introductions", { keyPath: "cardId" });
+      db.createObjectStore("outbox", { keyPath: "operation.id" });
+      db.createObjectStore("meta");
+      db.createObjectStore("decks", { keyPath: "id" });
+      db.createObjectStore("settings");
+      db.createObjectStore("conflicts");
+      db.createObjectStore("staging", { keyPath: "token" });
+    },
+  });
+  await old.put("outbox", {
+    operation: command.operation,
+    sequence: 1,
+    state: "acknowledged",
+    deliveryUnknown: true,
+    receipt: { operationId: id, status: "applied" },
+  });
+  old.close();
+  const local = repo(user);
+  await assert.rejects(local.beginSnapshot(), /Nieznany wynik/);
+  assert.equal((await local.lease("retry", 0, 10, 1))[0].operation.id, id);
+  await local.acknowledge({ operationId: id, status: "duplicate" }, "3");
+  assert.equal(await local.beginSnapshot(), 1);
   local.close();
 });
 
@@ -448,6 +553,7 @@ test("review transaction rolls back when each store write fails", async () => {
   for (const [i, failingStore] of [
     "reviews",
     "progress",
+    "progressVersions",
     "introductions",
     "outbox",
     "meta",
@@ -491,7 +597,7 @@ test("versionchange closes the existing connection and calls the owner", async (
     blocking: () => called++,
   });
   await local.snapshot(card);
-  const upgraded = await openDB(`recallio-user-${user}`, 4);
+  const upgraded = await openDB(`recallio-user-${user}`, 5);
   assert.equal(called, 1);
   upgraded.close();
   local.close();

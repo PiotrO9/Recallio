@@ -76,7 +76,7 @@ test("real Chromium IndexedDB serializes competing tabs and preserves retries", 
     };
     await pages[0].evaluate((c) => globalThis.repo.commitReview(c), make(1));
     const base = await pages[0].evaluate(() =>
-      globalThis.repo.readProgress(
+      globalThis.repo.readProgressVersion(
         "00000000-0000-4000-8000-000000000082",
         "a-b",
       ),
@@ -86,7 +86,11 @@ test("real Chromium IndexedDB serializes competing tabs and preserves retries", 
         page.evaluate(
           async ({ command, base }) => {
             try {
-              await globalThis.repo.commitReviewFrom(command, base);
+              await globalThis.repo.commitReviewFrom(
+                command,
+                base.progress,
+                base.localVersion,
+              );
               return "committed";
             } catch {
               return "rejected";
@@ -99,7 +103,12 @@ test("real Chromium IndexedDB serializes competing tabs and preserves retries", 
     const winner = outcomes.indexOf("committed");
     assert.deepEqual([...outcomes].sort(), ["committed", "rejected"]);
     await pages[winner].evaluate(
-      ({ command, base }) => globalThis.repo.commitReviewFrom(command, base),
+      ({ command, base }) =>
+        globalThis.repo.commitReviewFrom(
+          command,
+          base.progress,
+          base.localVersion,
+        ),
       { command: make(winner + 2), base },
     );
     const leases = await Promise.all(

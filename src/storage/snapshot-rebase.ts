@@ -176,15 +176,18 @@ export function createSnapshotRebaser(
             ? previous.lastEffectiveAt
             : event.occurredAt;
         const isResetIntroduction = resetKeys.has(key);
-        const mode =
+        const fallbackMode =
           !previous || isResetIntroduction
             ? "introduction"
             : Date.parse(effectiveAt) >= Date.parse(previous.dueAt)
               ? "due"
               : "practice";
+        const mode =
+          scheduler.classify?.(previous, effectiveAt) ?? fallbackMode;
         const projected: Progress = progressSchema.parse(
           scheduler.review({
-            previous: isResetIntroduction ? null : previous,
+            previous:
+              isResetIntroduction && !scheduler.classify ? null : previous,
             event,
             effectiveAt,
             mode,

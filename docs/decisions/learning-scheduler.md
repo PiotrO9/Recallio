@@ -1,6 +1,6 @@
 # Scheduler i zasady projekcji
 
-Status: decyzja zatwierdzona do realizacji, 2026-11-18. Nie implementuje nauki. Przed implementacją należy uzgodnić zależność, kontrakt kolejki i weryfikację środowisk opisane poniżej. Wpływ decyzji na zapis jest duży, migracja stanu i odtwarzanie historii są kosztowne; wersja algorytmu i jego parametry muszą być trwałe.
+Status: profil FSRS-6 i reset są zaimplementowane w `src/domain/learning/scheduler.ts`. Kontroler sesji i transport synchronizacji wymagają podłączenia. Wersja algorytmu i parametry są częścią utrwalonego stanu.
 
 ## Wybór i porównanie
 
@@ -20,7 +20,7 @@ Rekomendacja: FSRS-6 z `ts-fsrs` **5.4.2**, MIT, przypiętym do tej wersji przy 
 
 Profil `recallio-fsrs6-v1`: `request_retention=0.9`, `maximum_interval=36500`, `enable_fuzz=false`, `enable_short_term=false`; jawnie utrwalić również `learning_steps=["1m","10m"]`, `relearning_steps=["10m"]` mimo wyłączenia short-term. 0,9 i 36500 to wartości domyślne pakietu, nie obietnica dokładności; brak losowego fuzz zapewnia powtarzalny wynik. Wagi FSRS-6: `[0.212,1.2931,2.3065,8.2956,6.4133,0.8334,3.0194,0.001,1.8722,0.1666,0.796,1.4835,0.0614,0.2629,1.6483,0.6014,1.8729,0.5425,0.0912,0.0658,0.1542]`. Wersjonować model, wszystkie parametry i serializację stanu; zmiana wymaga nowego profilu, migracji i fixture. Zaokrąglanie i granice czasowe zgodnie z przypiętym pakietem, UTC instants; nie wyliczać interwału własnym przybliżeniem.
 
-Paczka została uruchomiona poza repozytorium (`npm install --prefix <temp> --no-save --ignore-scripts ts-fsrs@5.4.2`, Node 22.12). Nie dodano zależności do projektu. Przy dodawaniu przypiętej zależności sprawdzić scenariusze referencyjne w Node, bundlu przeglądarkowym i runtime Workers.
+Projekt przypina `ts-fsrs@5.4.2`. Stan serializuje terminy w UTC i przechowuje datę ostatniej oceny modelu jako `last_review`. Reset zapisuje nową epokę ze stanem FSRS `New` i pustym `last_review`, aby pierwsza ocena pozostała wprowadzeniem również po odczycie snapshotu. Zgodność z Workers należy sprawdzić w teście platformy.
 
 ## Polityka zdarzeń
 

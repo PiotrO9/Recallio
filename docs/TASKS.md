@@ -5,7 +5,7 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | ID | Stan | Zależy od | Zakres i odbiór |
 | --- | --- | --- | --- |
 | SETUP-01 | DONE | — | Przygotuj punkt startowy kolejki. Sprawdź uzgodnione porządki i skill, zweryfikuj dokumentację i testy, opublikuj wspólną bazę zmian na gałęzi roboczej. |
-| SCHED-01 | TODO | SETUP-01 | Zaimplementuj deterministyczny adapter FSRS-6 i reset postępu według ADR. Sprawdź stany i projekcje na istniejących scenariuszach referencyjnych. |
+| SCHED-01 | DONE | SETUP-01 | Zaimplementuj deterministyczny adapter FSRS-6 i reset postępu według ADR. Sprawdź stany i projekcje na istniejących scenariuszach referencyjnych. |
 | QUEUE-01 | TODO | SCHED-01 | Zaimplementuj kolejkę nowych, terminowych i dodatkowych fiszek oraz powroty sesyjne. Sprawdź limit wspólny dla kierunków, małe zestawy i dzień w strefie profilu. |
 | DATA-01 | TODO | SETUP-01 | Przygotuj lokalne migracje, ograniczenia właściciela i rodzica, RLS oraz granty. Sprawdź pustą bazę, upgrade i izolację dwóch kont także przez REST/RPC. |
 | PLATFORM-01 | TODO | SETUP-01 | Przygotuj build i smoke test w lokalnym runtime Workers. Sprawdź obsługę Route Handlers, cookies i zależności. Zapisz polecenia uruchomienia i wynik. |
@@ -26,3 +26,4 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono i weryfikację. Dla `BLOCKED` podaj ID, co udało się zrobić, przyczynę z dowodem oraz sprawdzalny warunek wznowienia. Jeśli część prac zachowano wyłącznie lokalnie, odnotuj jej lokalizację lub hash.
 
 - `SETUP-01` — uporządkowano dokumentację, usunięto koordynator pracy równoległej i uruchomiono kolejkę. Przeszły walidacja skilla, typecheck, 53 testy, build, test IndexedDB w Chromium i 4 testy E2E.
+- `SCHED-01` — dodano wersjonowany adapter FSRS-6, limitowanie czasu zdarzeń i reset epoki rozpoznawany również po snapshotcie. Przeszły typecheck, 63 testy, build, próbka projekcji w bundlu Chromium, test zapisu w Chromium i 4 testy E2E. Weryfikacja runtime Workers należy do `PLATFORM-01`.

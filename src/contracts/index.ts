@@ -202,6 +202,8 @@ export interface Candidate {
 }
 export interface Scheduler {
   readonly version: string;
+  /** Classify persisted state, including a reset already present in a snapshot. */
+  classify?(previous: Progress | null, effectiveAt: string): Candidate["mode"];
   review(input: {
     previous: Progress | null;
     event: ReviewEvent;

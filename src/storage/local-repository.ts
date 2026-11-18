@@ -258,9 +258,11 @@ export function createLocalRepository(
     },
     async snapshot(deckId) {
       const db = await connect();
-      const tx = db.transaction(["cards", "progress"], "readonly");
+      const tx = db.transaction(["cards", "progress", "decks"], "readonly");
+      const deck = await tx.objectStore("decks").get(deckId);
       const cards = (await tx.objectStore("cards").getAll()).filter(
-        (card) => card.deckId === deckId && !card.deletedAt,
+        (card) =>
+          deck && !deck.deletedAt && card.deckId === deckId && !card.deletedAt,
       );
       const ids = new Set(cards.map((card) => card.id));
       const progress = (await tx.objectStore("progress").getAll()).filter(
@@ -444,6 +446,12 @@ export function createLocalRepository(
           const rebased = result.decks.find((d) => d.id === deck.id);
           if (!rebased?.deletedAt)
             throw new Error("Rebase przywraca usunięty zestaw");
+          if (
+            result.cards.some(
+              (card) => card.deckId === deck.id && !card.deletedAt,
+            )
+          )
+            throw new Error("Rebase przywraca kartę usuniętego zestawu");
         }
         for (const name of [
           "decks",

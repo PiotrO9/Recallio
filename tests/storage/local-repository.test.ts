@@ -72,7 +72,7 @@ test("failure rolls back and retry preserves ID; leases expire; account database
   other.close();
 });
 
-test("different concurrent reviews compare the full local projection and retry the same event", async () => {
+test("different concurrent reviews reject a stale prepared command without altering it", async () => {
   const user = "00000000-0000-4000-8000-000000000071";
   const first = repo(user),
     second = repo(user);
@@ -116,12 +116,8 @@ test("different concurrent reviews compare the full local projection and retry t
   const losing = results[0].status === "rejected" ? a : b;
   const updated = await first.readProgress(card, "a-b");
   assert.ok(updated);
-  const recalculated = {
-    ...losing,
-    progress: { ...updated, dueAt: "2026-11-25T12:00:00.000Z" },
-  };
-  await first.commitReviewFrom(recalculated, updated);
-  assert.equal((await first.lease("sync", 0, 10, 10)).length, 3);
+  await assert.rejects(first.commitReviewFrom(losing, base), /Lokalny postęp/);
+  assert.equal((await first.lease("sync", 0, 10, 10)).length, 2);
   first.close();
   second.close();
 });
@@ -239,6 +235,58 @@ test("upgrade preserves pending operations", async () => {
   assert.equal((await local.lease("upgrade", 0, 10, 1))[0].operation.id, id);
   local.close();
   await deleteDB(name);
+});
+
+test("snapshot rebase cannot revive cards of a deleted deck", async () => {
+  const local = repo("00000000-0000-4000-8000-000000000072");
+  const deck = "00000000-0000-4000-8000-000000000073";
+  const page: SnapshotResponse = {
+    snapshotToken: "deleted-parent",
+    watermark: "1",
+    decks: [
+      {
+        id: deck,
+        name: "Deleted",
+        directionMode: "mixed",
+        revision: "1",
+        deletedAt: at,
+      },
+    ],
+    cards: [],
+    progress: [],
+    introductions: [],
+    settings: null,
+    nextPage: null,
+  };
+  await local.stageSnapshot(null, page);
+  await assert.rejects(
+    local.activateSnapshot("deleted-parent", (data) => ({
+      data: {
+        ...data,
+        cards: [
+          {
+            id: card,
+            deckId: deck,
+            sideA: "A",
+            sideB: "B",
+            exampleA: null,
+            exampleB: null,
+            contentRevision: "1",
+            deletedAt: null,
+          },
+        ],
+      },
+      handledOperationIds: [],
+    })),
+    /usuniętego zestawu/,
+  );
+  assert.equal(await local.getCursor(), undefined);
+  await local.activateSnapshot("deleted-parent", (data) => ({
+    data,
+    handledOperationIds: [],
+  }));
+  assert.equal(await local.getCursor(), "1");
+  local.close();
 });
 
 test("review transaction rolls back when each store write fails", async () => {

@@ -122,6 +122,8 @@ export function createLocalRepository(
     ): Promise<OutboxItem[]>;
     releaseLease(owner: string): Promise<void>;
     acknowledge(result: OperationResult): Promise<void>;
+    listBlocked(): Promise<OutboxItem[]>;
+    discardBlocked(operationId: string): Promise<void>;
     readContent(
       type: "deck" | "card" | "settings",
       id: string,
@@ -362,6 +364,8 @@ export function createLocalRepository(
           "contentOperations",
           "progress",
           "progressVersions",
+          "cards",
+          "decks",
           "introductions",
           "outbox",
           "meta",
@@ -385,23 +389,27 @@ export function createLocalRepository(
         }
         if (await tx.objectStore("contentOperations").get(event.id))
           throw new Error("Ponowne użycie identyfikatora");
+        const card = await tx.objectStore("cards").get(event.cardId);
+        const deck = card && (await tx.objectStore("decks").get(card.deckId));
+        const deleted = !!card?.deletedAt || !!deck?.deletedAt;
         const previous = await tx
           .objectStore("progress")
           .get([event.cardId, event.direction]);
         const version = await tx
           .objectStore("progressVersions")
           .get([event.cardId, event.direction]);
-        if ((version?.version ?? "0") !== localVersion)
+        if (!deleted && (version?.version ?? "0") !== localVersion)
           throw new Error(
             "Lokalny postęp zmienił się; przelicz projekcję tej samej oceny",
           );
-        if (canonical(previous ?? null) !== canonical(expected))
+        if (!deleted && canonical(previous ?? null) !== canonical(expected))
           throw new Error(
             "Lokalny postęp zmienił się; przelicz projekcję tej samej oceny",
           );
         if (
-          (!previous && event.observedProgressRevision !== null) ||
-          (previous && previous.epoch !== event.epoch)
+          !deleted &&
+          ((!previous && event.observedProgressRevision !== null) ||
+            (previous && previous.epoch !== event.epoch))
         )
           throw new Error("Nieaktualny postęp");
         const receipt = {
@@ -409,13 +417,15 @@ export function createLocalRepository(
           committedAt: options.now().toISOString(),
         };
         await tx.objectStore("reviews").add({ event, command, receipt });
-        await tx.objectStore("progress").put(progress);
-        await tx.objectStore("progressVersions").put({
-          cardId: event.cardId,
-          direction: event.direction,
-          version: (BigInt(localVersion) + 1n).toString(),
-        });
+        if (!deleted) await tx.objectStore("progress").put(progress);
+        if (!deleted)
+          await tx.objectStore("progressVersions").put({
+            cardId: event.cardId,
+            direction: event.direction,
+            version: (BigInt(localVersion) + 1n).toString(),
+          });
         if (
+          !deleted &&
           event.observedMode === "introduction" &&
           !(await tx.objectStore("introductions").get(event.cardId))
         ) {
@@ -738,16 +748,25 @@ export function createLocalRepository(
     },
     async acknowledge(input) {
       const result = operationResultSchema.parse(input);
-      if (result.status !== "applied" && result.status !== "duplicate")
-        throw new Error("Wynik nie potwierdza zastosowania operacji");
-      const commitCursor = revisionSchema.parse(result.commitCursor);
+      const accepted =
+        result.status === "applied" || result.status === "duplicate";
+      const commitCursor = accepted
+        ? revisionSchema.parse(result.commitCursor)
+        : undefined;
       const db = await connect();
       const tx = db.transaction(["outbox", "meta"], "readwrite");
       try {
         const item = await tx.objectStore("outbox").get(result.operationId);
         if (item?.state === "acknowledged") {
-          if (item.receiptCursor !== commitCursor)
+          if (!accepted || item.receiptCursor !== commitCursor)
             throw new Error("Potwierdzenie ma inną pozycję commita");
+          await tx.done;
+          return;
+        }
+        if (
+          item?.state === "blocked" &&
+          canonical(item.receipt) === canonical(result)
+        ) {
           await tx.done;
           return;
         }
@@ -759,9 +778,14 @@ export function createLocalRepository(
         if (!Number.isSafeInteger(generation))
           throw new Error("Wyczerpano licznik potwierdzeń");
         await meta.put(generation, "receiptGeneration");
-        item.state = "acknowledged";
+        item.state = accepted
+          ? "acknowledged"
+          : result.error === "dependency_pending"
+            ? "pending"
+            : "blocked";
+        item.deliveryUnknown = false;
         item.receipt = result;
-        item.receiptCursor = commitCursor;
+        if (commitCursor !== undefined) item.receiptCursor = commitCursor;
         delete item.leaseOwner;
         delete item.leaseUntil;
         await tx.objectStore("outbox").put(item);
@@ -773,6 +797,36 @@ export function createLocalRepository(
         await tx.done.catch(() => {});
         throw error;
       }
+    },
+    async discardBlocked(operationId) {
+      uuidSchema.parse(operationId);
+      const db = await connect();
+      const tx = db.transaction(["outbox", "meta"], "readwrite");
+      try {
+        const item = await tx.objectStore("outbox").get(operationId);
+        if (!item || item.state !== "blocked")
+          throw new Error("Operacja nie jest zablokowana");
+        const meta = tx.objectStore("meta");
+        const generation =
+          Number((await meta.get("receiptGeneration")) ?? 0) + 1;
+        if (!Number.isSafeInteger(generation))
+          throw new Error("Wyczerpano licznik potwierdzeń");
+        await meta.put(generation, "receiptGeneration");
+        await tx.objectStore("outbox").delete(operationId);
+        await tx.done;
+      } catch (error) {
+        try {
+          tx.abort();
+        } catch {}
+        await tx.done.catch(() => {});
+        throw error;
+      }
+    },
+    async listBlocked() {
+      const db = await connect();
+      return (await db.getAll("outbox"))
+        .filter((item) => item.state === "blocked")
+        .sort((a, b) => a.sequence - b.sequence);
     },
     async beginSnapshot() {
       const db = await connect();
@@ -972,6 +1026,54 @@ export function createLocalRepository(
           throw new Error(
             "Nieznany wynik wysłanej operacji; rozlicz receipt przed snapshotem",
           );
+        // Rebase only never-sent dependent content operations, and only when
+        // the snapshot revision matches a receipt for our own predecessor.
+        for (const item of pending) {
+          const operation = item.operation;
+          if (
+            item.state !== "pending" ||
+            item.deliveryUnknown ||
+            item.receipt !== undefined ||
+            !("baseRevision" in operation)
+          )
+            continue;
+          if (
+            !operation.type.startsWith("deck.") &&
+            !operation.type.startsWith("card.")
+          )
+            continue;
+          const kind = operation.type.split(".")[0];
+          const predecessor = allOutbox
+            .filter(
+              (prior) =>
+                prior.state === "acknowledged" &&
+                prior.sequence < item.sequence &&
+                prior.operation.entityId === operation.entityId &&
+                prior.operation.type.startsWith(`${kind}.`),
+            )
+            .at(-1);
+          const prior = predecessor?.operation;
+          const receiptRevision = predecessor?.receipt?.revision;
+          const snapshotRevision =
+            kind === "deck"
+              ? base.decks.find((value) => value.id === operation.entityId)
+                  ?.revision
+              : base.cards.find((value) => value.id === operation.entityId)
+                  ?.contentRevision;
+          const previousBase =
+            prior && "baseRevision" in prior ? prior.baseRevision : "0";
+          if (
+            receiptRevision &&
+            snapshotRevision === receiptRevision &&
+            operation.baseRevision === previousBase
+          ) {
+            item.operation = operationSchema.parse({
+              ...operation,
+              baseRevision: receiptRevision,
+            });
+            await tx.objectStore("outbox").put(item);
+          }
+        }
         const local = {
           reviews: (await tx.objectStore("reviews").getAll()).map(
             (item) => item.event,

@@ -30,6 +30,8 @@ Skrypt nie sprawdza istnienia worktree, raportu ani zgodności zakresu; odpowiad
 
 Zablokowanie i wznowienie: `block --id <ID> --owner <nazwa> --token <token> --reason <powod>` oraz `resume` z tymi samymi ID, owner i token. Gdy agent świadomie rezygnuje przed REVIEW, `release` z tymi parametrami zwalnia zadanie; istniejący worktree i pliki nie są usuwane.
 
+Jeśli przegląd wykazał potrzebę poprawek, właściciel wraca do pracy przez `rework --id <ID> --owner <nazwa> --token <token> --commit <pełny-hash-aktualnego-review>`. Polecenie atomowo sprawdza właściciela, token i zgłoszony commit, zachowuje poprzednie przekazanie oraz usuwa bieżący commit i raport z aktywnego zgłoszenia. Po poprawkach właściciel wykonuje nowy commit i ponownie zgłasza go przez `review`. Nie stosuj tego przejścia po integracji lub statusie DONE.
+
 ## Integrator
 
 Integrator przegląda raport i commit, uruchamia testy i integruje commit zwykłym merge (bez squash/cherry-pick, aby zachować tożsamość commita). Po sprawdzeniu na docelowym branchu:

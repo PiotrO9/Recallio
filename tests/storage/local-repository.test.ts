@@ -460,13 +460,6 @@ test("lost response prevents stale snapshot activation until receipt and a new s
     })),
     /Nieznany wynik/,
   );
-  await assert.rejects(
-    local.acknowledge({
-      operationId: id,
-      status: "rejected",
-      error: "invalid_payload",
-    }),
-  );
   await local.acknowledge({
     operationId: id,
     status: "duplicate",
@@ -571,6 +564,67 @@ test("receipt write failure rolls back without dropping the pending operation", 
     status: "duplicate",
     commitCursor: "1",
   });
+  local.close();
+});
+
+test("rejected results persist across restart and require explicit discard", async () => {
+  const user = "00000000-0000-4000-8000-000000000087";
+  const local = repo(user);
+  await local.commitReview(command);
+  await local.lease("sync", 0, 10, 1);
+  await local.acknowledge({
+    operationId: id,
+    status: "rejected",
+    error: "invalid_payload",
+  });
+  local.close();
+  const reopened = repo(user);
+  assert.equal(
+    (await reopened.listBlocked())[0].receipt?.error,
+    "invalid_payload",
+  );
+  assert.equal((await reopened.lease("retry", 20, 10, 1)).length, 0);
+  const page: SnapshotResponse = {
+    snapshotToken: "blocked",
+    watermark: "0",
+    decks: [],
+    cards: [],
+    progress: [],
+    introductions: [],
+    settings: null,
+    nextPage: null,
+  };
+  await stageFirst(reopened, page);
+  const { createSnapshotRebaser } =
+    await import("../../src/storage/snapshot-rebase");
+  await assert.rejects(
+    reopened.activateSnapshot(
+      page.snapshotToken,
+      createSnapshotRebaser({
+        version: "test",
+        review() {
+          throw Error("unused");
+        },
+      }),
+    ),
+    /zablokowanej/,
+  );
+  await reopened.discardBlocked(id);
+  await assert.rejects(reopened.discardBlocked(id));
+  reopened.close();
+});
+
+test("dependency_pending remains retryable with the original ID", async () => {
+  const local = repo("00000000-0000-4000-8000-000000000088");
+  await local.commitReview(command);
+  await local.lease("sync", 0, 10, 1);
+  await local.acknowledge({
+    operationId: id,
+    status: "rejected",
+    error: "dependency_pending",
+  });
+  assert.equal((await local.listBlocked()).length, 0);
+  assert.equal((await local.lease("retry", 1, 10, 1))[0].operation.id, id);
   local.close();
 });
 

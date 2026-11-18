@@ -14,6 +14,14 @@ Status: REVIEW, nie DONE. Właściciel `codex-local-20261117`; baza rezerwacji `
 
 Po `npm ci`: `npm run typecheck`, `npm test` (39 testów TS oraz 2 koordynacji), `npm run test:storage:browser` (Chromium), `npm run build` i `npm run test:e2e` (4 demo) przeszły. Testy obejmują awarie zapisów i migracji, retry, dwie karty i konta, snapshot, niepewne receipty, stale watermark, rebase i reset. E2E dotyczy demo. Brak rzeczywistego serwera synchronizacji, Supabase i Workers; żadne testy chmurowe nie były wykonywane.
 
+## Poprawki po przeglądzie
+
+Review zgłosiło trzy błędy: ocena usuniętej karty zmieniała projekcję, wyniki conflict/rejected blokowały kolejkę jako nieznane, a własne potwierdzone utworzenie powodowało fałszywy konflikt zależnej edycji. Ocena usuniętej karty lub rodzica zapisuje teraz historię i outbox bez projekcji/wprowadzenia; wyniki trwałe trafiają do `listBlocked`, retryable dependency_pending wraca do kolejki, a jawne `discardBlocked` usuwa tylko zablokowaną operację. Przy aktywacji snapshotu lokalny adapter aktualizuje rewizję wyłącznie niewysłanej zależnej operacji, gdy rewizja snapshotu odpowiada receipt własnego poprzednika; cudza rewizja i już wysłane operacje nie są nadpisywane. SYNC/UI musi przedstawić konflikt i świadomą decyzję o odrzuceniu, a nie wywoływać discard automatycznie.
+
+Dodano atomowe `rework` do koordynatora: tylko właściciel z tokenem i aktualnym commitem REVIEW może wznowić zadanie; stare zgłoszenie jest zachowane jako `previousReview`, a nowy commit wymaga ponownego `review`. Koordynator jest zmieniony w tym branchu; przed równoległym uruchomieniem nowych agentów integrator musi udostępnić wszystkim tę samą zintegrowaną wersję skryptu.
+
+Ponowna weryfikacja: `npm run typecheck`, `npm test` (46 testów TS i 3 koordynacji), `npm run test:storage:browser`, `npm run build`, `npm run test:e2e` (4 demo) przeszły. Nie wykonano faktycznej synchronizacji ani testów chmurowych.
+
 ## Uwagi dla integracji
 
 - Należy przejrzeć nowy wspólny kontrakt oraz migracje i wykonać zwykły merge z zachowaniem commita, bez cherry-pick. Nie wykonywać `done` przed przeglądem i testami w integracji.

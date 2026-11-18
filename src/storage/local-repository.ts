@@ -4,10 +4,12 @@ import {
   reviewEventSchema,
   progressSchema,
   operationSchema,
+  operationResultSchema,
   introductionSchema,
   snapshotResponseSchema,
   type SnapshotResponse,
   type Operation,
+  type OperationResult,
   type Card,
   type CommitReceipt,
   type Introduction,
@@ -20,7 +22,9 @@ import {
 export type OutboxItem = {
   operation: Operation;
   sequence: number;
-  state: "pending" | "leased" | "blocked";
+  deliveryUnknown: boolean;
+  state: "pending" | "leased" | "blocked" | "acknowledged";
+  receipt?: OperationResult;
   leaseOwner?: string;
   leaseUntil?: number;
 };
@@ -49,6 +53,7 @@ type StagedSnapshot = {
   watermark: string;
   nextPage: string | null;
   pages: SnapshotResponse[];
+  receiptGeneration: number;
 };
 export type SnapshotData = Pick<
   SnapshotResponse,
@@ -87,10 +92,13 @@ export function createLocalRepository(
     limit: number,
   ): Promise<OutboxItem[]>;
   releaseLease(owner: string): Promise<void>;
+  acknowledge(result: OperationResult): Promise<void>;
   stageSnapshot(
     pageToken: string | null,
     page: SnapshotResponse,
+    requestGeneration?: number,
   ): Promise<void>;
+  beginSnapshot(): Promise<number>;
   activateSnapshot(token: string, rebase: RebaseSnapshot): Promise<void>;
   getCursor(): Promise<string | undefined>;
   readProgress(
@@ -107,7 +115,7 @@ export function createLocalRepository(
   let connection: Promise<IDBPDatabase<Schema>> | undefined;
   const connect = () => {
     if (!connection) {
-      const opened = openDB<Schema>(`recallio-user-${userId}`, 2, {
+      const opened = openDB<Schema>(`recallio-user-${userId}`, 3, {
         upgrade(db, oldVersion, _newVersion, tx) {
           void tx.done.catch(() => {});
           if (oldVersion < 1) {
@@ -143,11 +151,31 @@ export function createLocalRepository(
                   return;
                 }
                 void cursor
-                  .update({ ...cursor.value, sequence: ++sequence })
+                  .update({
+                    ...cursor.value,
+                    sequence: ++sequence,
+                    deliveryUnknown: true,
+                  })
                   .catch(() => {});
                 void cursor
                   .continue()
                   .then(migrate)
+                  .catch(() => {});
+              })
+              .catch(() => {});
+          }
+          if (oldVersion === 2) {
+            const store = tx.objectStore("outbox");
+            void store
+              .openCursor()
+              .then(function migrateDelivery(cursor): void {
+                if (!cursor) return;
+                void cursor
+                  .update({ ...cursor.value, deliveryUnknown: true })
+                  .catch(() => {});
+                void cursor
+                  .continue()
+                  .then(migrateDelivery)
                   .catch(() => {});
               })
               .catch(() => {});
@@ -243,9 +271,12 @@ export function createLocalRepository(
         if (!Number.isSafeInteger(sequence))
           throw new Error("Wyczerpano kolejność outbox");
         await meta.put(sequence, "outboxSequence");
-        await tx
-          .objectStore("outbox")
-          .add({ operation, sequence, state: "pending" });
+        await tx.objectStore("outbox").add({
+          operation,
+          sequence,
+          deliveryUnknown: false,
+          state: "pending",
+        });
         await tx.done;
         return receipt;
       } catch (error) {
@@ -286,6 +317,7 @@ export function createLocalRepository(
       const all = await tx.store.getAll();
       const selected: OutboxItem[] = [];
       for (const item of all.sort((a, b) => a.sequence - b.sequence)) {
+        if (item.state === "acknowledged") continue;
         if (
           item.state === "blocked" ||
           (item.state === "leased" && (item.leaseUntil ?? Infinity) > now)
@@ -296,6 +328,7 @@ export function createLocalRepository(
       }
       for (const item of selected) {
         item.state = "leased";
+        item.deliveryUnknown = true;
         item.leaseOwner = owner;
         item.leaseUntil = now + duration;
         await tx.store.put(item);
@@ -315,20 +348,88 @@ export function createLocalRepository(
         }
       await tx.done;
     },
-    async stageSnapshot(pageToken, input) {
+    async acknowledge(input) {
+      const result = operationResultSchema.parse(input);
+      if (result.status !== "applied" && result.status !== "duplicate")
+        throw new Error("Wynik nie potwierdza zastosowania operacji");
+      const db = await connect();
+      const tx = db.transaction(["outbox", "meta"], "readwrite");
+      try {
+        const item = await tx.objectStore("outbox").get(result.operationId);
+        if (item?.state === "acknowledged") {
+          if (canonical(item.receipt) !== canonical(result))
+            throw new Error("Potwierdzenie różni się od zapisanego");
+          await tx.done;
+          return;
+        }
+        if (!item || !item.deliveryUnknown)
+          throw new Error("Brak wysłanej operacji");
+        const meta = tx.objectStore("meta");
+        const generation =
+          Number((await meta.get("receiptGeneration")) ?? 0) + 1;
+        if (!Number.isSafeInteger(generation))
+          throw new Error("Wyczerpano licznik potwierdzeń");
+        await meta.put(generation, "receiptGeneration");
+        item.state = "acknowledged";
+        item.receipt = result;
+        delete item.leaseOwner;
+        delete item.leaseUntil;
+        await tx.objectStore("outbox").put(item);
+        await tx.done;
+      } catch (error) {
+        try {
+          tx.abort();
+        } catch {}
+        await tx.done.catch(() => {});
+        throw error;
+      }
+    },
+    async beginSnapshot() {
+      const db = await connect();
+      const tx = db.transaction(["meta", "outbox"], "readonly");
+      const generation = Number(
+        (await tx.objectStore("meta").get("receiptGeneration")) ?? 0,
+      );
+      const items = await tx.objectStore("outbox").getAll();
+      if (
+        items.some(
+          (item) => item.state !== "acknowledged" && item.deliveryUnknown,
+        )
+      ) {
+        await tx.done;
+        throw new Error(
+          "Nieznany wynik wysłanej operacji; rozlicz receipt przed snapshotem",
+        );
+      }
+      await tx.done;
+      return generation;
+    },
+    async stageSnapshot(pageToken, input, requestGeneration) {
       const page = snapshotResponseSchema.parse(input);
       const db = await connect();
-      const tx = db.transaction("staging", "readwrite");
+      const tx = db.transaction(["staging", "meta"], "readwrite");
+      const store = tx.objectStore("staging");
       try {
-        const staged = await tx.store.get(page.snapshotToken);
+        const staged = await store.get(page.snapshotToken);
         if (!staged) {
           if (pageToken !== null)
             throw new Error("Brak pierwszej strony snapshotu");
-          await tx.store.add({
+          const receiptGeneration = Number(
+            (await tx.objectStore("meta").get("receiptGeneration")) ?? 0,
+          );
+          if (
+            !Number.isSafeInteger(requestGeneration) ||
+            requestGeneration !== receiptGeneration
+          )
+            throw new Error(
+              "Snapshot musi być zamówiony po rozliczeniu potwierdzeń",
+            );
+          await store.add({
             token: page.snapshotToken,
             watermark: page.watermark,
             nextPage: page.nextPage,
             pages: [page],
+            receiptGeneration,
           });
         } else {
           const priorIndex =
@@ -358,7 +459,7 @@ export function createLocalRepository(
             throw new Error("Powtarzający się token strony");
           staged.pages.push(page);
           staged.nextPage = page.nextPage;
-          await tx.store.put(staged);
+          await store.put(staged);
         }
         await tx.done;
       } catch (error) {
@@ -388,6 +489,11 @@ export function createLocalRepository(
         const staged = await tx.objectStore("staging").get(token);
         if (!staged || staged.nextPage !== null)
           throw new Error("Snapshot nie jest kompletny");
+        const receiptGeneration = Number(
+          (await tx.objectStore("meta").get("receiptGeneration")) ?? 0,
+        );
+        if (staged.receiptGeneration !== receiptGeneration)
+          throw new Error("Snapshot utworzono przed rozliczeniem potwierdzeń");
         const cursor = await tx.objectStore("meta").get("cursor");
         if (
           typeof cursor === "string" &&
@@ -424,9 +530,16 @@ export function createLocalRepository(
           return parsed;
         };
         const base = check(data);
-        const pending = (await tx.objectStore("outbox").getAll()).sort(
+        const allOutbox = (await tx.objectStore("outbox").getAll()).sort(
           (a, b) => a.sequence - b.sequence,
         );
+        const pending = allOutbox.filter(
+          (item) => item.state !== "acknowledged",
+        );
+        if (pending.some((item) => item.deliveryUnknown))
+          throw new Error(
+            "Nieznany wynik wysłanej operacji; rozlicz receipt przed snapshotem",
+          );
         const rebased = rebase(structuredClone(base), structuredClone(pending));
         const expectedIds = pending.map((item) => item.operation.id);
         if (
@@ -471,6 +584,10 @@ export function createLocalRepository(
           await tx.objectStore("introductions").add(value);
         if (result.settings)
           await tx.objectStore("settings").put(result.settings, "current");
+        for (const item of allOutbox.filter(
+          (item) => item.state === "acknowledged",
+        ))
+          await tx.objectStore("outbox").delete(item.operation.id);
         await tx.objectStore("meta").put(staged.watermark, "cursor");
         await tx.objectStore("meta").put(token, "snapshotGeneration");
         await tx.objectStore("staging").delete(token);

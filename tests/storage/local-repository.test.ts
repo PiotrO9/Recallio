@@ -43,6 +43,12 @@ function repo(userId: string, fail = false) {
     },
   });
 }
+async function stageFirst(
+  local: ReturnType<typeof repo>,
+  page: SnapshotResponse,
+) {
+  return local.stageSnapshot(null, page, await local.beginSnapshot());
+}
 test("failure rolls back and retry preserves ID; leases expire; account databases are separate", async () => {
   const a = "00000000-0000-4000-8000-000000000011",
     b = "00000000-0000-4000-8000-000000000012";
@@ -155,8 +161,8 @@ test("snapshot pages switch atomically and rebase pending reviews", async () => 
     settings: null,
     nextPage: "page2",
   };
-  await local.stageSnapshot(null, base);
-  await local.stageSnapshot(null, base);
+  await stageFirst(local, base);
+  await stageFirst(local, base);
   await assert.rejects(local.stageSnapshot(null, { ...base, watermark: "5" }));
   await assert.rejects(
     local.activateSnapshot("generation", () => {
@@ -187,8 +193,6 @@ test("snapshot pages switch atomically and rebase pending reviews", async () => 
     })),
   );
   assert.equal(await local.getCursor(), undefined);
-  assert.equal((await local.lease("reader", 0, 10, 10)).length, 1);
-  await local.releaseLease("reader");
   const originalAdd = IDBObjectStore.prototype.add;
   IDBObjectStore.prototype.add = function (...args) {
     if (this.name === "progress") throw Error("snapshot write failure");
@@ -237,6 +241,155 @@ test("upgrade preserves pending operations", async () => {
   await deleteDB(name);
 });
 
+test("lost response prevents stale snapshot activation until receipt and a new snapshot", async () => {
+  const user = "00000000-0000-4000-8000-000000000074";
+  const local = repo(user);
+  const page: SnapshotResponse = {
+    snapshotToken: "before-receipt",
+    watermark: "1",
+    decks: [],
+    cards: [],
+    progress: [],
+    introductions: [],
+    settings: null,
+    nextPage: null,
+  };
+  await local.commitReview(command);
+  await stageFirst(local, page);
+  const earlierRequest = await local.beginSnapshot();
+  await local.lease("sending-tab", 0, 10, 10);
+  await local.releaseLease("sending-tab");
+  await assert.rejects(
+    local.activateSnapshot(page.snapshotToken, (data) => ({
+      data,
+      handledOperationIds: [],
+    })),
+    /Nieznany wynik/,
+  );
+  await assert.rejects(
+    local.acknowledge({
+      operationId: id,
+      status: "rejected",
+      error: "invalid_payload",
+    }),
+  );
+  await local.acknowledge({ operationId: id, status: "duplicate" });
+  await local.acknowledge({ operationId: id, status: "duplicate" });
+  await assert.rejects(
+    local.stageSnapshot(
+      null,
+      { ...page, snapshotToken: "requested-too-early" },
+      earlierRequest,
+    ),
+    /zamówiony po rozliczeniu/,
+  );
+  await assert.rejects(
+    local.activateSnapshot(page.snapshotToken, (data) => ({
+      data,
+      handledOperationIds: [],
+    })),
+    /przed rozliczeniem/,
+  );
+  // A crash after the receipt must leave it durable until activation.
+  local.close();
+  const reopened = repo(user);
+  const after: SnapshotResponse = {
+    ...page,
+    snapshotToken: "after-receipt",
+    watermark: "2",
+    progress: [command.progress],
+  };
+  await stageFirst(reopened, after);
+  const originalDelete = IDBObjectStore.prototype.delete;
+  IDBObjectStore.prototype.delete = function (...args) {
+    if (this.name === "outbox") throw Error("ack cleanup failed");
+    return originalDelete.apply(this, args);
+  };
+  try {
+    await assert.rejects(
+      reopened.activateSnapshot(after.snapshotToken, (data) => ({
+        data,
+        handledOperationIds: [],
+      })),
+    );
+  } finally {
+    IDBObjectStore.prototype.delete = originalDelete;
+  }
+  assert.equal(await reopened.getCursor(), undefined);
+  await reopened.activateSnapshot(after.snapshotToken, (data) => ({
+    data,
+    handledOperationIds: [],
+  }));
+  assert.equal(await reopened.getCursor(), "2");
+  assert.equal((await reopened.lease("later", 20, 10, 10)).length, 0);
+  reopened.close();
+});
+
+test("receipt write failure rolls back without dropping the pending operation", async () => {
+  const local = repo("00000000-0000-4000-8000-000000000075");
+  await local.commitReview(command);
+  await local.lease("sync", 0, 10, 1);
+  const original = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (...args) {
+    if (this.name === "outbox") throw Error("receipt storage failure");
+    return original.apply(this, args);
+  };
+  try {
+    await assert.rejects(
+      local.acknowledge({ operationId: id, status: "applied" }),
+    );
+  } finally {
+    IDBObjectStore.prototype.put = original;
+  }
+  const retried = await local.lease("retry", 10, 10, 1);
+  assert.equal(retried[0].operation.id, id);
+  await local.acknowledge({ operationId: id, status: "duplicate" });
+  local.close();
+});
+
+test("v2 outbox migration conservatively treats delivery as unknown", async () => {
+  const user = "00000000-0000-4000-8000-000000000076";
+  const name = `recallio-user-${user}`;
+  const old = await openDB(name, 2, {
+    upgrade(db) {
+      db.createObjectStore("cards", { keyPath: "id" });
+      db.createObjectStore("progress", { keyPath: ["cardId", "direction"] });
+      db.createObjectStore("reviews", { keyPath: "event.id" }).createIndex(
+        "deviceSequence",
+        ["event.deviceId", "event.clientSeq"],
+        { unique: true },
+      );
+      db.createObjectStore("introductions", { keyPath: "cardId" });
+      db.createObjectStore("outbox", { keyPath: "operation.id" });
+      db.createObjectStore("meta");
+      db.createObjectStore("decks", { keyPath: "id" });
+      db.createObjectStore("settings");
+      db.createObjectStore("conflicts");
+      db.createObjectStore("staging", { keyPath: "token" });
+    },
+  });
+  await old.put("outbox", {
+    operation: command.operation,
+    sequence: 1,
+    state: "pending",
+  });
+  old.close();
+  const local = repo(user);
+  const page: SnapshotResponse = {
+    snapshotToken: "v2-migration",
+    watermark: "1",
+    decks: [],
+    cards: [],
+    progress: [],
+    introductions: [],
+    settings: null,
+    nextPage: null,
+  };
+  await assert.rejects(local.beginSnapshot(), /Nieznany wynik/);
+  assert.equal((await local.lease("retry", 0, 10, 1))[0].operation.id, id);
+  local.close();
+});
+
 test("snapshot rebase cannot revive cards of a deleted deck", async () => {
   const local = repo("00000000-0000-4000-8000-000000000072");
   const deck = "00000000-0000-4000-8000-000000000073";
@@ -258,7 +411,7 @@ test("snapshot rebase cannot revive cards of a deleted deck", async () => {
     settings: null,
     nextPage: null,
   };
-  await local.stageSnapshot(null, page);
+  await stageFirst(local, page);
   await assert.rejects(
     local.activateSnapshot("deleted-parent", (data) => ({
       data: {
@@ -338,7 +491,7 @@ test("versionchange closes the existing connection and calls the owner", async (
     blocking: () => called++,
   });
   await local.snapshot(card);
-  const upgraded = await openDB(`recallio-user-${user}`, 3);
+  const upgraded = await openDB(`recallio-user-${user}`, 4);
   assert.equal(called, 1);
   upgraded.close();
   local.close();

@@ -1,0 +1,718 @@
+{
+  "profile": "recallio-fsrs6-v1",
+  "package": "ts-fsrs@5.4.2",
+  "formatVersion": 2,
+  "fieldSemantics": "expected.progress contains partial projections; absent fields are not asserted",
+  "cases": [
+    {
+      "id": "introduction-good",
+      "initial": {
+        "progress": []
+      },
+      "events": [
+        {
+          "id": "e0",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:00:00.000Z",
+          "receivedAt": "2026-01-01T12:00:00.000Z",
+          "observedMode": "introduction"
+        }
+      ],
+      "expected": {
+        "progress": [
+          {
+            "cardId": "card-1",
+            "direction": "a-b",
+            "epoch": "0",
+            "dueAt": "2026-01-04T12:00:00.000Z",
+            "lastEffectiveAt": "2026-01-01T12:00:00.000Z",
+            "lastModelReview": "2026-01-01T12:00:00.000Z",
+            "stability": 2.3065,
+            "difficulty": 2.11810397
+          }
+        ],
+        "canonicalModes": ["introduction"]
+      }
+    },
+    {
+      "id": "twenty-fast-successes",
+      "initial": {
+        "progress": [
+          {
+            "cardId": "card-1",
+            "direction": "a-b",
+            "epoch": "0",
+            "dueAt": "2026-01-04T12:00:00.000Z",
+            "lastEffectiveAt": "2026-01-01T12:00:00.000Z",
+            "lastModelReview": "2026-01-01T12:00:00.000Z",
+            "stability": 2.3065,
+            "difficulty": 2.11810397
+          }
+        ]
+      },
+      "events": [
+        {
+          "id": "e1",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:01:00.000Z",
+          "receivedAt": "2026-01-01T12:01:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e2",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:02:00.000Z",
+          "receivedAt": "2026-01-01T12:02:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e3",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:03:00.000Z",
+          "receivedAt": "2026-01-01T12:03:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e4",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:04:00.000Z",
+          "receivedAt": "2026-01-01T12:04:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e5",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:05:00.000Z",
+          "receivedAt": "2026-01-01T12:05:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e6",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:06:00.000Z",
+          "receivedAt": "2026-01-01T12:06:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e7",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:07:00.000Z",
+          "receivedAt": "2026-01-01T12:07:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e8",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:08:00.000Z",
+          "receivedAt": "2026-01-01T12:08:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e9",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:09:00.000Z",
+          "receivedAt": "2026-01-01T12:09:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e10",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:10:00.000Z",
+          "receivedAt": "2026-01-01T12:10:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e11",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:11:00.000Z",
+          "receivedAt": "2026-01-01T12:11:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e12",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:12:00.000Z",
+          "receivedAt": "2026-01-01T12:12:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e13",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:13:00.000Z",
+          "receivedAt": "2026-01-01T12:13:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e14",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:14:00.000Z",
+          "receivedAt": "2026-01-01T12:14:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e15",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:15:00.000Z",
+          "receivedAt": "2026-01-01T12:15:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e16",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:16:00.000Z",
+          "receivedAt": "2026-01-01T12:16:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e17",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:17:00.000Z",
+          "receivedAt": "2026-01-01T12:17:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e18",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:18:00.000Z",
+          "receivedAt": "2026-01-01T12:18:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e19",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:19:00.000Z",
+          "receivedAt": "2026-01-01T12:19:00.000Z",
+          "observedMode": "practice"
+        },
+        {
+          "id": "e20",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:20:00.000Z",
+          "receivedAt": "2026-01-01T12:20:00.000Z",
+          "observedMode": "practice"
+        }
+      ],
+      "expected": {
+        "progress": [
+          {
+            "cardId": "card-1",
+            "direction": "a-b",
+            "epoch": "0",
+            "dueAt": "2026-01-04T12:00:00.000Z",
+            "lastEffectiveAt": "2026-01-01T12:20:00.000Z",
+            "lastModelReview": "2026-01-01T12:00:00.000Z",
+            "stability": 2.3065,
+            "difficulty": 2.11810397
+          }
+        ],
+        "canonicalModes": [
+          "practice",
+          "practice",
+          "practice",
+          "practice",
+          "practice",
+          "practice",
+          "practice",
+          "practice",
+          "practice",
+          "practice",
+          "practice",
+          "practice",
+          "practice",
+          "practice",
+          "practice",
+          "practice",
+          "practice",
+          "practice",
+          "practice",
+          "practice"
+        ],
+        "acceptedEventCount": 20
+      }
+    },
+    {
+      "id": "two-directions",
+      "initial": {
+        "progress": [
+          {
+            "cardId": "card-1",
+            "direction": "a-b",
+            "epoch": "0",
+            "dueAt": "2026-01-04T12:00:00.000Z",
+            "lastEffectiveAt": "2026-01-01T12:00:00.000Z",
+            "lastModelReview": "2026-01-01T12:00:00.000Z",
+            "stability": 2.3065,
+            "difficulty": 2.11810397
+          }
+        ],
+        "introducedCardIds": ["card-1"],
+        "remainingNew": 0
+      },
+      "events": [
+        {
+          "id": "reverse",
+          "cardId": "card-1",
+          "direction": "b-a",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:01:00.000Z",
+          "receivedAt": "2026-01-01T12:01:00.000Z",
+          "observedMode": "introduction"
+        }
+      ],
+      "expected": {
+        "progress": [
+          {
+            "cardId": "card-1",
+            "direction": "a-b",
+            "epoch": "0",
+            "dueAt": "2026-01-04T12:00:00.000Z",
+            "lastEffectiveAt": "2026-01-01T12:00:00.000Z",
+            "lastModelReview": "2026-01-01T12:00:00.000Z",
+            "stability": 2.3065,
+            "difficulty": 2.11810397
+          },
+          {
+            "cardId": "card-1",
+            "direction": "b-a",
+            "epoch": "0",
+            "dueAt": "2026-01-04T12:01:00.000Z",
+            "lastEffectiveAt": "2026-01-01T12:01:00.000Z",
+            "lastModelReview": "2026-01-01T12:01:00.000Z",
+            "stability": 2.3065,
+            "difficulty": 2.11810397
+          }
+        ],
+        "canonicalModes": ["introduction"],
+        "introducedCardIds": ["card-1"],
+        "remainingNew": 0
+      }
+    },
+    {
+      "id": "on-time-review",
+      "initial": {
+        "progress": [
+          {
+            "cardId": "card-1",
+            "direction": "a-b",
+            "epoch": "0",
+            "dueAt": "2026-01-04T12:00:00.000Z",
+            "lastEffectiveAt": "2026-01-01T12:00:00.000Z",
+            "lastModelReview": "2026-01-01T12:00:00.000Z",
+            "stability": 2.3065,
+            "difficulty": 2.11810397
+          }
+        ]
+      },
+      "events": [
+        {
+          "id": "due",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-04T12:00:00.000Z",
+          "receivedAt": "2026-01-04T12:00:00.000Z",
+          "observedMode": "due"
+        }
+      ],
+      "expected": {
+        "canonicalModes": ["due"],
+        "progress": [
+          {
+            "cardId": "card-1",
+            "direction": "a-b",
+            "epoch": "0",
+            "dueAt": "2026-01-18T12:00:00.000Z",
+            "lastEffectiveAt": "2026-01-04T12:00:00.000Z",
+            "lastModelReview": "2026-01-04T12:00:00.000Z",
+            "stability": 13.82690327,
+            "difficulty": 2.11121424
+          }
+        ]
+      }
+    },
+    {
+      "id": "after-ten-days",
+      "initial": {
+        "progress": [
+          {
+            "cardId": "card-1",
+            "direction": "a-b",
+            "epoch": "0",
+            "dueAt": "2026-01-04T12:00:00.000Z",
+            "lastEffectiveAt": "2026-01-01T12:00:00.000Z",
+            "lastModelReview": "2026-01-01T12:00:00.000Z",
+            "stability": 2.3065,
+            "difficulty": 2.11810397
+          }
+        ]
+      },
+      "events": [
+        {
+          "id": "late-due",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-11T12:00:00.000Z",
+          "receivedAt": "2026-01-11T12:00:00.000Z",
+          "observedMode": "due"
+        }
+      ],
+      "expected": {
+        "canonicalModes": ["due"],
+        "progress": [
+          {
+            "cardId": "card-1",
+            "direction": "a-b",
+            "epoch": "0",
+            "dueAt": "2026-02-05T12:00:00.000Z",
+            "lastEffectiveAt": "2026-01-11T12:00:00.000Z",
+            "lastModelReview": "2026-01-11T12:00:00.000Z",
+            "stability": 25.10871981,
+            "difficulty": 2.11121424
+          }
+        ]
+      }
+    },
+    {
+      "id": "practice-forgotten",
+      "initial": {
+        "progress": [
+          {
+            "cardId": "card-1",
+            "direction": "a-b",
+            "epoch": "0",
+            "dueAt": "2026-01-04T12:00:00.000Z",
+            "lastEffectiveAt": "2026-01-01T12:00:00.000Z",
+            "lastModelReview": "2026-01-01T12:00:00.000Z",
+            "stability": 2.3065,
+            "difficulty": 2.11810397
+          }
+        ],
+        "sessionReturns": []
+      },
+      "events": [
+        {
+          "id": "again",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 1,
+          "occurredAt": "2026-01-02T12:00:00.000Z",
+          "receivedAt": "2026-01-02T12:00:00.000Z",
+          "observedMode": "practice"
+        }
+      ],
+      "expected": {
+        "canonicalModes": ["practice"],
+        "progress": [
+          {
+            "cardId": "card-1",
+            "direction": "a-b",
+            "epoch": "0",
+            "dueAt": "2026-01-03T12:00:00.000Z",
+            "lastEffectiveAt": "2026-01-02T12:00:00.000Z",
+            "lastModelReview": "2026-01-02T12:00:00.000Z",
+            "stability": 0.57129918,
+            "difficulty": 7.39450274,
+            "lapses": 1
+          }
+        ],
+        "sessionReturns": [
+          {
+            "cardId": "card-1",
+            "direction": "a-b",
+            "epoch": "0"
+          }
+        ]
+      }
+    },
+    {
+      "id": "introduction-forgotten-and-return",
+      "initial": {
+        "progress": [],
+        "sessionReturns": [],
+        "otherAvailableCardIds": ["card-2"]
+      },
+      "events": [
+        {
+          "id": "first-again",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 1,
+          "occurredAt": "2026-01-01T12:00:00.000Z",
+          "receivedAt": "2026-01-01T12:00:00.000Z",
+          "observedMode": "introduction"
+        },
+        {
+          "id": "retry-good",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-01T12:02:00.000Z",
+          "receivedAt": "2026-01-01T12:02:00.000Z",
+          "observedMode": "practice"
+        }
+      ],
+      "expected": {
+        "canonicalModes": ["introduction", "practice"],
+        "afterFirst": {
+          "dueAt": "2026-01-02T12:00:00.000Z",
+          "sessionReturns": [
+            {
+              "cardId": "card-1",
+              "direction": "a-b",
+              "epoch": "0"
+            }
+          ],
+          "nextCardId": "card-2",
+          "cardAfterAlternative": "card-1"
+        },
+        "afterSecond": {
+          "dueAt": "2026-01-02T12:00:00.000Z",
+          "sessionReturns": [],
+          "lastModelReview": "2026-01-01T12:00:00.000Z"
+        }
+      }
+    },
+    {
+      "id": "late-event-after-due",
+      "initial": {
+        "progress": [
+          {
+            "cardId": "card-1",
+            "direction": "a-b",
+            "epoch": "0",
+            "dueAt": "2026-01-18T12:00:00.000Z",
+            "lastEffectiveAt": "2026-01-04T12:00:00.000Z",
+            "lastModelReview": "2026-01-04T12:00:00.000Z",
+            "stability": 13.82690327,
+            "difficulty": 2.11121424
+          }
+        ]
+      },
+      "events": [
+        {
+          "id": "offline",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2026-01-02T12:00:00.000Z",
+          "receivedAt": "2026-01-05T12:00:00.000Z",
+          "observedMode": "due"
+        }
+      ],
+      "expected": {
+        "canonicalModes": ["practice"],
+        "effectiveAt": ["2026-01-04T12:00:00.000Z"],
+        "dueAt": "2026-01-18T12:00:00.000Z",
+        "stability": 13.82690327,
+        "difficulty": 2.11121424,
+        "acceptedEventCount": 1
+      }
+    },
+    {
+      "id": "future-clock",
+      "initial": {
+        "progress": [
+          {
+            "cardId": "card-1",
+            "direction": "a-b",
+            "epoch": "0",
+            "dueAt": "2026-01-04T12:00:00.000Z",
+            "lastEffectiveAt": "2026-01-01T12:00:00.000Z",
+            "lastModelReview": "2026-01-01T12:00:00.000Z",
+            "stability": 2.3065,
+            "difficulty": 2.11810397
+          }
+        ]
+      },
+      "events": [
+        {
+          "id": "future",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 3,
+          "occurredAt": "2027-01-01T12:00:00.000Z",
+          "receivedAt": "2026-01-02T12:00:00.000Z",
+          "observedMode": "practice"
+        }
+      ],
+      "expected": {
+        "canonicalModes": ["practice"],
+        "effectiveAt": ["2026-01-02T12:00:00.000Z"],
+        "dueAt": "2026-01-04T12:00:00.000Z",
+        "stability": 2.3065,
+        "rawOccurredAt": "2027-01-01T12:00:00.000Z"
+      }
+    },
+    {
+      "id": "old-epoch-after-reset",
+      "initial": {
+        "currentEpochs": {
+          "a-b": "1",
+          "b-a": "0"
+        },
+        "progress": [],
+        "sessionReturns": []
+      },
+      "events": [
+        {
+          "id": "old",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 1,
+          "occurredAt": "2026-01-02T12:00:00.000Z",
+          "receivedAt": "2026-01-02T12:00:00.000Z",
+          "observedMode": "practice"
+        }
+      ],
+      "expected": {
+        "dispositions": ["ignored_old_epoch"],
+        "progress": [],
+        "sessionReturns": [],
+        "nextModeForCurrentEpoch": "introduction"
+      }
+    },
+    {
+      "id": "single-card-retry-after-commit",
+      "initial": {
+        "progress": [],
+        "sessionReturns": [],
+        "otherAvailableCardIds": []
+      },
+      "events": [
+        {
+          "id": "again-one-card",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 1,
+          "occurredAt": "2026-01-01T12:00:00.000Z",
+          "receivedAt": "2026-01-01T12:00:00.000Z",
+          "observedMode": "introduction"
+        },
+        {
+          "id": "again-one-card",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 1,
+          "occurredAt": "2026-01-01T12:00:00.000Z",
+          "receivedAt": "2026-01-01T12:00:00.000Z",
+          "observedMode": "introduction"
+        }
+      ],
+      "expected": {
+        "acceptedEventCount": 1,
+        "canonicalModes": ["introduction"],
+        "sessionReturns": [
+          {
+            "cardId": "card-1",
+            "direction": "a-b",
+            "epoch": "0"
+          }
+        ],
+        "nextCardId": "card-1",
+        "dueAt": "2026-01-02T12:00:00.000Z"
+      }
+    },
+    {
+      "id": "local-commit-failure",
+      "initial": {
+        "progress": [],
+        "sessionReturns": [],
+        "otherAvailableCardIds": ["card-2"]
+      },
+      "events": [
+        {
+          "id": "again-one-card",
+          "cardId": "card-1",
+          "direction": "a-b",
+          "epoch": "0",
+          "rating": 1,
+          "occurredAt": "2026-01-01T12:00:00.000Z",
+          "receivedAt": "2026-01-01T12:00:00.000Z",
+          "observedMode": "introduction",
+          "commitResult": "failure"
+        }
+      ],
+      "expected": {
+        "acceptedEventCount": 0,
+        "sessionReturns": [],
+        "activeCardId": "card-1",
+        "nextCardId": null
+      }
+    }
+  ]
+}

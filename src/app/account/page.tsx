@@ -20,6 +20,7 @@ export default async function AccountPage({
       )}
       <AccountPanel key={account.id} accountId={account.id} />
       <nav aria-label="Nauka">
+        <Link href="/decks">Moje zestawy</Link>
         <a href="/study">Przejdź do nauki</a>
         <Link href="/">Wróć do dema</Link>
       </nav>

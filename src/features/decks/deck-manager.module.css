@@ -1,0 +1,42 @@
+.body,
+.card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.body h2,
+.body p {
+  margin: 0;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actions button,
+.list button {
+  padding: 6px 10px;
+}
+
+.link {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}

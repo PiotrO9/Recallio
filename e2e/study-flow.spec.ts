@@ -141,6 +141,98 @@ test("a review survives an offline reload and synchronizes once to a second devi
       0,
     );
     await expect(otherPage.getByText("Zapisany postęp: 1")).toHaveCount(0);
+    await page.goto("/decks");
+    await expect(page.getByRole("heading", { name: "Nauka" })).toBeVisible();
+    const search = page.getByRole("searchbox", { name: "Wyszukaj zestaw" });
+    await search.fill("brak dopasowania");
+    await expect(
+      page.getByRole("button", { name: "Nauka", exact: true }),
+    ).toHaveCount(0);
+    await search.clear();
+    await page.getByRole("button", { name: "Dodaj zestaw" }).click();
+    await page.getByLabel("Nazwa zestawu").fill("Niewysłany szkic");
+    await page.getByRole("button", { name: "Anuluj" }).click();
+    await expect(
+      page.getByRole("button", { name: "Niewysłany szkic" }),
+    ).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Edytuj zestaw" }).click();
+    await page.getByLabel("Nazwa zestawu").fill("Zaktualizowany zestaw");
+    await page.getByLabel("Kierunek zestawu").selectOption("mixed");
+    await page.getByRole("button", { name: "Zapisz zestaw" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Zaktualizowany zestaw" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Edytuj fiszkę" }).click();
+    await page.getByLabel("Strona B").fill("dog (noun)");
+    await page.getByRole("button", { name: "Zapisz fiszkę" }).click();
+    await expect(page.getByText("dog (noun)", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Zresetuj A → B" }),
+    ).toBeVisible();
+    const changes = async () =>
+      (await (await primary.request.get("/api/v1/sync/pull?cursor=0")).json())
+        .changes;
+    await expect
+      .poll(
+        async () =>
+          (await changes()).filter(
+            ({ entity }: { entity: string }) => entity === "card",
+          ).length,
+      )
+      .toBe(2);
+    expect(
+      (await changes()).filter(
+        ({ entity }: { entity: string }) => entity === "progress",
+      ),
+    ).toHaveLength(1);
+
+    page.once("dialog", (dialog) => void dialog.accept());
+    await page.getByRole("button", { name: "Zresetuj A → B" }).click();
+    await expect
+      .poll(
+        async () =>
+          (await changes()).find(
+            ({ entity }: { entity: string }) => entity === "reset",
+          )?.payload.epoch,
+      )
+      .toBe("1");
+    page.once("dialog", (dialog) => void dialog.accept());
+    await page.getByRole("button", { name: "Usuń fiszkę" }).click();
+    await expect(page.getByText("W zestawie nie ma fiszek.")).toBeVisible();
+    await expect
+      .poll(async () =>
+        (await changes()).some(
+          (change: { entity: string; deleted: boolean }) =>
+            change.entity === "card" && change.deleted,
+        ),
+      )
+      .toBe(true);
+
+    const stale = await primary.request.post("/api/v1/sync/push", {
+      headers: { origin: baseURL! },
+      data: {
+        protocolVersion: 1,
+        deviceId: randomUUID(),
+        operations: [
+          {
+            id: randomUUID(),
+            type: "card.update",
+            entityId: cardId,
+            baseRevision: "0",
+            payload: {
+              sideA: "stara treść",
+              sideB: "old",
+              exampleA: null,
+              exampleB: null,
+            },
+          },
+        ],
+      },
+    });
+    expect((await stale.json()).results).toMatchObject([
+      { status: "conflict", error: "entity_deleted" },
+    ]);
   } finally {
     await Promise.all(devices.map((context) => context.close()));
     await Promise.all(

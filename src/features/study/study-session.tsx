@@ -34,14 +34,24 @@ const grades: readonly [Rating, string][] = [
   [4, "Łatwo"],
 ];
 
-export function StudySession({ accountId }: { accountId?: string }) {
+export function StudySession({
+  accountId,
+  deckId,
+}: {
+  accountId?: string;
+  deckId?: string;
+}) {
   const [offlineId, setOfflineId] = useState<string | null | undefined>(
     undefined,
   );
+  const [offlineDeck, setOfflineDeck] = useState<string | undefined>();
   useEffect(() => {
     if (accountId) return;
     const stored = uuidSchema.safeParse(savedOfflineAccount());
     setOfflineId(stored.success ? stored.data : null);
+    setOfflineDeck(
+      new URLSearchParams(window.location.search).get("deck") ?? undefined,
+    );
   }, [accountId]);
   const id = accountId ?? offlineId;
   if (!id)
@@ -52,10 +62,13 @@ export function StudySession({ accountId }: { accountId?: string }) {
           : "Wczytywanie danych…"}
       </p>
     );
-  return <StudyBoard key={id} userId={id} />;
+  const selected = deckId ?? offlineDeck;
+  return (
+    <StudyBoard key={`${id}:${selected ?? ""}`} userId={id} deckId={selected} />
+  );
 }
 
-function StudyBoard({ userId }: { userId: string }) {
+function StudyBoard({ userId, deckId }: { userId: string; deckId?: string }) {
   const [workspace, setWorkspace] = useState<SnapshotData>();
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [revealed, setRevealed] = useState(false);
@@ -105,6 +118,7 @@ function StudyBoard({ userId }: { userId: string }) {
     const deck = data.decks.find(
       (item) =>
         !item.deletedAt &&
+        (!deckId || item.id === deckId) &&
         data.cards.some((card) => card.deckId === item.id && !card.deletedAt),
     );
     if (!deck || !data.settings) return null;

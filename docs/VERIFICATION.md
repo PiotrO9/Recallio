@@ -16,6 +16,26 @@ npm run test:e2e
 
 E2E uruchamia `next start` na 127.0.0.1:3210 i testuje demo w desktopowym Chromium oraz emulacji iPhone'a w Chromium. Scenariusze obejmują zmianę kierunku, zapis i odczyt historii po odświeżeniu oraz błąd IndexedDB. Po błędzie fiszka zostaje na ekranie, a ponowienie zapisuje jedną odpowiedź. Zrzuty trafiają do `test-results/`.
 
+## Lokalna baza Supabase
+
+W uruchomionym Dockerze utwórz sieć raz, a potem uruchamiaj polecenia dla projektu Recallio:
+
+```powershell
+docker network create --opt com.docker.network.bridge.host_binding_ipv4=127.0.0.1 recallio-local
+npx --yes supabase@3.2.0 start --network-id recallio-local
+npx --yes supabase@3.2.0 migration up
+npx --yes supabase@3.2.0 test db --network-id recallio-local
+npx --yes supabase@3.2.0 db advisors --level warn --fail-on error
+
+$recallioStatus = npx --yes supabase@3.2.0 status -o json | ConvertFrom-Json
+$env:RECALLIO_TEST_ANON_KEY = $recallioStatus.ANON_KEY
+$env:RECALLIO_TEST_SERVICE_ROLE_KEY = $recallioStatus.SERVICE_ROLE_KEY
+node --test tests/database/rest.test.mjs
+Remove-Item Env:RECALLIO_TEST_ANON_KEY, Env:RECALLIO_TEST_SERVICE_ROLE_KEY
+```
+
+Test REST używa lokalnego adresu `127.0.0.1:54321` i usuwa utworzone konta testowe. Publiczne tabele przyznają użytkownikom wyłącznie odczyt własnych wierszy. Tabele kursora, resetów i potwierdzeń są w prywatnym schemacie. Testy produkcyjnych funkcji RPC do synchronizacji należą do `SYNC-01`.
+
 ## Wymagane scenariusze następnych etapów
 
 - Atomiczność: błąd przy każdym store → zero częściowego postępu/outbox.

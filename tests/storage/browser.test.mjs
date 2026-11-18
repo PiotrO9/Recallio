@@ -55,6 +55,7 @@ test("real Chromium IndexedDB serializes competing tabs and preserves retries", 
         algorithmVersion: "test",
       };
       return {
+        localVersion: n === 1 ? "0" : "1",
         event: {
           id,
           cardId,

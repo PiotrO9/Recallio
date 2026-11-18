@@ -1,4 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import { createSnapshotRebaser, type ResetProjection } from "./snapshot-rebase";
 import {
   uuidSchema,
   reviewEventSchema,
@@ -13,6 +14,9 @@ import {
   type OperationResult,
   type Card,
   type CommitReceipt,
+  type ContentRecord,
+  type ContentRepository,
+  type ResetRepository,
   type Introduction,
   type LearningRepository,
   type PreparedReview,
@@ -57,6 +61,10 @@ interface Schema extends DBSchema {
   settings: { key: string; value: NonNullable<SnapshotResponse["settings"]> };
   conflicts: { key: string; value: unknown };
   staging: { key: string; value: StagedSnapshot };
+  contentOperations: {
+    key: string;
+    value: { operation: Operation; expected: unknown; committedAt: string };
+  };
 }
 type StagedSnapshot = {
   token: string;
@@ -73,6 +81,13 @@ export type SnapshotData = Pick<
 export type RebaseSnapshot = (
   snapshot: SnapshotData,
   pending: readonly OutboxItem[],
+  local: {
+    reviews: readonly ReviewEvent[];
+    introductions: readonly Introduction[];
+    decks: SnapshotData["decks"];
+    cards: SnapshotData["cards"];
+    settings: SnapshotData["settings"];
+  },
 ) => { data: SnapshotData; handledOperationIds: readonly string[] };
 
 function canonical(value: unknown): string {
@@ -96,39 +111,55 @@ export interface LocalOptions {
 /** A separate database per authenticated account; it is never the demo database. */
 export function createLocalRepository(
   options: LocalOptions,
-): LearningRepository & {
-  lease(
-    owner: string,
-    now: number,
-    duration: number,
-    limit: number,
-  ): Promise<OutboxItem[]>;
-  releaseLease(owner: string): Promise<void>;
-  acknowledge(result: OperationResult, commitCursor: string): Promise<void>;
-  stageSnapshot(
-    pageToken: string | null,
-    page: SnapshotResponse,
-    requestGeneration?: number,
-  ): Promise<void>;
-  beginSnapshot(): Promise<number>;
-  discardSnapshot(token: string): Promise<void>;
-  activateSnapshot(token: string, rebase: RebaseSnapshot): Promise<void>;
-  getCursor(): Promise<string | undefined>;
-  readProgress(
-    cardId: string,
-    direction: Progress["direction"],
-  ): Promise<Progress | null>;
-  readProgressVersion(
-    cardId: string,
-    direction: Progress["direction"],
-  ): Promise<{ progress: Progress | null; localVersion: string }>;
-  commitReviewFrom(
-    command: PreparedReview,
-    expected: Progress | null,
-    localVersion: string,
-  ): Promise<CommitReceipt>;
-  close(): void;
-} {
+): LearningRepository &
+  ContentRepository &
+  ResetRepository & {
+    lease(
+      owner: string,
+      now: number,
+      duration: number,
+      limit: number,
+    ): Promise<OutboxItem[]>;
+    releaseLease(owner: string): Promise<void>;
+    acknowledge(result: OperationResult): Promise<void>;
+    readContent(
+      type: "deck" | "card" | "settings",
+      id: string,
+    ): Promise<ContentRecord>;
+    commitContent(
+      operation: Operation,
+      expected: unknown,
+    ): Promise<{ operationId: string; committedAt: string }>;
+    commitReset(
+      operation: Operation,
+      expected: Progress,
+      localVersion: string,
+      reset: ResetProjection,
+    ): Promise<{ operationId: string; committedAt: string }>;
+    stageSnapshot(
+      pageToken: string | null,
+      page: SnapshotResponse,
+      requestGeneration?: number,
+    ): Promise<void>;
+    beginSnapshot(): Promise<number>;
+    discardSnapshot(token: string): Promise<void>;
+    activateSnapshot(token: string, rebase: RebaseSnapshot): Promise<void>;
+    getCursor(): Promise<string | undefined>;
+    readProgress(
+      cardId: string,
+      direction: Progress["direction"],
+    ): Promise<Progress | null>;
+    readProgressVersion(
+      cardId: string,
+      direction: Progress["direction"],
+    ): Promise<{ progress: Progress | null; localVersion: string }>;
+    commitReviewFrom(
+      command: PreparedReview,
+      expected: Progress | null,
+      localVersion: string,
+    ): Promise<CommitReceipt>;
+    close(): void;
+  } {
   const userId = uuidSchema.parse(options.userId);
   const maxSnapshotBytes = options.maxSnapshotBytes ?? 32 * 1024 * 1024;
   if (!Number.isSafeInteger(maxSnapshotBytes) || maxSnapshotBytes <= 0)
@@ -136,7 +167,7 @@ export function createLocalRepository(
   let connection: Promise<IDBPDatabase<Schema>> | undefined;
   const connect = () => {
     if (!connection) {
-      const opened = openDB<Schema>(`recallio-user-${userId}`, 4, {
+      const opened = openDB<Schema>(`recallio-user-${userId}`, 6, {
         upgrade(db, oldVersion, _newVersion, tx) {
           void tx.done.catch(() => {});
           if (oldVersion < 1) {
@@ -225,6 +256,42 @@ export function createLocalRepository(
             db.createObjectStore("progressVersions", {
               keyPath: ["cardId", "direction"],
             });
+          if (oldVersion === 4) {
+            void tx
+              .objectStore("outbox")
+              .openCursor()
+              .then(function migrateCursor(cursor): void {
+                if (!cursor) return;
+                const item = cursor.value;
+                if (item.state === "acknowledged") {
+                  if (
+                    item.receipt &&
+                    item.receiptCursor &&
+                    revisionSchema.safeParse(item.receiptCursor).success
+                  ) {
+                    item.receipt = {
+                      ...item.receipt,
+                      commitCursor: item.receiptCursor,
+                    };
+                  } else {
+                    item.state = "pending";
+                    item.deliveryUnknown = true;
+                    delete item.receipt;
+                    delete item.receiptCursor;
+                  }
+                  void cursor.update(item).catch(() => {});
+                }
+                void cursor
+                  .continue()
+                  .then(migrateCursor)
+                  .catch(() => {});
+              })
+              .catch(() => {});
+          }
+          if (oldVersion < 6)
+            db.createObjectStore("contentOperations", {
+              keyPath: "operation.id",
+            });
         },
         blocked: options.blocked,
         blocking() {
@@ -245,9 +312,11 @@ export function createLocalRepository(
   };
   return {
     async commitReview(command) {
-      // The shared port carries no local base. Accept only the first review;
-      // subsequent callers must use the local compare-and-swap extension.
-      return this.commitReviewFrom(command, null, "0");
+      const previous = await this.readProgress(
+        command.event.cardId,
+        command.event.direction,
+      );
+      return this.commitReviewFrom(command, previous, command.localVersion);
     },
     async readProgress(cardId, direction) {
       const db = await connect();
@@ -269,6 +338,8 @@ export function createLocalRepository(
       progressSchema.parse(command.progress);
       operationSchema.parse(command.operation);
       if (expected !== null) progressSchema.parse(expected);
+      if (localVersion !== command.localVersion)
+        throw new Error("Niespójna lokalna wersja");
       if (!/^(0|[1-9]\d*)$/.test(localVersion))
         throw new Error("Nieprawidłowa lokalna wersja");
       const { event, progress, operation } = command;
@@ -288,6 +359,7 @@ export function createLocalRepository(
       const tx = db.transaction(
         [
           "reviews",
+          "contentOperations",
           "progress",
           "progressVersions",
           "introductions",
@@ -299,11 +371,20 @@ export function createLocalRepository(
       try {
         const existing = await tx.objectStore("reviews").get(event.id);
         if (existing) {
-          if (canonical(existing.command) !== canonical(command))
+          const oldCommand = existing.command as PreparedReview & {
+            localVersion?: string;
+          };
+          const comparable =
+            oldCommand.localVersion === undefined
+              ? { ...oldCommand, localVersion: command.localVersion }
+              : oldCommand;
+          if (canonical(comparable) !== canonical(command))
             throw new Error("Ponowne użycie identyfikatora");
           await tx.done;
           return existing.receipt;
         }
+        if (await tx.objectStore("contentOperations").get(event.id))
+          throw new Error("Ponowne użycie identyfikatora");
         const previous = await tx
           .objectStore("progress")
           .get([event.cardId, event.direction]);
@@ -379,6 +460,236 @@ export function createLocalRepository(
       await tx.done;
       return { cards, progress };
     },
+    async readContent(type, id) {
+      const db = await connect();
+      if (type === "deck") return (await db.get("decks", id)) ?? null;
+      if (type === "card") return (await db.get("cards", id)) ?? null;
+      if (id !== userId) throw new Error("Nieprawidłowe konto ustawień");
+      return (await db.get("settings", "current")) ?? null;
+    },
+    async commitReset(input, expected, localVersion, reset) {
+      const operation = operationSchema.parse(input);
+      if (operation.type !== "progress.reset")
+        throw new Error("Nieprawidłowa operacja resetu");
+      progressSchema.parse(expected);
+      if (!/^(0|[1-9]\d*)$/.test(localVersion))
+        throw new Error("Nieprawidłowa lokalna wersja");
+      const db = await connect();
+      const tx = db.transaction(
+        [
+          "progress",
+          "progressVersions",
+          "outbox",
+          "meta",
+          "reviews",
+          "contentOperations",
+          "cards",
+          "decks",
+        ],
+        "readwrite",
+      );
+      try {
+        const receipts = tx.objectStore("contentOperations");
+        const prior = await receipts.get(operation.id);
+        const base = { progress: expected, localVersion };
+        if (prior) {
+          if (
+            canonical(prior.operation) !== canonical(operation) ||
+            canonical(prior.expected) !== canonical(base)
+          )
+            throw new Error("Ponowne użycie identyfikatora");
+          await tx.done;
+          return { operationId: operation.id, committedAt: prior.committedAt };
+        }
+        if (await tx.objectStore("reviews").get(operation.id))
+          throw new Error("Ponowne użycie identyfikatora");
+        const key: [string, string] = [
+          operation.entityId,
+          operation.payload.direction,
+        ];
+        const current = await tx.objectStore("progress").get(key);
+        const version = await tx.objectStore("progressVersions").get(key);
+        const card = await tx.objectStore("cards").get(operation.entityId);
+        const deck = card && (await tx.objectStore("decks").get(card.deckId));
+        if (!card || card.deletedAt || !deck || deck.deletedAt)
+          throw new Error("Karta jest niedostępna");
+        if (
+          !current ||
+          canonical(current) !== canonical(expected) ||
+          (version?.version ?? "0") !== localVersion ||
+          current.revision !== operation.baseRevision ||
+          BigInt(operation.payload.epoch) !== BigInt(current.epoch) + 1n
+        )
+          throw new Error("Konflikt resetu postępu");
+        const projected = progressSchema.parse(
+          reset(current, operation.payload.epoch),
+        );
+        if (
+          projected.cardId !== current.cardId ||
+          projected.direction !== current.direction ||
+          projected.epoch !== operation.payload.epoch ||
+          projected.algorithmVersion !== current.algorithmVersion
+        )
+          throw new Error("Niespójny wynik resetu");
+        const committedAt = options.now().toISOString();
+        const meta = tx.objectStore("meta");
+        const sequence = Number((await meta.get("outboxSequence")) ?? 0) + 1;
+        if (!Number.isSafeInteger(sequence))
+          throw new Error("Wyczerpano kolejność outbox");
+        await tx.objectStore("progress").put(projected);
+        await tx.objectStore("progressVersions").put({
+          cardId: current.cardId,
+          direction: current.direction,
+          version: (BigInt(localVersion) + 1n).toString(),
+        });
+        await meta.put(sequence, "outboxSequence");
+        await tx.objectStore("outbox").add({
+          operation,
+          sequence,
+          deliveryUnknown: false,
+          state: "pending",
+        });
+        await receipts.add({ operation, expected: base, committedAt });
+        await tx.done;
+        return { operationId: operation.id, committedAt };
+      } catch (error) {
+        try {
+          tx.abort();
+        } catch {}
+        await tx.done.catch(() => {});
+        throw error;
+      }
+    },
+    async commitContent(input, expected) {
+      const operation = operationSchema.parse(input);
+      if (
+        operation.type === "review.record" ||
+        operation.type === "progress.reset"
+      )
+        throw new Error("Nieobsługiwany typ zapisu treści");
+      if (operation.type === "settings.update" && operation.entityId !== userId)
+        throw new Error("Nieprawidłowe konto ustawień");
+      const db = await connect();
+      const tx = db.transaction(
+        [
+          "decks",
+          "cards",
+          "settings",
+          "outbox",
+          "meta",
+          "reviews",
+          "contentOperations",
+        ],
+        "readwrite",
+      );
+      try {
+        const receipts = tx.objectStore("contentOperations");
+        const existing = await receipts.get(operation.id);
+        if (existing) {
+          if (
+            canonical(existing.operation) !== canonical(operation) ||
+            canonical(existing.expected) !== canonical(expected)
+          )
+            throw new Error("Ponowne użycie identyfikatora");
+          await tx.done;
+          return {
+            operationId: operation.id,
+            committedAt: existing.committedAt,
+          };
+        }
+        if (await tx.objectStore("reviews").get(operation.id))
+          throw new Error("Ponowne użycie identyfikatora");
+        const decks = await tx.objectStore("decks").getAll();
+        const cards = await tx.objectStore("cards").getAll();
+        const settings =
+          (await tx.objectStore("settings").get("current")) ?? null;
+        const current = operation.type.startsWith("deck.")
+          ? (decks.find((x) => x.id === operation.entityId) ?? null)
+          : operation.type.startsWith("card.")
+            ? (cards.find((x) => x.id === operation.entityId) ?? null)
+            : settings;
+        if (canonical(current) !== canonical(expected))
+          throw new Error("Lokalna treść zmieniła się");
+        const committedAt = options.now().toISOString();
+        const localDecks =
+          operation.type === "deck.delete"
+            ? decks.map((d) =>
+                d.id === operation.entityId
+                  ? { ...d, deletedAt: committedAt }
+                  : d,
+              )
+            : decks;
+        const localCards =
+          operation.type === "card.delete"
+            ? cards.map((c) =>
+                c.id === operation.entityId
+                  ? { ...c, deletedAt: committedAt }
+                  : c,
+              )
+            : cards;
+        const rebase = createSnapshotRebaser({
+          version: "unused",
+          review() {
+            throw new Error("Nieoczekiwana ocena");
+          },
+        });
+        const result = rebase(
+          { decks, cards, settings, progress: [], introductions: [] },
+          [
+            {
+              operation,
+              sequence: 0,
+              state: "pending",
+              deliveryUnknown: false,
+            },
+          ],
+          {
+            reviews: [],
+            introductions: [],
+            decks: localDecks,
+            cards: localCards,
+            settings,
+          },
+        );
+        if (operation.type.startsWith("deck.")) {
+          const value = result.data.decks.find(
+            (x) => x.id === operation.entityId,
+          );
+          if (!value) throw new Error("Brak wynikowego zestawu");
+          await tx.objectStore("decks").put(value);
+        } else if (operation.type.startsWith("card.")) {
+          const value = result.data.cards.find(
+            (x) => x.id === operation.entityId,
+          );
+          if (!value) throw new Error("Brak wynikowej fiszki");
+          await tx.objectStore("cards").put(value);
+        } else {
+          if (!result.data.settings)
+            throw new Error("Brak wynikowych ustawień");
+          await tx.objectStore("settings").put(result.data.settings, "current");
+        }
+        const meta = tx.objectStore("meta");
+        const sequence = Number((await meta.get("outboxSequence")) ?? 0) + 1;
+        if (!Number.isSafeInteger(sequence))
+          throw new Error("Wyczerpano kolejność outbox");
+        await meta.put(sequence, "outboxSequence");
+        await tx.objectStore("outbox").add({
+          operation,
+          sequence,
+          deliveryUnknown: false,
+          state: "pending",
+        });
+        await receipts.add({ operation, expected, committedAt });
+        await tx.done;
+        return { operationId: operation.id, committedAt };
+      } catch (error) {
+        try {
+          tx.abort();
+        } catch {}
+        await tx.done.catch(() => {});
+        throw error;
+      }
+    },
     async lease(owner, now, duration, limit) {
       if (
         !owner ||
@@ -425,11 +736,11 @@ export function createLocalRepository(
         }
       await tx.done;
     },
-    async acknowledge(input, commitCursor) {
+    async acknowledge(input) {
       const result = operationResultSchema.parse(input);
-      revisionSchema.parse(commitCursor);
       if (result.status !== "applied" && result.status !== "duplicate")
         throw new Error("Wynik nie potwierdza zastosowania operacji");
+      const commitCursor = revisionSchema.parse(result.commitCursor);
       const db = await connect();
       const tx = db.transaction(["outbox", "meta"], "readwrite");
       try {
@@ -578,6 +889,7 @@ export function createLocalRepository(
           "cards",
           "progress",
           "progressVersions",
+          "reviews",
           "introductions",
           "settings",
           "outbox",
@@ -660,7 +972,20 @@ export function createLocalRepository(
           throw new Error(
             "Nieznany wynik wysłanej operacji; rozlicz receipt przed snapshotem",
           );
-        const rebased = rebase(structuredClone(base), structuredClone(pending));
+        const local = {
+          reviews: (await tx.objectStore("reviews").getAll()).map(
+            (item) => item.event,
+          ),
+          introductions: await tx.objectStore("introductions").getAll(),
+          decks: await tx.objectStore("decks").getAll(),
+          cards: await tx.objectStore("cards").getAll(),
+          settings: (await tx.objectStore("settings").get("current")) ?? null,
+        };
+        const rebased = rebase(
+          structuredClone(base),
+          structuredClone(pending),
+          structuredClone(local),
+        );
         const expectedIds = pending.map((item) => item.operation.id);
         if (
           rebased.handledOperationIds.length !== expectedIds.length ||

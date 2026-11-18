@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts && node --test tests/*.test.mjs",
+    "test": "tsx --test tests/*.test.ts tests/storage/*.test.ts && node --test tests/*.test.mjs",
+    "test:storage:browser": "node --test tests/storage/*.test.mjs",
     "test:e2e": "playwright test",
     "format:check": "prettier --check ."
   },
@@ -27,6 +28,7 @@
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "esbuild": "0.28.2",
     "fake-indexeddb": "6.2.8",
     "prettier": "3.10.1",
     "tsx": "4.23.15",

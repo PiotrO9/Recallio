@@ -54,7 +54,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
       },
       maxRedirects: 0,
     });
-    expect(response.headers().location).toBe("/decks");
+    expect(response.headers().location).toBe("/");
     return context;
   }
 
@@ -111,8 +111,9 @@ test("a review survives an offline reload and synchronizes once to a second devi
 
     const page = await primary.newPage();
     await page.goto("/");
-    await expect(page).toHaveURL(/\/decks$/);
-    await page.goto("/study");
+    await expect(page).toHaveURL(baseURL + "/");
+    await expectAccessible(page);
+    await page.getByRole("link", { name: "Przejdź do nauki" }).click();
     await expect(page.getByRole("heading", { name: "pies" })).toBeVisible();
     await expectAccessible(page);
     const manifestResponse = await request.get("/manifest.webmanifest");

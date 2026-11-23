@@ -43,7 +43,7 @@ test("sync receipts, pagination, projection and account isolation", async ({
       form: { intent: "login", email, password },
       maxRedirects: 0,
     });
-    expect(signedIn.headers().location).toBe("/decks");
+    expect(signedIn.headers().location).toBe("/");
     return { id, api: context.request };
   }
 

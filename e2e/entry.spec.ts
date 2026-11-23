@@ -5,6 +5,7 @@ test("visitors enter through accessible sign-in at 320px", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 720 });
   await page.goto("/");
   await expect(page).toHaveURL(/\/auth$/);
+  await expect(page.locator('a[href="/"]')).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Zaloguj się" }),
   ).toBeVisible();

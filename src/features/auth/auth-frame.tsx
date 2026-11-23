@@ -5,31 +5,24 @@ import styles from "./auth.module.css";
 export function AuthFrame({
   title,
   children,
-  linkLogo = true,
+  showLogo = true,
 }: {
   title: string;
   children: ReactNode;
-  linkLogo?: boolean;
+  showLogo?: boolean;
 }) {
-  const logo = (
-    <>
-      <span className="brand-mark" aria-hidden="true">
-        r.
-      </span>
-      recallio
-    </>
-  );
   return (
     <div className={styles.shell}>
       <a className="skip-link" href="#main">
         Przejdź do treści
       </a>
-      {linkLogo ? (
+      {showLogo && (
         <Link className="brand" href="/">
-          {logo}
+          <span className="brand-mark" aria-hidden="true">
+            r.
+          </span>
+          recallio
         </Link>
-      ) : (
-        <div className="brand">{logo}</div>
       )}
       <main id="main" tabIndex={-1} className={styles.panel}>
         <h1>{title}</h1>

@@ -6,6 +6,7 @@ test("visitors enter through accessible sign-in at 320px", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/auth\/login$/);
   await expect(page.locator('a[href="/"]')).toHaveCount(0);
+  await expect(page.getByText(/recallio/i)).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Zaloguj się" }),
   ).toBeVisible();

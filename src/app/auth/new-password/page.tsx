@@ -11,7 +11,7 @@ export default async function NewPasswordPage({
     redirect("/auth/login?status=session");
   const { status } = await searchParams;
   return (
-    <AuthFrame title="Ustaw nowe hasło" linkLogo={false}>
+    <AuthFrame title="Ustaw nowe hasło" showLogo={false}>
       {status && (
         <p role="alert">Nie udało się zmienić hasła. Spróbuj ponownie.</p>
       )}

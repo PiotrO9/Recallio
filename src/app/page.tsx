@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import "@fontsource/instrument-serif/400.css";
+import "@fontsource/instrument-serif/400-italic.css";
 import { serverAuth, verifiedIdentity } from "@/server/auth/client";
 import styles from "./dashboard.module.css";
 
@@ -25,13 +27,36 @@ export default async function Home() {
         </Link>
       </header>
       <main id="main" tabIndex={-1} className={styles.main}>
-        <h1>Panel nauki</h1>
-        <section className={styles.study}>
-          <h2>Powtórki</h2>
-          <a className={styles.start} href="/study">
-            Przejdź do nauki
-          </a>
-        </section>
+        <div className={styles.spread}>
+          <div className={styles.intro}>
+            <h1>
+              Panel <em>nauki</em>
+            </h1>
+            <p>
+              Otwórz zestaw i przypomnij sobie odpowiedź, zanim odwrócisz
+              fiszkę.
+            </p>
+            <a className={styles.start} href="/study">
+              Przejdź do nauki
+            </a>
+          </div>
+          <figure className={styles.print}>
+            <img
+              src="/ejiri.webp"
+              width="1100"
+              height="736"
+              alt="Podmuch wiatru porywa kartki nad drogą. W oddali widać górę Fudżi."
+            />
+            <figcaption>
+              <span>
+                Katsushika Hokusai, <cite>Ejiri w prowincji Suruga</cite>
+              </span>
+              <a href="https://www.metmuseum.org/art/collection/search/55735">
+                The Met
+              </a>
+            </figcaption>
+          </figure>
+        </div>
         <section className={styles.library}>
           <h2>Biblioteka</h2>
           <Link href="/decks">

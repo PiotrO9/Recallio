@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import "@fontsource/instrument-serif/400.css";
-import "@fontsource/instrument-serif/400-italic.css";
+import { Masthead } from "@/components/masthead";
+import { EjiriPrint } from "@/components/ejiri-print";
 import { serverAuth, verifiedIdentity } from "@/server/auth/client";
 import styles from "./dashboard.module.css";
 
@@ -10,23 +10,12 @@ export default async function Home() {
   if (!account) redirect("/auth/login");
 
   return (
-    <div className={styles.workspace}>
+    <div className="page-shell">
       <a className="skip-link" href="#main">
         Przejdź do treści
       </a>
-      <header className={styles.header}>
-        <span className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            r.
-          </span>
-          recallio
-        </span>
-        <Link href="/account" className={styles.account}>
-          <strong>Moje konto</strong>
-          {account.email && <span>{account.email}</span>}
-        </Link>
-      </header>
-      <main id="main" tabIndex={-1} className={styles.main}>
+      <Masthead email={account.email} />
+      <main id="main" tabIndex={-1}>
         <div className={styles.spread}>
           <div className={styles.intro}>
             <h1>
@@ -36,26 +25,11 @@ export default async function Home() {
               Otwórz zestaw i przypomnij sobie odpowiedź, zanim odwrócisz
               fiszkę.
             </p>
-            <a className={styles.start} href="/study">
+            <a className="primary" href="/study">
               Przejdź do nauki
             </a>
           </div>
-          <figure className={styles.print}>
-            <img
-              src="/ejiri.webp"
-              width="1100"
-              height="736"
-              alt="Podmuch wiatru porywa kartki nad drogą. W oddali widać górę Fudżi."
-            />
-            <figcaption>
-              <span>
-                Katsushika Hokusai, <cite>Ejiri w prowincji Suruga</cite>
-              </span>
-              <a href="https://www.metmuseum.org/art/collection/search/55735">
-                The Met
-              </a>
-            </figcaption>
-          </figure>
+          <EjiriPrint />
         </div>
         <section className={styles.library}>
           <h2>Biblioteka</h2>

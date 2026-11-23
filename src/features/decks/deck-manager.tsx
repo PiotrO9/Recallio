@@ -257,27 +257,29 @@ export function DeckManager({ userId }: { userId: string }) {
           Nie udało się zapisać zmiany. Sprawdź dane lub odśwież listę.
         </p>
       )}
-      <label>
-        Wyszukaj zestaw
-        <input
-          type="search"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-      </label>
-      <button
-        className="primary"
-        disabled={busy}
-        onClick={() => setDeckForm(null)}
-      >
-        Dodaj zestaw
-      </button>
-      <Link
-        className={styles.link}
-        href={deck ? `/import?deck=${deck.id}` : "/import"}
-      >
-        Importuj CSV
-      </Link>
+      <div className={styles.toolbar}>
+        <label>
+          Wyszukaj zestaw
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
+        <button
+          className="primary"
+          disabled={busy}
+          onClick={() => setDeckForm(null)}
+        >
+          Dodaj zestaw
+        </button>
+        <Link
+          className={styles.link}
+          href={deck ? `/import?deck=${deck.id}` : "/import"}
+        >
+          Importuj CSV
+        </Link>
+      </div>
       {deckForm !== undefined && (
         <form
           className="auth-form"
@@ -352,24 +354,24 @@ export function DeckManager({ userId }: { userId: string }) {
             >
               Usuń zestaw
             </button>
+            <a href={`/study?deck=${deck.id}`} className={styles.link}>
+              Ucz się z tego zestawu
+            </a>
+            <button
+              className="auth-secondary"
+              disabled={!cards.length}
+              onClick={download}
+            >
+              Eksportuj CSV
+            </button>
+            <button
+              className="primary"
+              disabled={busy}
+              onClick={() => setCardForm(null)}
+            >
+              Dodaj fiszkę
+            </button>
           </div>
-          <a href={`/study?deck=${deck.id}`} className={styles.link}>
-            Ucz się z tego zestawu
-          </a>
-          <button
-            className="auth-secondary"
-            disabled={!cards.length}
-            onClick={download}
-          >
-            Eksportuj CSV
-          </button>
-          <button
-            className="primary"
-            disabled={busy}
-            onClick={() => setCardForm(null)}
-          >
-            Dodaj fiszkę
-          </button>
           {cardForm !== undefined && (
             <form
               className="auth-form"
@@ -468,9 +470,6 @@ export function DeckManager({ userId }: { userId: string }) {
             : "Wczytywanie zestawów…"}
         </p>
       )}
-      <Link className={styles.link} href="/account">
-        Moje konto
-      </Link>
     </div>
   );
 }

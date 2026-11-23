@@ -31,7 +31,7 @@ export default async function AuthPage({
   }[intent];
 
   return (
-    <AuthFrame title={title} showLogo={false}>
+    <AuthFrame title={title} variant="auth">
       {status && Object.hasOwn(statusMessages, status) && (
         <p role={status === "sent" ? "status" : "alert"}>
           {statusMessages[status]}

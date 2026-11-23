@@ -1,42 +1,80 @@
 .body,
+.list,
 .card {
   display: grid;
-  gap: 12px;
+  gap: 1rem;
   min-width: 0;
   overflow-wrap: anywhere;
 }
-
-.body h2,
 .body p {
   margin: 0;
 }
-
-.list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 8px;
-}
-
-.card {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 12px;
-}
-
+.toolbar,
 .actions {
   display: flex;
+  align-items: end;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 0.65rem 1rem;
 }
-
-.actions button,
-.list button {
-  padding: 6px 10px;
+.toolbar label {
+  flex: 1 1 12rem;
 }
-
+.actions {
+  align-items: center;
+}
 .link {
-  text-decoration: underline;
-  text-underline-offset: 4px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 0;
+}
+.list:empty {
+  display: none;
+}
+.list li {
+  border-bottom: 1px solid var(--line);
+}
+.list li > button[aria-pressed] {
+  width: 100%;
+  text-align: left;
+  padding: 0.7rem 1rem;
+  font-family: var(--display);
+  font-size: 1.55rem;
+  border: 0;
+  border-inline-start: 3px solid transparent;
+  border-radius: 0;
+}
+.list li > button[aria-pressed="true"] {
+  border-inline-start-color: var(--rust);
+  background: var(--surface);
+}
+.card {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding-block: 1.1rem;
+}
+.card .actions {
+  grid-column: 1/-1;
+}
+.body section {
+  border-top: 3px double var(--ink);
+  padding-top: 1.4rem;
+}
+.body form {
+  background: var(--surface);
+  border-left: 2px solid var(--rust);
+  padding: clamp(1rem, 3vw, 1.75rem);
+}
+@media (max-width: 480px) {
+  .toolbar label {
+    flex-basis: 100%;
+  }
+  .card {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
 }

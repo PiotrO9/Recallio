@@ -1,4 +1,6 @@
 :root {
+  --display: "Instrument Serif", Georgia, serif;
+  --rust: #91492f;
   --ink: #293c33;
   --muted: #596359;
   --line: #dedfd5;
@@ -67,12 +69,14 @@ p {
   line-height: 1.7;
 }
 .primary {
-  background: var(--ink);
+  border: 1px solid transparent;
+  display: inline-block;
+  border-radius: 4px;
+  padding: 0.92rem 1.65rem;
   color: var(--surface);
-  padding: 14px 25px;
-  border: 1px solid var(--ink);
-  border-radius: 9px;
-  font-size: 13px;
+  background: var(--ink);
+  font-size: 0.9375rem;
+  font-weight: 650;
 }
 .primary:hover {
   background: #405747;
@@ -86,4 +90,76 @@ p {
 }
 .skip-link:focus {
   top: 10px;
+}
+
+.page-shell {
+  width: min(calc(100% - 2.5rem), 72rem);
+  margin-inline: auto;
+}
+.masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  min-height: 5rem;
+  padding-block: 0.875rem;
+  border-bottom: 1px solid var(--ink);
+}
+.account-link {
+  display: grid;
+  align-content: center;
+  min-width: 0;
+  min-height: 44px;
+  text-align: right;
+  font-size: 0.875rem;
+}
+.account-link span {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+}
+.account-link strong,
+.art-print a {
+  text-decoration: underline;
+  text-decoration-color: var(--control-line);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+}
+.art-print {
+  margin: 0;
+}
+.art-print img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+}
+.art-print figcaption {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-top: 0.65rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.art-print cite {
+  font-family: var(--display);
+  font-size: 1rem;
+}
+.art-print a {
+  flex-shrink: 0;
+}
+
+.account-link:hover strong,
+.art-print a:hover {
+  text-decoration-color: currentColor;
+}
+@media (max-width: 440px) {
+  .masthead {
+    gap: 0.7rem;
+  }
+  .account-link span {
+    font-size: 0.75rem;
+  }
 }

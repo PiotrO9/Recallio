@@ -552,6 +552,7 @@ function StudyBoard({
         ) : (
           !offlineShell && (
             <button
+              className="auth-secondary"
               type="button"
               disabled={preparingOffline || updating || syncState === "offline"}
               onClick={() => void prepareOffline(currentDeck.id)}
@@ -570,6 +571,7 @@ function StudyBoard({
       )}
       {waitingWorker && !revealed && !busy && !saveError && (
         <button
+          className="auth-secondary"
           type="button"
           disabled={preparingOffline || updating}
           onClick={() => void applyUpdate()}

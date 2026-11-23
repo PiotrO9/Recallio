@@ -26,30 +26,23 @@ export default async function Home() {
       </header>
       <main id="main" tabIndex={-1} className={styles.main}>
         <h1>Panel nauki</h1>
-        <div className={styles.columns}>
-          <section className={styles.study}>
-            <div className={styles.cards} aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </div>
-            <h2>Powtórki</h2>
-            <a className={styles.start} href="/study">
-              Przejdź do nauki <span aria-hidden="true">→</span>
-            </a>
-          </section>
-          <section className={styles.library}>
-            <h2>Biblioteka</h2>
-            <Link href="/decks">
-              <strong>Moje zestawy</strong>
-              <span>Dodawaj zestawy i edytuj fiszki.</span>
-            </Link>
-            <Link href="/import">
-              <strong>Importuj CSV</strong>
-              <span>Wczytaj fiszki z pliku.</span>
-            </Link>
-          </section>
-        </div>
+        <section className={styles.study}>
+          <h2>Powtórki</h2>
+          <a className={styles.start} href="/study">
+            Przejdź do nauki
+          </a>
+        </section>
+        <section className={styles.library}>
+          <h2>Biblioteka</h2>
+          <Link href="/decks">
+            <strong>Moje zestawy</strong>
+            <span>Dodawaj zestawy i edytuj fiszki.</span>
+          </Link>
+          <Link href="/import">
+            <strong>Importuj CSV</strong>
+            <span>Wczytaj fiszki z pliku.</span>
+          </Link>
+        </section>
       </main>
     </div>
   );

@@ -9,7 +9,7 @@ export default async function StudyPage({
   searchParams: Promise<{ deck?: string }>;
 }) {
   const identity = await verifiedIdentity(await serverAuth());
-  if (!identity) redirect("/auth?status=session");
+  if (!identity) redirect("/auth/login?status=session");
   const { deck } = await searchParams;
   return (
     <AuthFrame title="Nauka">

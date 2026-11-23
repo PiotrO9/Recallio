@@ -44,7 +44,7 @@ async function emailLink(
 }
 
 async function login(page: Page, email: string, password: string) {
-  await page.goto("/auth");
+  await page.goto("/auth/login");
   await page.getByLabel("Adres e-mail").fill(email);
   await page.getByLabel("Hasło").fill(password);
   await page.getByRole("button", { name: "Zaloguj się" }).click();
@@ -110,7 +110,7 @@ test("account requires a verified session, sign-up and reset links stay on the l
   const password = randomUUID();
   const replacement = randomUUID();
   await page.goto("/account");
-  await expect(page).toHaveURL(/\/auth\?status=session$/);
+  await expect(page).toHaveURL(/\/auth\/login\?status=session$/);
   const invalid = await request.get(
     "/auth/confirm?type=email&token_hash=invalid&next=https://example.com",
     { maxRedirects: 0 },
@@ -123,7 +123,7 @@ test("account requires a verified session, sign-up and reset links stay on the l
   });
   expect(otherOrigin.status()).toBe(403);
 
-  await page.goto("/auth?mode=signup");
+  await page.goto("/auth/signup");
   await page.getByLabel("Adres e-mail").fill(email);
   await page.getByLabel("Hasło").fill(password);
   await page.getByRole("button", { name: "Utwórz konto" }).click();
@@ -142,12 +142,16 @@ test("account requires a verified session, sign-up and reset links stay on the l
   const account = await page.request.get("/account");
   expect(account.headers()["cache-control"]).toContain("no-store");
   await page.getByRole("button", { name: "Wyloguj się" }).click();
-  await expect(page).toHaveURL(/\/auth$/);
+  await expect(page).toHaveURL(/\/auth\/login$/);
   await login(page, email, password);
 
   await page.getByRole("button", { name: "Wyloguj się" }).click();
-  await expect(page).toHaveURL(/\/auth$/);
+  await expect(page).toHaveURL(/\/auth\/login$/);
   await page.getByRole("link", { name: "Nie pamiętam hasła" }).click();
+  await expect(page).toHaveURL(/\/auth\/forgot-password$/);
+  await expect(
+    page.getByRole("heading", { name: "Odzyskaj hasło" }),
+  ).toBeVisible();
   await page.getByLabel("Adres e-mail").fill(email);
   await page.getByRole("button", { name: "Wyślij link" }).click();
   await expect(page.getByRole("status")).toContainText("skrzynce");
@@ -161,6 +165,6 @@ test("account requires a verified session, sign-up and reset links stay on the l
   ).toBeVisible();
   await expireSession(page, baseURL!);
   await page.goto("/account");
-  await expect(page).toHaveURL(/\/auth\?status=session$/);
+  await expect(page).toHaveURL(/\/auth\/login\?status=session$/);
   await login(page, email, replacement);
 });

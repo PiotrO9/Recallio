@@ -10,7 +10,7 @@ export default async function AccountPage({
   searchParams: Promise<{ status?: string }>;
 }) {
   const account = await verifiedIdentity(await serverAuth());
-  if (!account) redirect("/auth?status=session");
+  if (!account) redirect("/auth/login?status=session");
   const { status } = await searchParams;
   return (
     <AuthFrame title="Twoje konto">

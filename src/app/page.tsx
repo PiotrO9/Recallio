@@ -3,5 +3,5 @@ import { serverAuth, verifiedIdentity } from "@/server/auth/client";
 
 export default async function Home() {
   const account = await verifiedIdentity(await serverAuth());
-  redirect(account ? "/decks" : "/auth");
+  redirect(account ? "/decks" : "/auth/login");
 }

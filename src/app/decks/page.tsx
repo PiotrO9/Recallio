@@ -5,7 +5,7 @@ import { serverAuth, verifiedIdentity } from "@/server/auth/client";
 
 export default async function DecksPage() {
   const account = await verifiedIdentity(await serverAuth());
-  if (!account) redirect("/auth?status=session");
+  if (!account) redirect("/auth/login?status=session");
   return (
     <AuthFrame title="Moje zestawy">
       <DeckManager userId={account.id} />

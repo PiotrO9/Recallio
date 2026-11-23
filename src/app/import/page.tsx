@@ -9,7 +9,7 @@ export default async function ImportPage({
   searchParams: Promise<{ deck?: string }>;
 }) {
   const account = await verifiedIdentity(await serverAuth());
-  if (!account) redirect("/auth?status=session");
+  if (!account) redirect("/auth/login?status=session");
   const { deck } = await searchParams;
   return (
     <AuthFrame title="Importuj fiszki">

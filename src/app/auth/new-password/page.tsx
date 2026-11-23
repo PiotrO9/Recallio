@@ -8,7 +8,7 @@ export default async function NewPasswordPage({
   searchParams: Promise<{ status?: string }>;
 }) {
   if (!(await verifiedIdentity(await serverAuth())))
-    redirect("/auth?status=session");
+    redirect("/auth/login?status=session");
   const { status } = await searchParams;
   return (
     <AuthFrame title="Ustaw nowe hasło" linkLogo={false}>

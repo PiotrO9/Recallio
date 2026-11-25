@@ -4,6 +4,7 @@
 
 - Uruchomienie aplikacji — [README](README.md).
 - Zakres funkcji i [kryteria odbioru](docs/PRODUCT-BRIEF.md#20-kryteria-gotowości-pierwszej-wersji) — [brief produktu](docs/PRODUCT-BRIEF.md).
+- Projektowanie ekranów i przygotowanie makiet — [kierunek wizualny i lista widoków](docs/BRIEF-MAKIET.md).
 - Dane i synchronizacja — [kontrakty v1](docs/CONTRACTS.md), w tym sekcje [API](docs/CONTRACTS.md#api) i [CSV](docs/CONTRACTS.md#csv-v1).
 - Architektura i [kolejność prac](docs/TECHNICAL-PLAN.md#11-etapy-i-kryteria-przejścia) — [plan techniczny](docs/TECHNICAL-PLAN.md).
 - Wykonanie serii zadań — [kolejka](docs/TASKS.md) i [skill recallio-queue](.agents/skills/recallio-queue/SKILL.md).

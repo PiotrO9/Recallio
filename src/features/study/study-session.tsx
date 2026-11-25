@@ -12,13 +12,10 @@ import {
 import {
   recordSessionAnswer,
   remainingNewForDay,
+  DEFAULT_NEW_LIMIT,
   studyQueue,
 } from "@/domain/learning/queue";
-import {
-  getStudyDay,
-  getStudyPeriod,
-  studyTimezoneAt,
-} from "@/domain/learning/study-time";
+import { getStudyDay, getStudyPeriod } from "@/domain/learning/study-time";
 import {
   FSRS_VERSION,
   fsrsScheduler,
@@ -118,7 +115,6 @@ function StudyBoard({
   const restartButton = useRef<HTMLButtonElement>(null);
   const moveToCard = useRef(false);
   const active = useRef<Candidate | null>(null);
-  const studySettings = useRef<Settings | null>(null);
   const previousCard = useRef<string | null>(null);
   const returns = useRef<readonly SessionReturn[]>([]);
   const prepared = useRef<PreparedReview | null>(null);
@@ -133,15 +129,10 @@ function StudyBoard({
         userId,
         now: () => new Date(),
         introduction(event) {
-          if (!studySettings.current) throw new Error("Brak strefy nauki");
-          const { timezone } = studyTimezoneAt(
-            event.occurredAt,
-            studySettings.current,
-          );
           return {
             cardId: event.cardId,
             firstEffectiveAt: event.occurredAt,
-            studyDay: getStudyDay(event.occurredAt, timezone),
+            studyDay: getStudyDay(event.occurredAt),
           };
         },
       }),
@@ -176,9 +167,9 @@ function StudyBoard({
   function choose(data: SnapshotData) {
     if (endedRef.current) return null;
     const deck = selectDeck(data);
-    if (!deck || !data.settings) return null;
+    if (!deck) return null;
     const now = new Date().toISOString();
-    const period = getStudyPeriod(now, data.settings);
+    const period = getStudyPeriod(now);
     return studyQueue.next({
       cards: data.cards.filter((card) => card.deckId === deck.id),
       progress: data.progress,
@@ -190,7 +181,7 @@ function StudyBoard({
       remainingNew: remainingNewForDay(
         data.introductions,
         period,
-        data.settings.newLimit +
+        (data.settings?.newLimit ?? DEFAULT_NEW_LIMIT) +
           (extra.current?.dayStart === period.start ? extra.current.count : 0),
       ),
       random: Math.random,
@@ -205,7 +196,6 @@ function StudyBoard({
     availableOffline.current = decks;
     setOfflineDecks(decks);
     setWorkspace(data);
-    studySettings.current = data.settings;
     if (advance || (!active.current && !saving.current)) {
       const next = choose(data);
       active.current = next;
@@ -426,7 +416,7 @@ function StudyBoard({
     }
   }
 
-  async function saveSettings(next: Omit<Settings, "timezoneChanges">) {
+  async function saveSettings(next: Settings) {
     const { revision, ...payload } = next;
     await repository.commitContent(
       {
@@ -443,9 +433,7 @@ function StudyBoard({
   }
 
   function addNew() {
-    const settings = workspace?.settings;
-    if (!settings) return;
-    const dayStart = getStudyPeriod(new Date().toISOString(), settings).start;
+    const dayStart = getStudyPeriod(new Date().toISOString()).start;
     extra.current = {
       dayStart,
       count:
@@ -509,8 +497,8 @@ function StudyBoard({
     (workspace && selectDeck(workspace));
   const now = new Date().toISOString();
   const dueToday =
-    settings && workspace && (settings.showDue || sessionCount > 0)
-      ? countDueToday(getStudyPeriod(now, settings).end)
+    workspace && (settings?.showDue || sessionCount > 0)
+      ? countDueToday(getStudyPeriod(now).end)
       : null;
 
   function countDueToday(end: number) {
@@ -546,7 +534,6 @@ function StudyBoard({
         ) : null}
       </div>
       {currentDeck &&
-        workspace?.settings &&
         (offlineDecks.includes(currentDeck.id) ? (
           <p role="status">Zestaw jest dostępny offline.</p>
         ) : (
@@ -700,14 +687,13 @@ function StudyBoard({
       ) : (
         <p>
           {workspace
-            ? workspace.cards.length && settings
+            ? workspace.cards.length
               ? "W tym zestawie nie ma teraz fiszek w ramach limitu."
               : "Nie ma dostępnych fiszek do nauki."
             : "Wczytywanie fiszek…"}
         </p>
       )}
       {!ended &&
-        settings &&
         workspace?.cards.some(
           (card) => !card.deletedAt && (!deckId || card.deckId === deckId),
         ) && (
@@ -725,11 +711,7 @@ function StudyBoard({
           </div>
         )}
       {workspace && (
-        <StudySettings
-          settings={workspace.settings}
-          now={now}
-          save={saveSettings}
-        />
+        <StudySettings settings={workspace.settings} save={saveSettings} />
       )}
     </div>
   );

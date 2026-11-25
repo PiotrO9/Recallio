@@ -52,7 +52,7 @@ PreparedReview zawiera lokalną wersję bazowej projekcji, oddzielną od rewizji
 
 ## API
 
-Wszystkie poniższe endpointy są prywatne, zwracają JSON i mają `Cache-Control: private, no-store`. Serwer weryfikuje sesję Supabase Auth i używa wyłącznie identyfikatora z tej sesji. Dla pierwszego wprowadzenia fiszki konto musi mieć zapis ustawień ze strefą IANA. Brak ustawień daje `dependency_pending`, aby ponowić to samo zdarzenie po zapisaniu ustawień.
+Wszystkie poniższe endpointy są prywatne, zwracają JSON i mają `Cache-Control: private, no-store`. Serwer weryfikuje sesję Supabase Auth i używa wyłącznie identyfikatora z tej sesji. Pierwsze wprowadzenie korzysta ze strefy `Europe/Warsaw` także przed zapisaniem ustawień.
 
 | Endpoint                             | Wejście                                 | Wynik                                                 |
 | ------------------------------------ | --------------------------------------- | ----------------------------------------------------- |
@@ -97,7 +97,7 @@ Snapshot musi mieć stały watermark i spójny zbiór (materializowany snapshot 
 
 Każda strona snapshotu zawiera tablicę `introductions` (także gdy jest pusta). Wprowadzenie ma `cardId`, `firstEffectiveAt` oraz `studyDay` w formacie YYYY-MM-DD; należy do tej samej generacji i watermarku co pozostałe dane. Pełny snapshot obejmuje wprowadzenia całego konta, niezależnie od stron zestawów. Lokalne repozytorium przełącza je atomowo wraz z generacją i uwzględnia pending outbox.
 
-Zapisane ustawienia w pull i snapshocie zawierają początkową `timezone` oraz opcjonalną historię `timezoneChanges`. Każdy wpis ma `timezone` i `effectiveAt` w UTC. W `settings.update` klient przekazuje wybraną strefę. Serwer wyznacza datę wejścia w życie przy najbliższym resecie w aktualnej strefie według [decyzji o danych lokalnych konta i czasie](decisions/002-local-account-and-time.md).
+Pole `timezone` w operacji `settings.update` pozostaje częścią kontraktu v1. Serwer stosuje `Europe/Warsaw` również przy odbiorze starszych operacji z inną strefą. Pull i snapshot zwracają ustawienia z tą strefą. Zasady liczenia dnia opisuje [decyzja o danych lokalnych konta i czasie](decisions/002-local-account-and-time.md).
 
 Ocena zawiera wymagane `observedMode` (`introduction`, `due`, `practice`), zamrożone razem ze zdarzeniem i zachowane przy retry. Jest to obserwacja klienta, nie autorytatywna klasyfikacja: stan lub zegar urządzenia mogą być nieaktualne. Regułę kanonicznej klasyfikacji na podstawie stanu serwera i `effectiveAt` opisuje [decyzja o schedulerze](decisions/learning-scheduler.md).
 

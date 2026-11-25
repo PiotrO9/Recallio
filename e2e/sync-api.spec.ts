@@ -81,7 +81,7 @@ test("sync receipts, pagination, projection and account isolation", async ({
       entityId: first.id,
       baseRevision: "0",
       payload: {
-        timezone: "Europe/Warsaw",
+        timezone: "Pacific/Honolulu",
         newLimit: 2,
         showDue: true,
         showSession: false,
@@ -106,6 +106,8 @@ test("sync receipts, pagination, projection and account isolation", async ({
       "applied",
       "applied",
     ]);
+    expect(partial[2].entity.timezone).toBe("Europe/Warsaw");
+    expect(partial[2].entity.timezoneChanges).toBeUndefined();
     expect(await push([deck])).toMatchObject([
       { status: "duplicate", commitCursor: partial[0].commitCursor },
     ]);

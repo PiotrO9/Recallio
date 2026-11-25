@@ -3,6 +3,7 @@ import type { Client } from "pg";
 import {
   operationResultSchema,
   operationSchema,
+  settingsSchema,
   snapshotResponseSchema,
   uuidSchema,
   type Card,
@@ -153,7 +154,13 @@ export async function pull(
        order by sequence limit $2`,
           [cursor, limit + 1],
         );
-        const changes = rows.slice(0, limit);
+        const changes = rows
+          .slice(0, limit)
+          .map((change) =>
+            change.entity === "settings"
+              ? { ...change, payload: settingsSchema.parse(change.payload) }
+              : change,
+          );
         return {
           changes,
           nextCursor: changes.at(-1)?.sequence ?? cursor,

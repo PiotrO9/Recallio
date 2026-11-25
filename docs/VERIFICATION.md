@@ -83,7 +83,7 @@ OpenNext zgłasza ograniczone wsparcie Windows. Przy problemach z narzędziami b
 | --- | --- | --- |
 | Rejestracja i reset hasła, wejście bez sesji | [Auth E2E](../e2e/auth.spec.ts) z lokalną pocztą, [wejście do aplikacji](../e2e/entry.spec.ts) | Dostarczenie poczty i callback HTTPS na testowym środowisku |
 | Zestawy ręczne, czytelne błędy CSV, pomijanie duplikatów, zachowanie treści i postępu, eksport bez utraty treści | [Ścieżka użytkownika](../e2e/study-flow.spec.ts), [testy CSV](../tests/import/csv.test.ts) i [test transakcji importu](../tests/storage/content-repository.test.ts) | Pełny eksport i ponowny import z interfejsu na środowisku testowym. Roundtrip samych danych jest sprawdzony jednostkowo |
-| Dwa niezależne kierunki, ciągły trening, odporność na szybkie oceny, zmiana strefy od zaplanowanego resetu | [Scheduler](../tests/learning-scheduler.test.ts), [kolejka](../tests/learning-queue.test.ts) i [ścieżka treningu](../e2e/study-flow.spec.ts) | Pomiar długiej prywatnej sesji z ponownym otwarciem aplikacji |
+| Dwa niezależne kierunki, ciągły trening, odporność na szybkie oceny, reset limitu o północy w Warszawie | [Scheduler](../tests/learning-scheduler.test.ts), [kolejka](../tests/learning-queue.test.ts) i [ścieżka treningu](../e2e/study-flow.spec.ts) | Pomiar długiej prywatnej sesji z ponownym otwarciem aplikacji |
 | Trwały zapis, offline po przygotowaniu, instalacja PWA | [Test IndexedDB](../tests/storage/browser.test.mjs) i [E2E z odświeżeniem oraz aktualizacją workera](../e2e/study-flow.spec.ts) | Instalacja i pełne zamknięcie oraz ponowne uruchomienie na rzeczywistych urządzeniach z wdrożeniem HTTPS |
 | Idempotencja, praca na dwóch urządzeniach, izolacja kont | [API synchronizacji](../e2e/sync-api.spec.ts), [ścieżka dwóch urządzeń](../e2e/study-flow.spec.ts), [REST](../tests/database/rest.test.mjs) i [RLS](../supabase/tests/account_isolation.sql) | Odbiór w Supabase i Workers w `FLOW-02` |
 | Czytelny interfejs i stylistyka Rachmistrza | Wspólne kolory i typografia, scenariusze klawiatury i testy axe | Ręczny odbiór na docelowych urządzeniach |
@@ -101,7 +101,7 @@ W odtworzonej bazie właściciel odczytał swoją fiszkę i ocenę, a drugie kon
 - Wiele kart: równoległy drain i crash lease → brak utraty/dublowania.
 - RLS: dwóch użytkowników, anon, manipulacja owner/deck FK, bezpośredni REST/RPC.
 - Konflikty: edit/edit, edit/delete, review/delete, review/reset, dwa review offline.
-- Zegar: przyszły/cofnięty, DST, zmiana strefy i granica dnia.
+- Zegar: przyszły/cofnięty, DST i granica dnia w Warszawie niezależnie od strefy urządzenia.
 - Offline: przygotowanie, utrata sieci, zamknięcie/reload, ponowny sync na buildzie produkcyjnym.
 - Aktualizacja: stary klient, SW, DB migration z niewysłanym outbox.
 - CSV: polskie znaki, cytaty, multiline, BOM, limit, identyczne wpisy i warianty, roundtrip.

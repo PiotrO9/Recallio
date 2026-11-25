@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  settingsSchema,
   operationSchema,
   operationResultSchema,
   pullQuerySchema,
@@ -244,4 +245,26 @@ test("batch envelope allows per-operation invalid payload without rejecting vali
   assert.equal(pushEnvelopeSchema.safeParse(mixed).success, true);
   assert.equal(operationSchema.safeParse(mixed.operations[0]).success, true);
   assert.equal(operationSchema.safeParse(mixed.operations[1]).success, false);
+});
+
+test("legacy profiles keep their limit and counters in the fixed Warsaw timezone", () => {
+  assert.deepEqual(
+    settingsSchema.parse({
+      timezone: "America/New_York",
+      timezoneChanges: [
+        { timezone: "Asia/Tokyo", effectiveAt: "2027-01-01T00:00:00.000Z" },
+      ],
+      newLimit: 0,
+      showDue: true,
+      showSession: false,
+      revision: "7",
+    }),
+    {
+      timezone: "Europe/Warsaw",
+      newLimit: 0,
+      showDue: true,
+      showSession: false,
+      revision: "7",
+    },
+  );
 });

@@ -31,7 +31,7 @@ Projekt przypina `ts-fsrs@5.4.2`. Stan serializuje terminy w UTC i przechowuje d
 - `QueuePolicy.next` otrzymuje uporządkowaną listę kluczy powrotu `(cardId,direction,epoch)` oraz poprzedni `cardId`. Kontroler sesji ma aktualizować tę listę po potwierdzeniu lokalnego zapisu i przed wyborem następnej fiszki. Przed wdrożeniem trzeba sprawdzić atomowy zapis i przełączenie UI po retry.
 - Czas serwera: kolejność zaakceptowania per użytkownik, `effectiveAt = max(lastEffectiveAt, min(occurredAt, receivedAt))`, jak ADR 002. Oryginalne occurredAt i fakt korekty pozostają w historii. Przyszły czas jest ograniczany; stare zdarzenie nie cofa czasu i może stać się practice. Ten porządek nie daje wyniku niezależnego od kolejności synchronizacji. Pozytywne practice nie aktualizuje zegara FSRS, choć aktualizuje `lastEffectiveAt` projekcji.
 - Reset inkrementuje epoch danego kierunku i usuwa projekcję tej epoki z kolejki; historia pozostaje. Ocena starej epoki i ocena usuniętej karty zachowuje się jako historia bez aktualizacji projekcji. Retry tego samego ID nie powtarza działania. Zmiana treści nie resetuje postępu.
-- Dzienny limit dotyczy unikalnego cardId we wszystkich kierunkach, w strefie profilu, a jawne zwiększenie limitu jest decyzją użytkownika. Polityka zmiany strefy i liczba domyślna pozostają produktową decyzją; nie przypisywać im fikcyjnych wartości. Rozstrzygnięcie jest wymagane przed ustawieniami.
+- Dzienny limit dotyczy unikalnego cardId we wszystkich kierunkach. Domyślnie wynosi 20 i można go zmienić. Granice dnia w `Europe/Warsaw` określa [ADR 002](002-local-account-and-time.md).
 
 ## Scenariusze referencyjne
 

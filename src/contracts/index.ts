@@ -1,3 +1,4 @@
+import { STUDY_TIMEZONE } from "../domain/learning/study-time";
 import { z } from "zod";
 
 // Decimal strings prevent loss of bigint precision during JSON transport.
@@ -314,21 +315,26 @@ export const progressSchema = z
     (v) => v.schedulerState.version === v.algorithmVersion,
     "Wersje algorytmu i stanu muszą być zgodne",
   );
-export const settingsSchema = z.strictObject({
-  timezone: z.string().min(1).max(100),
-  timezoneChanges: z
-    .array(
-      z.strictObject({
-        timezone: z.string().min(1).max(100),
-        effectiveAt: instantSchema,
-      }),
-    )
-    .optional(),
-  newLimit: z.number().int().min(0).max(10000),
-  showDue: z.boolean(),
-  showSession: z.boolean(),
-  revision: revisionSchema,
-});
+export const settingsSchema = z
+  .strictObject({
+    timezone: z.string().min(1).max(100),
+    timezoneChanges: z
+      .array(
+        z.strictObject({
+          timezone: z.string().min(1).max(100),
+          effectiveAt: instantSchema,
+        }),
+      )
+      .optional(),
+    newLimit: z.number().int().min(0).max(10000),
+    showDue: z.boolean(),
+    showSession: z.boolean(),
+    revision: revisionSchema,
+  })
+  .transform(({ timezoneChanges: _legacyChanges, ...settings }) => ({
+    ...settings,
+    timezone: STUDY_TIMEZONE,
+  }));
 export type Deck = z.infer<typeof deckSchema>;
 export type Settings = z.infer<typeof settingsSchema>;
 export type ContentRecord = Deck | Card | Settings | null;

@@ -72,18 +72,6 @@ test("a review survives an offline reload and synchronizes once to a second devi
         operations: [
           {
             id: randomUUID(),
-            entityId: owner.id,
-            type: "settings.update",
-            baseRevision: "0",
-            payload: {
-              timezone: "Europe/Warsaw",
-              newLimit: 2,
-              showDue: true,
-              showSession: false,
-            },
-          },
-          {
-            id: randomUUID(),
             entityId: deckId,
             type: "deck.create",
             payload: { name: "Nauka", directionMode: "a-b" },
@@ -107,7 +95,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
       (await seed.json()).results.map(
         ({ status }: { status: string }) => status,
       ),
-    ).toEqual(["applied", "applied", "applied"]);
+    ).toEqual(["applied", "applied"]);
 
     const page = await primary.newPage();
     await page.goto("/");
@@ -149,7 +137,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
       .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller))
       .toBe(true);
     const cachedPaths = await page.evaluate(async () => {
-      const cache = await caches.open("recallio-study-shell-v3");
+      const cache = await caches.open("recallio-study-shell-v4");
       return (await cache.keys()).map((entry) => new URL(entry.url).pathname);
     });
     expect(cachedPaths).toContain("/study/offline");
@@ -282,52 +270,32 @@ test("a review survives an offline reload and synchronizes once to a second devi
         .filter(({ entity }: { entity: string }) => entity === "settings")
         .at(-1)?.payload.newLimit;
     };
+    const openSettings = otherPage.getByText("Ustawienia nauki", {
+      exact: true,
+    });
+    await openSettings.click();
     await expect(defaultLimit).toHaveValue("20");
-    await otherPage
-      .getByLabel("Strefa nauki", { exact: true })
-      .fill("Europe/Warsaw");
+    await expect(
+      otherPage.getByText("Strefa nauki: Europe/Warsaw"),
+    ).toBeVisible();
+    await expect(otherPage.locator('[name="timezone"]')).toHaveCount(0);
     await saveSettings.click();
     await expect.poll(syncedLimit).toBe(20);
-    await otherPage.getByText("Ustawienia nauki", { exact: true }).click();
     await defaultLimit.fill("0");
     await saveSettings.click();
     await expect.poll(syncedLimit).toBe(0);
     await otherPage.reload();
     await expect(otherPage.locator('input[name="newLimit"]')).toHaveValue("0");
-    const openSettings = otherPage.getByText("Ustawienia nauki", {
-      exact: true,
-    });
     await openSettings.click();
-    await otherPage
-      .getByLabel("Strefa nauki", { exact: true })
-      .fill("Pacific/Honolulu");
-    await saveSettings.click();
     await expect(
-      otherPage.getByText("Obecna strefa nauki: Europe/Warsaw"),
+      otherPage.getByText("Strefa nauki: Europe/Warsaw"),
     ).toBeVisible();
-    const scheduled = otherPage
-      .getByRole("status")
-      .filter({ hasText: "Strefa Pacific/Honolulu zacznie obowiązywać" });
-    await expect(scheduled).toBeVisible();
-    const effectiveAt = await scheduled
-      .locator("time")
-      .getAttribute("datetime");
-    expect(effectiveAt).toBeTruthy();
     const snapshot = await otherDevice.request.get("/api/v1/sync/snapshot");
     expect(snapshot.ok()).toBe(true);
     expect((await snapshot.json()).settings).toMatchObject({
       timezone: "Europe/Warsaw",
-      timezoneChanges: [{ timezone: "Pacific/Honolulu", effectiveAt }],
       newLimit: 0,
     });
-    await otherPage.clock.setFixedTime(new Date(effectiveAt!));
-    await otherPage.reload();
-    await expect(otherPage.locator('input[name="newLimit"]')).toHaveValue("0");
-    await openSettings.click();
-    await expect(
-      otherPage.getByText("Obecna strefa nauki: Pacific/Honolulu"),
-    ).toBeVisible();
-    await expect(scheduled).toHaveCount(0);
     await page.goto("/decks");
     await expect(page.getByRole("heading", { name: "Nauka" })).toBeVisible();
     await expectAccessible(page);

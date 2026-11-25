@@ -41,7 +41,7 @@ Docelowe moduły: `domain/learning`, `features/training`, `features/decks`, `fea
 
 ## 4. Model danych chmurowych
 
-Identyfikatory UUID generowane na urządzeniu. Czas UTC (timestamptz), strefa IANA w ustawieniach. Wersje monotoniczne bigint. Typy DTO reprezentują bigint jako string, bez utraty precyzji JSON.
+Identyfikatory UUID generowane na urządzeniu. Czas UTC (timestamptz), stała strefa nauki `Europe/Warsaw`. Wersje monotoniczne bigint. Typy DTO reprezentują bigint jako string, bez utraty precyzji JSON.
 
 | Tabela             | Klucz / pola                                                                                                                                          | Ograniczenia i indeksy                                                                         |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
@@ -106,7 +106,7 @@ Dwa porty: Scheduler interpretuje pojedynczą ocenę i czas; QueuePolicy wybiera
 
 Kolejka: zaległe/dzisiejsze → zależnie od interleaving nowe w limicie → dodatkowe ćwiczenie znanych. Unikaj poprzedniego cardId, nie tylko kierunku, o ile istnieje alternatywa. Niepamiętana karta wraca po innych. Gdy zestaw ma jedną kartę, dopuszczaj kolejne ćwiczenie, ale bez traktowania jako odległej powtórki. Osobna akcja „Dodaj więcej nowych” rozszerza dzisiejszy limit świadomie. Koniec planu daje dyskretny komunikat, nie koniec sesji.
 
-Nowe fiszki: raz poznany cardId nie zużywa kolejnego limitu przy innym kierunku. Dzień liczony w strefie profilu, nie przez dzielenie UTC przez 24h. Testy DST i zmiany strefy. Offline wiele urządzeń może łącznie przekroczyć limit — synchronizacja scala unikalne wprowadzenia i nie odrzuca ocen; ścisły globalny limit offline nie jest obiecywany.
+Nowe fiszki: raz poznany cardId nie zużywa kolejnego limitu przy innym kierunku. Dzień nauki wyznaczają kolejne północe w `Europe/Warsaw`. Testy obejmują obie zmiany czasu. Offline wiele urządzeń może łącznie przekroczyć limit — synchronizacja scala unikalne wprowadzenia i nie odrzuca ocen; ścisły globalny limit offline nie jest obiecywany.
 
 ## 8. Konta, offline i PWA
 

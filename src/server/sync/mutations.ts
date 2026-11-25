@@ -7,11 +7,7 @@ import type {
   Progress,
   Settings,
 } from "../../contracts";
-import {
-  getStudyDay,
-  scheduleStudyTimezone,
-  studyTimezoneAt,
-} from "../../domain/learning/study-time";
+import { getStudyDay, STUDY_TIMEZONE } from "../../domain/learning/study-time";
 import {
   FSRS_VERSION,
   fsrsScheduler,
@@ -227,15 +223,10 @@ async function reviewMutation(
       [card.id],
     );
     if (!found.rowCount) {
-      const settings = await getSettings(db);
-      if (!settings) return { error: "dependency_pending" };
       introduction = {
         cardId: card.id,
         firstEffectiveAt: effectiveAt,
-        studyDay: getStudyDay(
-          effectiveAt,
-          studyTimezoneAt(effectiveAt, settings).timezone,
-        ),
+        studyDay: getStudyDay(effectiveAt),
       };
     }
   }
@@ -347,43 +338,25 @@ export async function mutate(
       return resetMutation(db, operation);
     case "settings.update": {
       if (operation.entityId !== userId) return { error: "invalid_payload" };
-      try {
-        getStudyDay(now, operation.payload.timezone);
-      } catch (error) {
-        if (error instanceof RangeError) return { error: "invalid_payload" };
-        throw error;
-      }
       const current = await getSettings(db);
       if ((current?.revision ?? "0") !== operation.baseRevision) {
         return { error: "revision_conflict", current: current ?? undefined };
       }
-      const requested = operation.payload.timezone;
-      const timezone = current?.timezone ?? requested;
-      const timezoneChanges =
-        current && scheduleStudyTimezone(current, requested, now);
       const { newLimit, showDue, showSession } = operation.payload;
       const revision = (BigInt(operation.baseRevision) + 1n).toString();
       const settings: Settings = {
-        timezone,
+        timezone: STUDY_TIMEZONE,
         newLimit,
         showDue,
         showSession,
         revision,
-        ...(timezoneChanges && { timezoneChanges }),
       };
       await db.query(
         `insert into public.user_settings (user_id,timezone,new_limit,show_due,show_session,revision,timezone_changes)
-         values (${account},$1,$2,$3,$4,$5,$6) on conflict (user_id) do update set
-         new_limit=excluded.new_limit,show_due=excluded.show_due,show_session=excluded.show_session,
+         values (${account},$1,$2,$3,$4,$5,null) on conflict (user_id) do update set
+         timezone=excluded.timezone,new_limit=excluded.new_limit,show_due=excluded.show_due,show_session=excluded.show_session,
          revision=excluded.revision,timezone_changes=excluded.timezone_changes`,
-        [
-          timezone,
-          newLimit,
-          showDue,
-          showSession,
-          revision,
-          timezoneChanges ? JSON.stringify(timezoneChanges) : null,
-        ],
+        [STUDY_TIMEZONE, newLimit, showDue, showSession, revision],
       );
       return [
         {

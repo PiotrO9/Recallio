@@ -996,19 +996,14 @@ export function createLocalRepository(
     },
     async markOfflineDeck(deckId) {
       const db = await connect();
-      const tx = db.transaction(
-        ["decks", "cards", "settings", "meta"],
-        "readwrite",
-      );
-      const [deck, cards, settings] = await Promise.all([
+      const tx = db.transaction(["decks", "cards", "meta"], "readwrite");
+      const [deck, cards] = await Promise.all([
         tx.objectStore("decks").get(deckId),
         tx.objectStore("cards").getAll(),
-        tx.objectStore("settings").get("current"),
       ]);
       if (
         !deck ||
         deck.deletedAt ||
-        !settings ||
         !cards.some((card) => card.deckId === deckId && !card.deletedAt)
       ) {
         await tx.done;

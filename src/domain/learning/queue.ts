@@ -10,6 +10,8 @@ import {
 import { fsrsScheduler } from "./scheduler";
 import type { getStudyPeriod } from "./study-time";
 
+export const DEFAULT_NEW_LIMIT = 20;
+
 const directions = ["a-b", "b-a"] as const;
 
 function progressKey(cardId: string, direction: Direction): string {

@@ -1,6 +1,8 @@
 # Recallio — kierunek wizualny i brief do makiet
 
-25 listopada 2026 · Podstawa analizy: wersja `f6f525e` · Dokument roboczy do projektowania
+25 listopada 2026 · Podstawa analizy: wersja `f6f525e` · Archiwalny brief do pierwszej serii makiet
+
+W aplikacji widoki W01–W18 korzystają z motywu „Kolorowy notes”. Galeria poniżej zachowuje wcześniejszą oprawę i opis przejść. Aktualny wygląd określają [wspólne style](../src/app/globals.css) i [komponent kartki z zakładką](../src/components/notebook.tsx).
 
 ## 1. Decyzja projektowa
 

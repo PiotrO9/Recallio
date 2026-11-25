@@ -114,6 +114,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
       );
     }
     const devtools = await primary.newCDPSession(page);
+    await page.getByText("Ustawienia nauki", { exact: true }).click();
     const prepare = page.getByRole("button", {
       name: "Przygotuj zestaw offline",
     });
@@ -137,7 +138,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
       .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller))
       .toBe(true);
     const cachedPaths = await page.evaluate(async () => {
-      const cache = await caches.open("recallio-study-shell-v4");
+      const cache = await caches.open("recallio-study-shell-v5");
       return (await cache.keys()).map((entry) => new URL(entry.url).pathname);
     });
     expect(cachedPaths).toContain("/study/offline");

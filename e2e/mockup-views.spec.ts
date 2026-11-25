@@ -86,7 +86,9 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
     ).toBeVisible();
     await frame("W13");
     await page.goto("/");
-    await expect(page.getByText("Od czego zaczniesz?")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Twój pierwszy zestaw" }),
+    ).toBeVisible();
     await frame("W01");
     await page.getByRole("link", { name: "Utwórz pierwszy zestaw" }).click();
     await frame("W03");
@@ -96,12 +98,29 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
     await page.getByLabel("Strona B").fill("rachunek");
     await frame("W05");
     await page.getByRole("button", { name: "Zapisz fiszkę" }).click();
-    await page.getByRole("link", { name: "Ucz się z tego zestawu" }).click();
+    await expect(
+      page.getByRole("link", { name: "Ucz się z tego zestawu" }),
+    ).toBeVisible();
+    await page.goto("/");
+    await expect(
+      page.getByRole("heading", { name: "Włoski w kawiarni" }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: info.outputPath("W01-active.png"),
+      fullPage: true,
+      scale: "css",
+    });
+    await page.getByRole("link", { name: "Poznaj nowe fiszki" }).click();
     await expect(page.getByRole("heading", { name: "un conto" })).toBeVisible();
     await frame("W06");
+    const prompt = page.getByRole("heading", { name: "un conto" });
+    const promptTop = () =>
+      prompt.evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
+    const beforeReveal = await promptTop();
     await page.getByRole("button", { name: "Pokaż odpowiedź" }).click();
     await expect(page.getByText("rachunek", { exact: true })).toBeVisible();
     await frame("W07");
+    expect(Math.abs((await promptTop()) - beforeReveal)).toBeLessThan(2);
     await page.getByRole("button", { name: "Dobrze", exact: true }).click();
     await expect(
       page.getByRole("button", { name: "Pokaż odpowiedź" }),

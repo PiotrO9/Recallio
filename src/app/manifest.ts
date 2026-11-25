@@ -9,8 +9,8 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/study",
     scope: "/",
     display: "standalone",
-    background_color: "#f5f7fc",
-    theme_color: "#3149b8",
+    background_color: "#f6f3f7",
+    theme_color: "#584080",
     icons: [
       { src: "/icons/recallio-192.png", sizes: "192x192", type: "image/png" },
       {

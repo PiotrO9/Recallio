@@ -304,3 +304,26 @@ textarea[aria-invalid="true"] {
     height: 30px;
   }
 }
+
+/* The notebook palette follows the signed-in study flow, including its offline shell. */
+:root:has(.notebook-view) {
+  --ink: #29233a;
+  --muted: #645e70;
+  --brand: #584080;
+  --brand-hover: #453067;
+  --line: #dcd5df;
+  --control-line: #90829b;
+  --accent: #efa880;
+  --focus: #65428e;
+  --background: #f6f3f7;
+}
+.notebook-view .primary {
+  border-radius: 8px;
+}
+:root:has(.notebook-view) .masthead::before {
+  background: #fbf9fb;
+}
+:root:has(.notebook-view) .masthead nav a:hover {
+  background: #ede8f2;
+  color: var(--brand);
+}

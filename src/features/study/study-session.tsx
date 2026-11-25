@@ -33,6 +33,7 @@ import {
   registerStudyWorker,
   savedOfflineAccount,
 } from "./offline";
+import { NotebookSheet } from "@/components/notebook";
 import { ConfirmAction } from "@/components/confirm-action";
 import { StudySettings } from "./study-settings";
 import styles from "./study.module.css";
@@ -469,7 +470,7 @@ function StudyBoard({
     if (busy) return;
     if (ended) restartButton.current?.focus();
     else if (saveError) retryButton.current?.focus();
-    else if (revealed) firstGrade.current?.focus();
+    else if (revealed) firstGrade.current?.focus({ preventScroll: true });
     else if (candidate && moveToCard.current) {
       moveToCard.current = false;
       revealButton.current?.focus();
@@ -529,50 +530,34 @@ function StudyBoard({
   const hasMaterial = workspace?.cards.some(
     (c) => !c.deletedAt && (!deckId || c.deckId === deckId),
   );
+  const deckLink = currentDeck && (
+    <a href={`/decks?deck=${currentDeck.id}`}>{currentDeck.name}</a>
+  );
   if (ended)
     return (
-      <section className={styles.finished}>
-        {currentDeck && (
-          <a href={`/decks?deck=${currentDeck.id}`}>Wróć do zestawu</a>
-        )}
-        <h1>Sesja zakończona.</h1>
-        {currentDeck && <p>{currentDeck.name}</p>}
-        <div className="section-rule">
-          <h2>Możesz tu wrócić w każdej chwili.</h2>
+      <section className={"notebook-view " + styles.finished}>
+        <NotebookSheet
+          deckId={currentDeck?.id}
+          tab={deckLink}
+          className={styles.closed}
+        >
+          <h1>Sesja zakończona.</h1>
           {settings?.showSession && <p>Odpowiedzi w sesji: {sessionCount}</p>}
           <div className="action-row">
             <button ref={restartButton} className="primary" onClick={restart}>
               Rozpocznij nową sesję
             </button>
-            <a href="/decks">Moje zestawy</a>
+            {currentDeck ? (
+              <a href={`/decks?deck=${currentDeck.id}`}>Wróć do zestawu</a>
+            ) : (
+              <a href="/decks">Moje zestawy</a>
+            )}
           </div>
-        </div>
+        </NotebookSheet>
       </section>
     );
   return (
-    <div className={styles.board}>
-      {currentDeck && (
-        <div className="section-heading">
-          <a href={`/decks?deck=${currentDeck.id}`}>{currentDeck.name}</a>
-          <span>
-            {offlineShell || syncState === "offline"
-              ? "Offline"
-              : candidate?.mode === "practice"
-                ? "Ćwiczenie dodatkowe"
-                : "Trening"}
-          </span>
-        </div>
-      )}
-      <div role="status">
-        {status && (
-          <p>
-            {syncState === "offline" && sessionCount > 0
-              ? "Oceny zapisane na tym urządzeniu. Synchronizacja wznowi się po połączeniu."
-              : status}
-          </p>
-        )}
-        {busy && <p>Zapisywanie oceny na urządzeniu…</p>}
-      </div>
+    <div className={"notebook-view " + styles.board}>
       {settings?.showDue && dueToday !== null && (
         <p>Powtórki na dziś: {dueToday}</p>
       )}
@@ -587,19 +572,29 @@ function StudyBoard({
       )}
       {candidate ? (
         <>
-          <div className={styles.card}>
-            <small>
-              {candidate.direction === "a-b" ? "Strona A" : "Strona B"}
-            </small>
-            <h1>
-              {candidate.direction === "a-b"
-                ? candidate.card.sideA
-                : candidate.card.sideB}
-            </h1>
+          <NotebookSheet
+            deckId={currentDeck?.id}
+            tab={deckLink}
+            className={styles.card}
+          >
+            <div className={styles.prompt}>
+              <small>
+                {candidate.mode === "practice"
+                  ? "Ćwiczenie dodatkowe"
+                  : "Pytanie"}{" "}
+                · {candidate.direction === "a-b" ? "Strona A" : "Strona B"}
+              </small>
+              <h1>
+                {candidate.direction === "a-b"
+                  ? candidate.card.sideA
+                  : candidate.card.sideB}
+              </h1>
+            </div>
             <div className={styles.answer} aria-live="polite">
               {revealed && (
                 <>
                   <small>
+                    Odpowiedź ·{" "}
                     {candidate.direction === "a-b" ? "Strona B" : "Strona A"}
                   </small>
                   <p className={styles.translation}>
@@ -619,7 +614,7 @@ function StudyBoard({
                 </>
               )}
             </div>
-          </div>
+          </NotebookSheet>
           {revealed && !saveError && <p>Jak dobrze pamiętasz odpowiedź?</p>}
           {revealed ? (
             <>
@@ -687,7 +682,11 @@ function StudyBoard({
           )}
         </>
       ) : (
-        <section className={styles.card}>
+        <NotebookSheet
+          deckId={currentDeck?.id}
+          tab={deckLink}
+          className={styles.card}
+        >
           <h1>
             {!workspace
               ? "Wczytywanie fiszek…"
@@ -711,7 +710,7 @@ function StudyBoard({
               {currentDeck ? "Wróć do zestawu" : "Wróć do zestawów"}
             </a>
           )}
-        </section>
+        </NotebookSheet>
       )}
       {!offlineUnavailable &&
         workspace?.cards.some(
@@ -742,37 +741,52 @@ function StudyBoard({
             )}
           </div>
         )}
+      <div role="status">
+        {status && (
+          <p>
+            {syncState === "offline" && sessionCount > 0
+              ? "Oceny zapisane na tym urządzeniu. Synchronizacja wznowi się po połączeniu."
+              : status}
+          </p>
+        )}
+        {busy && <p>Zapisywanie oceny na urządzeniu…</p>}
+      </div>
       {workspace && (
-        <StudySettings settings={workspace.settings} save={saveSettings} />
-      )}
-      {currentDeck &&
-        (offlineDecks.includes(currentDeck.id) ? (
-          <p role="status">Zestaw jest dostępny offline.</p>
-        ) : (
-          !offlineShell && (
-            <button
-              className="auth-secondary"
-              type="button"
-              disabled={preparingOffline || updating || syncState === "offline"}
-              onClick={() => void prepareOffline(currentDeck.id)}
-            >
-              {preparingOffline
-                ? "Przygotowywanie zestawu…"
-                : "Przygotuj zestaw offline"}
-            </button>
-          )
-        ))}
-      {workspace && workspace.progress.length > 0 && (
-        <details>
-          <summary>Zapis na urządzeniu</summary>
-          <p>Zapisany postęp: {workspace.progress.length}</p>
+        <details className={styles.settings}>
+          <summary>Ustawienia nauki</summary>
+          <StudySettings settings={workspace.settings} save={saveSettings} />
+          {currentDeck &&
+            (offlineDecks.includes(currentDeck.id) ? (
+              <p role="status">Zestaw jest dostępny offline.</p>
+            ) : (
+              !offlineShell && (
+                <button
+                  className="auth-secondary"
+                  type="button"
+                  disabled={
+                    preparingOffline || updating || syncState === "offline"
+                  }
+                  onClick={() => void prepareOffline(currentDeck.id)}
+                >
+                  {preparingOffline
+                    ? "Przygotowywanie zestawu…"
+                    : "Przygotuj zestaw offline"}
+                </button>
+              )
+            ))}
+          {workspace && workspace.progress.length > 0 && (
+            <details>
+              <summary>Zapis na urządzeniu</summary>
+              <p>Zapisany postęp: {workspace.progress.length}</p>
+            </details>
+          )}
+          {offlineError && (
+            <p role="alert">
+              Nie udało się przygotować zestawu offline. Sprawdź połączenie i
+              wolne miejsce, a następnie ponów próbę.
+            </p>
+          )}
         </details>
-      )}
-      {offlineError && (
-        <p role="alert">
-          Nie udało się przygotować zestawu offline. Sprawdź połączenie i wolne
-          miejsce, a następnie ponów próbę.
-        </p>
       )}
       {waitingWorker && !revealed && !busy && !saveError && (
         <button

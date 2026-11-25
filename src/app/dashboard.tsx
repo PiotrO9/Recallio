@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { CardArt } from "@/components/card-art";
+import { NotebookSheet, deckColor } from "@/components/notebook";
 import {
   createLocalRepository,
   type SnapshotData,
@@ -60,22 +60,25 @@ function recommend(data: SnapshotData, now: string) {
 
   if (!deck)
     return {
-      name: "Od czego zaczniesz?",
-      caption: "Twoja biblioteka jest pusta",
+      deckId: undefined,
+      name: "Twój pierwszy zestaw",
+      caption: "Biblioteka jest pusta",
       action: "Utwórz pierwszy zestaw",
       href: "/decks?new=1",
     };
   const detail = "/decks?deck=" + deck.id;
   if (!card)
     return {
+      deckId: deck.id,
       name: deck.name,
-      caption: "Zestaw czeka na materiał",
+      caption: "Pusty zestaw",
       action: "Dodaj pierwszą fiszkę",
       href: detail + "&card=new",
     };
   const study = "/study?deck=" + deck.id;
   if (due.length)
     return {
+      deckId: deck.id,
       name: deck.name,
       caption: data.settings?.showDue
         ? "Kierunki do powtórki w zestawie: " +
@@ -86,6 +89,7 @@ function recommend(data: SnapshotData, now: string) {
     };
   if (fresh)
     return {
+      deckId: deck.id,
       name: deck.name,
       caption: "Nowe fiszki",
       action: "Poznaj nowe fiszki",
@@ -93,12 +97,14 @@ function recommend(data: SnapshotData, now: string) {
     };
   if (practice)
     return {
+      deckId: deck.id,
       name: deck.name,
       caption: "Plan na dziś wykonany",
       action: "Ćwicz dalej",
       href: study,
     };
   return {
+    deckId: deck.id,
     name: deck.name,
     caption: limit
       ? "Dzisiejszy limit nowych fiszek został wykorzystany."
@@ -164,25 +170,20 @@ export function Dashboard({ userId }: { userId: string }) {
       ? recommend(data, new Date().toISOString())
       : null;
   return (
-    <>
+    <div className={"notebook-view " + styles.dashboard}>
       <h1 className={styles.title}>Panel nauki</h1>
-      <section className={styles.spread}>
-        <div className={styles.intro}>
-          <div>
-            {issue && (
-              <p role="status">
-                Aktualizacja biblioteki jest chwilowo niedostępna.
-              </p>
-            )}
+      <div className={styles.layout}>
+        <section className={styles.cover}>
+          <NotebookSheet deckId={item?.deckId} className={styles.page}>
             {item ? (
               <>
-                <p>{item.caption}</p>
+                <p className={styles.caption}>{item.caption}</p>
                 <h2>{item.name}</h2>
                 <div className="action-row">
                   <Link className="primary" href={item.href}>
                     {item.action}
                   </Link>
-                  <Link href="/decks">Moje zestawy</Link>
+                  {!decks?.length && <Link href="/import">Importuj CSV</Link>}
                 </div>
               </>
             ) : (
@@ -194,42 +195,35 @@ export function Dashboard({ userId }: { userId: string }) {
                 )}
               </p>
             )}
-          </div>
-        </div>
-        <CardArt />
-      </section>
-      <section className={styles.library}>
-        <div className="section-heading">
-          <h2>Biblioteka</h2>
-          <Link href="/import">Importuj CSV</Link>
-        </div>
-        <div className="deck-grid">
-          {decks?.map((d) => (
-            <Link
-              key={d.id}
-              className="catalog-row"
-              href={"/decks?deck=" + d.id}
-            >
-              <span>
-                {d.name}
-                <span className="item-count">
-                  Fiszki: {counts.get(d.id) ?? 0}
-                </span>
-              </span>
-              <small>Otwórz</small>
+          </NotebookSheet>
+          {issue && (
+            <p role="status">
+              Aktualizacja biblioteki jest chwilowo niedostępna.
+            </p>
+          )}
+        </section>
+        {!!decks?.length && (
+          <section className={styles.library}>
+            <div className="section-heading">
+              <h2>Biblioteka</h2>
+              <Link href="/decks">Moje zestawy</Link>
+            </div>
+            <ul>
+              {decks.map((d) => (
+                <li key={d.id}>
+                  <Link href={"/decks?deck=" + d.id} style={deckColor(d.id)}>
+                    <strong>{d.name}</strong>
+                    <small>Fiszki: {counts.get(d.id) ?? 0}</small>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <Link className="text-action" href="/import">
+              Importuj CSV
             </Link>
-          ))}
-        </div>
-        {item && !decks?.length && (
-          <Link className={styles.empty} href="/decks?new=1">
-            <span aria-hidden="true" className={styles.miniDeck} />
-            <span>
-              <strong>Twój pierwszy zestaw</strong>
-              <small>Dodaj fiszki, do których chcesz wracać.</small>
-            </span>
-          </Link>
+          </section>
         )}
-      </section>
-    </>
+      </div>
+    </div>
   );
 }

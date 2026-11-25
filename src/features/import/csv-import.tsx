@@ -10,6 +10,7 @@ import {
   MAX_CSV_BYTES,
   normalizeCsvText,
   parseCsv,
+  type Content,
   type ImportAction,
   type ImportRow,
 } from "@/domain/import/csv";
@@ -31,6 +32,45 @@ const labels = {
   invalid: "Błąd wiersza",
 };
 const pageSize = 20;
+
+function ContentColumn({
+  title,
+  content,
+  compareWith,
+}: {
+  title: string;
+  content: Content;
+  compareWith?: Content;
+}) {
+  const fields = [
+    ["sideA", "Strona A"],
+    ["sideB", "Strona B"],
+    ["exampleA", "Przykład A"],
+    ["exampleB", "Przykład B"],
+  ] as const;
+  return (
+    <div>
+      <strong>{title}</strong>
+      <dl>
+        {fields.map(([key, label]) => {
+          if (key.startsWith("example") && !content[key] && !compareWith?.[key])
+            return null;
+          return (
+            <div
+              key={key}
+              data-different={
+                !!compareWith && content[key] !== compareWith[key]
+              }
+            >
+              <dt>{label}</dt>
+              <dd>{content[key] || "Brak"}</dd>
+            </div>
+          );
+        })}
+      </dl>
+    </div>
+  );
+}
 
 export function CsvImport({
   userId,
@@ -344,7 +384,7 @@ export function CsvImport({
         {error && <p role="alert">{error}</p>}
       </div>
       {done && (
-        <section className="section-rule">
+        <section className={styles.receipt}>
           <p>
             Zapisano {done.next} z {done.total} kroków.
           </p>
@@ -385,7 +425,7 @@ export function CsvImport({
         </section>
       )}
       {active ? (
-        <div className={styles.body}>
+        <div className={styles.receipt}>
           <progress
             max={active.total || 1}
             value={active.next}
@@ -529,11 +569,11 @@ export function CsvImport({
                   />{" "}
                   Pomiń duplikaty
                 </label>
-                <p>
+                <p className={styles.totals}>
                   Separator: {file.delimiter === "," ? "przecinek" : "średnik"}.
                   Do zapisu: {accepted} z {rows.length}.
                 </p>
-                <p>
+                <p className={styles.filename}>
                   {filename} · {target?.name ?? newName}
                 </p>
                 <button
@@ -543,7 +583,7 @@ export function CsvImport({
                 >
                   Zmień plik lub zestaw
                 </button>
-                <ol className={styles.rows}>
+                <ol className={styles.rows} aria-label="Wiersze importu">
                   {rows
                     .slice(page * pageSize, (page + 1) * pageSize)
                     .map((row) => {
@@ -552,9 +592,29 @@ export function CsvImport({
                       const needsTarget =
                         choice.kind === "update_examples" ||
                         choice.kind === "replace_content";
+                      const firstMatch = row.matches[0];
+                      const fileMatch =
+                        !choice.target && firstMatch?.source === "file"
+                          ? firstMatch
+                          : undefined;
+                      const compareId =
+                        choice.target ??
+                        (firstMatch?.source === "deck"
+                          ? firstMatch.id
+                          : undefined);
+                      const comparison = fileMatch
+                        ? rows.find((r) => r.row === fileMatch.row)?.content
+                        : compareId
+                          ? existing.find((c) => c.id === compareId)
+                          : undefined;
                       return (
                         <li key={row.row} className={styles.row}>
-                          <details className={styles.record}>
+                          <details
+                            className={styles.record}
+                            data-review={
+                              !choice.kind || row.classification === "invalid"
+                            }
+                          >
                             <summary>
                               <span>
                                 Wiersz {row.row} · {labels[row.classification]}
@@ -575,30 +635,21 @@ export function CsvImport({
                               </small>
                             </summary>
                             <div className={styles.compare}>
-                              <div>
-                                <b>W pliku</b>
-                                <p>
-                                  {row.content.sideA} / {row.content.sideB}
-                                </p>
-                                {row.content.exampleA} {row.content.exampleB}
-                              </div>
-                              {targets.length > 0 && (
-                                <div>
-                                  <b>W zestawie</b>
-                                  {(choice.target
-                                    ? targets.filter(
-                                        (c) => c.id === choice.target,
-                                      )
-                                    : targets.slice(0, 1)
-                                  ).map((c) => (
-                                    <div key={c.id}>
-                                      <p>
-                                        {c.sideA} / {c.sideB}
-                                      </p>
-                                      {c.exampleA} {c.exampleB}
-                                    </div>
-                                  ))}
-                                </div>
+                              <ContentColumn
+                                title="W pliku"
+                                content={row.content}
+                                compareWith={comparison}
+                              />
+                              {comparison && (
+                                <ContentColumn
+                                  title={
+                                    fileMatch
+                                      ? `Wiersz ${fileMatch.row} w tym pliku`
+                                      : "W zestawie"
+                                  }
+                                  content={comparison}
+                                  compareWith={row.content}
+                                />
                               )}
                             </div>
                             {row.errors.join(" ")}

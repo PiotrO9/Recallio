@@ -1,5 +1,5 @@
 const cachePrefix = "recallio-study-shell-";
-const shellCache = cachePrefix + "v5";
+const shellCache = cachePrefix + "v6";
 const offlineShell = "/study/offline";
 
 self.addEventListener("activate", (event) => {

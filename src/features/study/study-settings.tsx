@@ -1,5 +1,6 @@
 "use client";
 
+import styles from "./study.module.css";
 import { ValidatedField } from "@/components/validated-field";
 import { useState, type FormEvent } from "react";
 import { settingsSchema, type Settings } from "@/contracts";
@@ -41,7 +42,10 @@ export function StudySettings({
   }
 
   return (
-    <form className="auth-form" onSubmit={(event) => void submit(event)}>
+    <form
+      className={styles.preferences + " auth-form"}
+      onSubmit={(event) => void submit(event)}
+    >
       <ValidatedField
         label="Dzienny limit nowych fiszek"
         hint="Podaj liczbę całkowitą od 0 do 10000."
@@ -57,22 +61,25 @@ export function StudySettings({
           onChange={(e) => setLimit(e.target.value)}
         />
       </ValidatedField>
-      <label>
-        <input
-          name="showDue"
-          type="checkbox"
-          defaultChecked={settings?.showDue}
-        />{" "}
-        Pokaż powtórki na dziś
-      </label>
-      <label>
-        <input
-          name="showSession"
-          type="checkbox"
-          defaultChecked={settings?.showSession}
-        />{" "}
-        Pokaż liczbę odpowiedzi w sesji
-      </label>
+      <fieldset>
+        <legend>Liczniki w treningu</legend>
+        <label>
+          <input
+            name="showDue"
+            type="checkbox"
+            defaultChecked={settings?.showDue}
+          />{" "}
+          Pokaż powtórki na dziś
+        </label>
+        <label>
+          <input
+            name="showSession"
+            type="checkbox"
+            defaultChecked={settings?.showSession}
+          />{" "}
+          Pokaż liczbę odpowiedzi w sesji
+        </label>
+      </fieldset>
       {(limit ?? String(settings?.newLimit ?? DEFAULT_NEW_LIMIT)) === "0" && (
         <p>
           Nowe fiszki są wyłączone. Zaplanowane powtórki pozostają dostępne.

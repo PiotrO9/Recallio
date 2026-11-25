@@ -138,6 +138,12 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
       page.getByRole("button", { name: "Edytuj fiszkę" }),
     ).toBeVisible();
     await frame("W04");
+    const index = page.getByRole("region", { name: "Biblioteka" });
+    if (mobile) await expect(index).toBeHidden();
+    else
+      await expect(index.locator('button[aria-current="true"]')).toContainText(
+        "Włoski w kawiarni",
+      );
     await page.getByRole("button", { name: "Wróć do zestawów" }).click();
     await expect(
       page.getByRole("button", { name: /Włoski w kawiarni/ }),
@@ -183,6 +189,21 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
       await page
         .getByText("Wiersz " + row + " · " + kind, { exact: true })
         .click();
+      if (row === 2) {
+        const comparison = page
+          .locator("details[open]")
+          .filter({ has: page.getByLabel("Akcja wiersza 2", { exact: true }) });
+        await expect(
+          comparison.getByText("W zestawie", { exact: true }),
+        ).toBeVisible();
+        await expect(
+          comparison.getByText("rachunek", { exact: true }),
+        ).toBeVisible();
+        await comparison.screenshot({
+          path: info.outputPath("W11-conflict.png"),
+          scale: "css",
+        });
+      }
       await page
         .getByLabel("Akcja wiersza " + row, { exact: true })
         .selectOption("skip");

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NotebookSheet, deckColor } from "@/components/notebook";
 import {
   createLocalRepository,
@@ -58,14 +58,7 @@ function recommend(data: SnapshotData, now: string) {
   const card = byId.get(due[0]?.cardId) ?? fresh ?? practice ?? cards[0];
   const deck = (card && available.get(card.deckId)) ?? decks[0];
 
-  if (!deck)
-    return {
-      deckId: undefined,
-      name: "Twój pierwszy zestaw",
-      caption: "Biblioteka jest pusta",
-      action: "Utwórz pierwszy zestaw",
-      href: "/decks?new=1",
-    };
+  if (!deck) return null;
   const detail = "/decks?deck=" + deck.id;
   if (!card)
     return {
@@ -116,6 +109,11 @@ function recommend(data: SnapshotData, now: string) {
 export function Dashboard({ userId }: { userId: string }) {
   const [data, setData] = useState<SnapshotData>();
   const [issue, setIssue] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshRef = useRef<(() => void) | null>(null);
+  const retryButton = useRef<HTMLButtonElement>(null);
+  const resultHeading = useRef<HTMLHeadingElement>(null);
+  const focusResult = useRef(false);
   useEffect(() => {
     const repo = createLocalRepository({
       userId,
@@ -134,74 +132,123 @@ export function Dashboard({ userId }: { userId: string }) {
       online: () => navigator.onLine,
     });
     let active = true;
-    async function refresh() {
+    let running = false;
+    let timer: number | undefined;
+    async function read() {
       try {
         const cached = await repo.readWorkspace();
         if (!active) return;
-        if (cached.decks.length) setData(cached);
+        if (cached.decks.some((deck) => !deck.deletedAt)) setData(cached);
         const status = await sync.run();
         if (!active) return;
         const updated = await repo.readWorkspace();
         if (active) {
+          focusResult.current =
+            status === "idle" &&
+            retryButton.current !== null &&
+            document.activeElement === retryButton.current;
           setData(updated);
           setIssue(status !== "idle");
         }
       } catch {
         if (active) setIssue(true);
+      } finally {
+        running = false;
+        if (active) setRefreshing(false);
       }
     }
-    void refresh();
+    function refresh() {
+      if (running) return;
+      running = true;
+      setRefreshing(true);
+      const delay = sync.retryAt() - Date.now();
+      if (delay > 0) timer = window.setTimeout(read, delay);
+      else void read();
+    }
+    refreshRef.current = refresh;
+    refresh();
     window.addEventListener("focus", refresh);
     window.addEventListener("online", refresh);
     return () => {
       active = false;
+      refreshRef.current = null;
+      window.clearTimeout(timer);
       window.removeEventListener("focus", refresh);
       window.removeEventListener("online", refresh);
       repo.close();
     };
   }, [userId]);
+  useEffect(() => {
+    if (!issue && focusResult.current) {
+      resultHeading.current?.focus();
+      focusResult.current = false;
+    }
+  }, [issue]);
   const decks = data?.decks.filter((d) => !d.deletedAt);
   const counts = new Map<string, number>();
   for (const card of data?.cards ?? [])
     if (!card.deletedAt)
       counts.set(card.deckId, (counts.get(card.deckId) ?? 0) + 1);
-  const item =
-    data && (!issue || decks?.length)
-      ? recommend(data, new Date().toISOString())
-      : null;
+  const item = data && recommend(data, new Date().toISOString());
   return (
     <div className={styles.dashboard}>
       <h1 className={styles.title}>Panel nauki</h1>
       <div className={styles.layout}>
-        <section className={styles.cover}>
-          <NotebookSheet deckId={item?.deckId} className={styles.page}>
-            {item ? (
-              <>
-                <p className={styles.caption}>{item.caption}</p>
-                <h2>{item.name}</h2>
-                <div className="action-row">
-                  <Link className="primary" href={item.href}>
-                    {item.action}
-                  </Link>
-                  {!decks?.length && <Link href="/import">Importuj CSV</Link>}
-                </div>
-              </>
-            ) : (
+        {item ? (
+          <section className={styles.cover}>
+            <NotebookSheet deckId={item.deckId} className={styles.page}>
+              <p className={styles.caption}>{item.caption}</p>
+              <h2 ref={resultHeading} tabIndex={-1}>
+                {item.name}
+              </h2>
+              <div className="action-row">
+                <Link className="primary" href={item.href}>
+                  {item.action}
+                </Link>
+              </div>
+            </NotebookSheet>
+            {issue && (
               <p role="status">
-                {issue ? (
-                  <Link href="/decks">Otwórz bibliotekę</Link>
-                ) : (
-                  "Wczytywanie biblioteki…"
-                )}
+                Aktualizacja biblioteki jest chwilowo niedostępna.
               </p>
             )}
-          </NotebookSheet>
-          {issue && (
-            <p role="status">
-              Aktualizacja biblioteki jest chwilowo niedostępna.
-            </p>
-          )}
-        </section>
+          </section>
+        ) : issue ? (
+          <section className={styles.stateCard} aria-labelledby="library-error">
+            <h2 id="library-error">Nie udało się wczytać zestawów</h2>
+            <div className="action-row">
+              <button
+                ref={retryButton}
+                className="primary"
+                aria-disabled={refreshing}
+                onClick={() => refreshRef.current?.()}
+              >
+                {refreshing ? "Ponawianie…" : "Spróbuj ponownie"}
+              </button>
+              <Link href="/decks">Otwórz bibliotekę</Link>
+            </div>
+          </section>
+        ) : data ? (
+          <section className={styles.stateCard} aria-labelledby="first-deck">
+            <div className={styles.intro}>
+              <h2 id="first-deck" ref={resultHeading} tabIndex={-1}>
+                Twój pierwszy zestaw
+              </h2>
+              <span className={styles.flashcards} aria-hidden="true" />
+            </div>
+            <p>Dodaj fiszki z tym, czego chcesz się nauczyć.</p>
+            <div className="action-row">
+              <Link className="primary" href="/decks?new=1">
+                Utwórz zestaw
+              </Link>
+              <Link href="/import">Importuj CSV</Link>
+            </div>
+          </section>
+        ) : (
+          <p className={styles.loading} role="status">
+            Wczytywanie biblioteki…
+          </p>
+        )}
         {!!decks?.length && (
           <section className={styles.library}>
             <div className="section-heading">

@@ -299,7 +299,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
     });
     await otherPage.goto("/");
     await otherPage
-      .getByRole("link", { name: "Utwórz pierwszy zestaw" })
+      .getByRole("link", { name: "Utwórz zestaw", exact: true })
       .click();
     await otherPage.getByLabel("Nazwa zestawu").fill("Włoski w kawiarni");
     await otherPage.getByRole("button", { name: "Zapisz zestaw" }).click();

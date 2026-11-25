@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { expectAccessible } from "./accessibility";
 test.skip(
   process.env.RECALLIO_RUN_SYNC_TESTS !== "1",
   "Wymaga lokalnego Supabase",
@@ -85,12 +86,56 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
       page.getByText(credentials.email, { exact: true }),
     ).toBeVisible();
     await frame("W13");
+    const pull = "**/api/v1/sync/pull?*";
+    await page.route(pull, (route) =>
+      route.fulfill({ status: 503, headers: { "Retry-After": "1" } }),
+    );
+    if (mobile) await page.setViewportSize({ width: 320, height: 720 });
     await page.goto("/");
+    const errorCard = page.getByRole("region", {
+      name: "Nie udało się wczytać zestawów",
+    });
+    await expect(errorCard).toBeVisible();
+    await expect(
+      errorCard.getByRole("link", { name: "Otwórz bibliotekę" }),
+    ).toHaveAttribute("href", "/decks");
+    await expect(page.getByRole("link", { name: "Utwórz zestaw" })).toHaveCount(
+      0,
+    );
+    await expectAccessible(page);
+    await page.screenshot({
+      path: info.outputPath("W01-error.png"),
+      scale: "css",
+    });
+    const loadedAt = await page.evaluate(() => performance.timeOrigin);
+    const retryButton = errorCard.getByRole("button", {
+      name: "Spróbuj ponownie",
+    });
+    await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes("/sync/pull?") && response.status() === 503,
+      ),
+      retryButton.click(),
+    ]);
+    await expect(retryButton).toBeEnabled();
+    await page.unroute(pull);
+    await retryButton.focus();
+    await retryButton.press("Enter");
+    await expect(
+      page.getByRole("heading", { name: "Twój pierwszy zestaw" }),
+    ).toBeFocused();
+    expect(await page.evaluate(() => performance.timeOrigin)).toBe(loadedAt);
+    await expectAccessible(page);
+    if (mobile) await page.setViewportSize({ width, height: 844 });
+    await page.reload();
     await expect(
       page.getByRole("heading", { name: "Twój pierwszy zestaw" }),
     ).toBeVisible();
     await frame("W01");
-    await page.getByRole("link", { name: "Utwórz pierwszy zestaw" }).click();
+    await page
+      .getByRole("link", { name: "Utwórz zestaw", exact: true })
+      .click();
     await frame("W03");
     await page.getByLabel("Nazwa zestawu").fill("Włoski w kawiarni");
     await page.getByRole("button", { name: "Zapisz zestaw" }).click();
@@ -101,7 +146,19 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
     await expect(
       page.getByRole("link", { name: "Ucz się z tego zestawu" }),
     ).toBeVisible();
+    await page.route(pull, (route) => route.fulfill({ status: 503 }));
     await page.goto("/");
+    await expect(
+      page.getByText("Aktualizacja biblioteki jest chwilowo niedostępna."),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Włoski w kawiarni" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Poznaj nowe fiszki" }),
+    ).toBeVisible();
+    await page.unroute(pull);
+    await page.reload();
     await expect(
       page.getByRole("heading", { name: "Włoski w kawiarni" }),
     ).toBeVisible();

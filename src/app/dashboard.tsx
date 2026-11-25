@@ -170,7 +170,7 @@ export function Dashboard({ userId }: { userId: string }) {
       ? recommend(data, new Date().toISOString())
       : null;
   return (
-    <div className={"notebook-view " + styles.dashboard}>
+    <div className={styles.dashboard}>
       <h1 className={styles.title}>Panel nauki</h1>
       <div className={styles.layout}>
         <section className={styles.cover}>

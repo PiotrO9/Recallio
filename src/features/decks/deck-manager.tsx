@@ -1,5 +1,6 @@
 "use client";
 
+import { NotebookSheet, deckColor } from "@/components/notebook";
 import { ValidatedField } from "@/components/validated-field";
 import { prepareStudyShell } from "@/features/study/offline";
 import { ConfirmAction } from "@/components/confirm-action";
@@ -284,398 +285,456 @@ export function DeckManager({
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  const browsing = deckForm === undefined && (!deck || cardForm === undefined);
+  const preview = !deck && found[0];
+  const previewCard =
+    preview && data?.cards.find((c) => !c.deletedAt && c.deckId === preview.id);
+  const focusSelection = useRef(false);
+  function openDeck(id: string) {
+    if (id === selected) return;
+    focusSelection.current = true;
+    setSelected(id);
+    setCardForm(undefined);
+  }
+
   return (
     <div className={styles.body}>
-      {!deck && deckForm === undefined && <h1>Moje zestawy</h1>}
-      {message && <p role="status">{message}</p>}
       {error && (
         <p role="alert">
           Nie udało się zapisać zmiany. Sprawdź dane lub odśwież listę.
         </p>
       )}
-      {!deck && deckForm === undefined && (
-        <div className={styles.toolbar}>
-          <label>
-            Wyszukaj zestaw
-            <input
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </label>
-          <button
-            className="primary"
-            disabled={busy}
-            onClick={() => setDeckForm(null)}
-          >
-            Dodaj zestaw
-          </button>
-          <Link className={styles.link} href="/import">
-            Importuj CSV
-          </Link>
-        </div>
-      )}
-      {deckForm !== undefined && (
-        <form
-          className="auth-form"
-          key={deckForm?.id ?? "new-deck"}
-          onSubmit={saveDeck}
-        >
-          <header className={styles.formIntro}>
-            <h1>{deckForm ? "Edytuj zestaw" : "Nowy zestaw"}</h1>
-            <p>Wybierz, którą stronę fiszki zobaczysz jako pytanie.</p>
-          </header>
-          <div className={styles.fields}>
-            <ValidatedField label="Nazwa zestawu" hint="Wpisz nazwę zestawu.">
-              <input
-                autoFocus
-                name="name"
-                defaultValue={deckForm?.name}
-                maxLength={120}
-                required
-              />
-            </ValidatedField>
-            <fieldset className={styles.direction}>
-              <legend>Kierunek zestawu</legend>
-              {[
-                ["a-b", "Ze strony A na B"],
-                ["b-a", "Ze strony B na A"],
-                ["mixed", "Mieszany"],
-              ].map(([value, label]) => (
-                <label key={value}>
-                  <input
-                    type="radio"
-                    name="directionMode"
-                    value={value}
-                    defaultChecked={
-                      value === (deckForm?.directionMode ?? "a-b")
-                    }
-                  />
-                  {label}
-                </label>
-              ))}
-            </fieldset>
-            <button className="primary" disabled={busy}>
-              Zapisz zestaw
-            </button>
-            <button
-              className="auth-secondary"
-              type="button"
-              disabled={busy}
-              onClick={() => setDeckForm(undefined)}
-            >
-              Anuluj
-            </button>
-          </div>
-        </form>
-      )}
-      {!deck && deckForm === undefined && (
-        <ul className={styles.list} aria-label="Zestawy">
-          {found.map((item) => (
-            <li key={item.id}>
+      <div
+        className={styles.layout}
+        data-split={browsing && !!(deck || preview)}
+        data-selected={!!deck}
+      >
+        {browsing && (
+          <section className={styles.index} aria-label="Biblioteka">
+            {deck ? <h2>Moje zestawy</h2> : <h1>Moje zestawy</h1>}
+            <div className={styles.toolbar}>
+              <label>
+                Wyszukaj zestaw
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </label>
               <button
-                className="catalog-row"
-                ref={(el) => {
-                  if (el && rowToFocus.current === item.id) {
-                    el.focus();
-                    rowToFocus.current = undefined;
-                  }
-                }}
-                onClick={() => {
-                  setSelected(item.id);
-                  setCardForm(undefined);
-                  setDeckForm(undefined);
-                }}
+                className="primary"
+                disabled={busy}
+                onClick={() => setDeckForm(null)}
               >
-                <span>
-                  {item.name}
-                  <span className="item-count">
-                    Fiszki: {counts.get(item.id) ?? 0}
-                  </span>
-                </span>
-                <small>Otwórz</small>
+                Dodaj zestaw
               </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {!deck && decks.length > 0 && !found.length && (
-        <div>
-          <p>Brak wyników dla „{search}”.</p>
-          <button
-            type="button"
-            className="text-action"
-            onClick={() => setSearch("")}
-          >
-            Wyczyść wyszukiwanie
-          </button>
-        </div>
-      )}
-      {deck && deckForm === undefined ? (
-        <section className={styles.body} aria-label={deck.name}>
-          <button
-            className="text-action"
-            onClick={() => {
-              if (cardForm === undefined) {
-                rowToFocus.current = deck.id;
-                setSelected(undefined);
-              }
-              setCardForm(undefined);
-            }}
-          >
-            {cardForm === undefined ? "Wróć do zestawów" : "Wróć do zestawu"}
-          </button>
-          {cardForm === undefined && <h1>{deck.name}</h1>}
-          {cardForm === undefined && (
-            <p>
-              Fiszki: {cards.length} ·{" "}
-              {deck.directionMode === "mixed"
-                ? "Kierunek mieszany"
-                : deck.directionMode === "a-b"
-                  ? "Ze strony A na B"
-                  : "Ze strony B na A"}
-            </p>
-          )}
-          {notice?.deckId === deck.id && (
-            <p role="status">
-              {notice.text}
-              {cardForm === null && (
-                <>
-                  {" "}
-                  <a href={`/study?deck=${deck.id}`}>Ucz się z tego zestawu</a>
-                </>
-              )}
-            </p>
-          )}
-          {cardForm === undefined && (
-            <>
-              <div className={styles.actions}>
-                {!!cards.length && (
-                  <a className="primary" href={`/study?deck=${deck.id}`}>
-                    Ucz się z tego zestawu
-                  </a>
-                )}
-                <button
-                  className={cards.length ? "auth-secondary" : "primary"}
-                  disabled={busy}
-                  onClick={() => setCardForm(null)}
-                >
-                  {cards.length ? "Dodaj fiszkę" : "Dodaj pierwszą fiszkę"}
-                </button>
-              </div>
-              <details>
-                <summary>Zarządzaj zestawem</summary>
-                {offlineReady.includes(deck.id) ? (
-                  <p role="status">
-                    Zestaw jest gotowy do nauki offline na tym urządzeniu.
-                  </p>
-                ) : (
-                  <button
-                    className="auth-secondary"
-                    disabled={busy || !cards.length}
-                    onClick={() =>
-                      void perform(async () => {
-                        setOfflineIssue(undefined);
-                        try {
-                          const result = await controller.run(true);
-                          setStatus(result);
-                          const shell =
-                            result === "idle"
-                              ? await prepareStudyShell()
-                              : "unavailable";
-                          if (shell === "quota")
-                            throw new DOMException(
-                              "Brak miejsca",
-                              "QuotaExceededError",
-                            );
-                          if (shell !== "ready") throw new Error();
-                          await repository.markOfflineDeck(deck.id);
-                          setOfflineReady(await repository.readOfflineDecks());
-                        } catch (err) {
-                          setOfflineIssue({
-                            id: deck.id,
-                            quota:
-                              err instanceof DOMException &&
-                              err.name === "QuotaExceededError",
-                          });
-                        }
-                      })
-                    }
-                  >
-                    Przygotuj zestaw offline
-                  </button>
-                )}
-                {offlineIssue?.id === deck.id && (
-                  <p role="alert">
-                    {offlineIssue.quota
-                      ? "Brakuje miejsca na urządzeniu. Zwolnij miejsce i spróbuj ponownie."
-                      : "Nie udało się przygotować zestawu offline. Sprawdź połączenie i ponów próbę."}
-                  </p>
-                )}
-                <div className={styles.actions}>
-                  <Link href={`/import?deck=${deck.id}`}>
-                    Importuj CSV do zestawu
-                  </Link>
-                  <button
-                    className="auth-secondary"
-                    disabled={busy}
-                    onClick={() => setDeckForm(deck)}
-                  >
-                    Edytuj zestaw
-                  </button>
-                  <ConfirmAction
-                    label="Usuń zestaw"
-                    title="Usunąć zestaw?"
-                    description={`Usuniesz zestaw „${deck.name}” i wszystkie jego fiszki.`}
-                    disabled={busy}
-                    onConfirm={() => remove(deck)}
-                  />
+              <Link className={styles.link} href="/import">
+                Importuj CSV
+              </Link>
+            </div>
 
+            <ul className={styles.list} aria-label="Zestawy">
+              {found.map((item) => (
+                <li key={item.id}>
                   <button
-                    className="auth-secondary"
-                    disabled={!cards.length}
-                    onClick={download}
+                    className={styles.deckRow}
+                    style={deckColor(item.id)}
+                    aria-current={deck?.id === item.id ? "true" : undefined}
+                    ref={(el) => {
+                      if (el && rowToFocus.current === item.id) {
+                        el.focus();
+                        rowToFocus.current = undefined;
+                      }
+                    }}
+                    onClick={() => openDeck(item.id)}
                   >
-                    Eksportuj CSV
+                    <span>
+                      {item.name}
+                      <span className={styles.count}>
+                        Fiszki: {counts.get(item.id) ?? 0}
+                      </span>
+                    </span>
+                    <small>Otwórz</small>
                   </button>
-                </div>
-              </details>
-            </>
-          )}
-          {cardForm !== undefined && (
-            <form
-              className="auth-form"
-              key={cardForm?.id ?? "new-card-" + savedCards}
-              onSubmit={saveCard}
-            >
-              <header className={styles.formIntro}>
-                <h1>
-                  {cardForm
-                    ? "Edytuj fiszkę"
-                    : cards.length
-                      ? "Nowa fiszka"
-                      : "Pierwsza fiszka"}
-                </h1>
-                <p>{deck.name}</p>
-              </header>
-              <div className={styles.fields}>
-                <div className={styles.pair}>
-                  <ValidatedField label="Strona A" hint="Wpisz treść strony A.">
-                    <textarea
-                      autoFocus
-                      name="sideA"
-                      defaultValue={cardForm?.sideA}
-                      maxLength={4000}
-                      required
-                    />
-                  </ValidatedField>
-                  <ValidatedField
-                    label="Strona B"
-                    hint="Wpisz odpowiedź ze strony B."
-                  >
-                    <textarea
-                      name="sideB"
-                      defaultValue={cardForm?.sideB}
-                      maxLength={4000}
-                      required
-                    />
-                  </ValidatedField>
-                </div>
-                <details open={cardForm ? true : undefined}>
-                  <summary>Przykłady (opcjonalne)</summary>
-                  <div className={styles.pair}>
-                    <label>
-                      Przykład A
-                      <input
-                        name="exampleA"
-                        defaultValue={cardForm?.exampleA ?? ""}
-                        maxLength={8000}
-                      />
-                    </label>
-                    <label>
-                      Przykład B
-                      <input
-                        name="exampleB"
-                        defaultValue={cardForm?.exampleB ?? ""}
-                        maxLength={8000}
-                      />
-                    </label>
-                  </div>
-                </details>
-                {cardForm && (
-                  <details>
-                    <summary>Postęp i usuwanie</summary>
-                    <div className="action-row">
-                      {data?.progress
-                        .filter((p) => p.cardId === cardForm.id)
-                        .map((p) => (
-                          <ConfirmAction
-                            key={p.direction}
-                            label={`Zresetuj ${p.direction === "a-b" ? "A → B" : "B → A"}`}
-                            title="Zresetować postęp kierunku?"
-                            description="Historia ocen pozostanie zapisana. Wybrany kierunek rozpocznie naukę od początku."
-                            disabled={busy}
-                            onConfirm={() => reset(cardForm, p.direction)}
-                          />
-                        ))}
-                      <ConfirmAction
-                        label="Usuń fiszkę"
-                        title="Usunąć fiszkę?"
-                        description="Obie strony fiszki zostaną usunięte z zestawu."
-                        disabled={busy}
-                        onConfirm={() => remove(currentCardVersion(cardForm))}
-                      />
-                    </div>
-                  </details>
-                )}
-                <button className="primary" disabled={busy}>
-                  Zapisz fiszkę
-                </button>
-                <button
-                  className="auth-secondary"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setCardForm(undefined)}
-                >
-                  Anuluj
-                </button>
-              </div>
-            </form>
-          )}
-          {cardForm === undefined && <h2>Fiszki</h2>}
-          {cardForm === undefined && (
-            <ul className={styles.list} aria-label="Fiszki">
-              {cards.map((card) => (
-                <li className={styles.card} key={card.id}>
-                  <strong>{card.sideA}</strong>
-                  <span>{card.sideB}</span>
-                  <div className={styles.actions}>
-                    <button
-                      className="auth-secondary"
-                      disabled={busy}
-                      onClick={() => setCardForm(card)}
-                    >
-                      Edytuj fiszkę
-                    </button>
-                  </div>
                 </li>
               ))}
             </ul>
-          )}
-          {cardForm === undefined && !cards.length && (
-            <p>W zestawie nie ma fiszek.</p>
-          )}
-        </section>
-      ) : (
-        !decks.length &&
-        deckForm === undefined && (
-          <p>
-            {data
-              ? "Utwórz pierwszy zestaw lub zaimportuj fiszki z pliku CSV."
-              : "Wczytywanie zestawów…"}
-          </p>
-        )
-      )}
+            {decks.length > 0 && !found.length && (
+              <div>
+                <p>Brak wyników dla „{search}”.</p>
+                <button
+                  type="button"
+                  className="text-action"
+                  onClick={() => setSearch("")}
+                >
+                  Wyczyść wyszukiwanie
+                </button>
+              </div>
+            )}
+
+            {!decks.length && (
+              <p>
+                {data
+                  ? "Utwórz pierwszy zestaw lub zaimportuj fiszki z pliku CSV."
+                  : "Wczytywanie zestawów…"}
+              </p>
+            )}
+          </section>
+        )}
+        {browsing && preview && (
+          <aside className={styles.preview} aria-label="Podgląd zestawu">
+            <NotebookSheet deckId={preview.id} className={styles.cover}>
+              <p>Podgląd zestawu</p>
+              <h2>{preview.name}</h2>
+              <p>Fiszki: {counts.get(preview.id) ?? 0}</p>
+              {previewCard && (
+                <div className={styles.sample}>
+                  <strong>{previewCard.sideA}</strong>
+                  <span>{previewCard.sideB}</span>
+                </div>
+              )}
+              <button
+                type="button"
+                className="primary"
+                onClick={() => openDeck(preview.id)}
+              >
+                Otwórz zestaw
+              </button>
+            </NotebookSheet>
+          </aside>
+        )}
+        {deckForm !== undefined && (
+          <form
+            className="auth-form"
+            key={deckForm?.id ?? "new-deck"}
+            onSubmit={saveDeck}
+          >
+            <header className={styles.formIntro}>
+              <h1>{deckForm ? "Edytuj zestaw" : "Nowy zestaw"}</h1>
+              <p>Wybierz, którą stronę fiszki zobaczysz jako pytanie.</p>
+            </header>
+            <NotebookSheet deckId={deck?.id} className={styles.fields}>
+              <ValidatedField label="Nazwa zestawu" hint="Wpisz nazwę zestawu.">
+                <input
+                  autoFocus
+                  name="name"
+                  defaultValue={deckForm?.name}
+                  maxLength={120}
+                  required
+                />
+              </ValidatedField>
+              <fieldset className={styles.direction}>
+                <legend>Kierunek zestawu</legend>
+                {[
+                  ["a-b", "Ze strony A na B"],
+                  ["b-a", "Ze strony B na A"],
+                  ["mixed", "Mieszany"],
+                ].map(([value, label]) => (
+                  <label key={value}>
+                    <input
+                      type="radio"
+                      name="directionMode"
+                      value={value}
+                      defaultChecked={
+                        value === (deckForm?.directionMode ?? "a-b")
+                      }
+                    />
+                    {label}
+                  </label>
+                ))}
+              </fieldset>
+              <button className="primary" disabled={busy}>
+                Zapisz zestaw
+              </button>
+              <button
+                className="auth-secondary"
+                type="button"
+                disabled={busy}
+                onClick={() => setDeckForm(undefined)}
+              >
+                Anuluj
+              </button>
+            </NotebookSheet>
+          </form>
+        )}
+
+        {deck && deckForm === undefined && (
+          <section className={styles.detail} aria-label={deck.name}>
+            <button
+              className="text-action"
+              onClick={() => {
+                if (cardForm === undefined) {
+                  rowToFocus.current = deck.id;
+                  setSelected(undefined);
+                }
+                setCardForm(undefined);
+              }}
+            >
+              {cardForm === undefined ? "Wróć do zestawów" : "Wróć do zestawu"}
+            </button>
+            {cardForm === undefined && (
+              <NotebookSheet deckId={deck.id} className={styles.cover}>
+                <h1
+                  tabIndex={-1}
+                  ref={(el) => {
+                    if (el && focusSelection.current) {
+                      focusSelection.current = false;
+                      el.focus();
+                    }
+                  }}
+                >
+                  {deck.name}
+                </h1>
+                <p>
+                  Fiszki: {cards.length} ·{" "}
+                  {deck.directionMode === "mixed"
+                    ? "Kierunek mieszany"
+                    : deck.directionMode === "a-b"
+                      ? "Ze strony A na B"
+                      : "Ze strony B na A"}
+                </p>
+                <div className={styles.actions}>
+                  {!!cards.length && (
+                    <a className="primary" href={`/study?deck=${deck.id}`}>
+                      Ucz się z tego zestawu
+                    </a>
+                  )}
+                  <button
+                    className={cards.length ? "auth-secondary" : "primary"}
+                    disabled={busy}
+                    onClick={() => setCardForm(null)}
+                  >
+                    {cards.length ? "Dodaj fiszkę" : "Dodaj pierwszą fiszkę"}
+                  </button>
+                </div>
+              </NotebookSheet>
+            )}
+            {notice?.deckId === deck.id && (
+              <p role="status">
+                {notice.text}
+                {cardForm === null && (
+                  <>
+                    {" "}
+                    <a href={`/study?deck=${deck.id}`}>
+                      Ucz się z tego zestawu
+                    </a>
+                  </>
+                )}
+              </p>
+            )}
+            {cardForm === undefined && (
+              <>
+                <details>
+                  <summary>Zarządzaj zestawem</summary>
+                  {offlineReady.includes(deck.id) ? (
+                    <p role="status">
+                      Zestaw jest gotowy do nauki offline na tym urządzeniu.
+                    </p>
+                  ) : (
+                    <button
+                      className="auth-secondary"
+                      disabled={busy || !cards.length}
+                      onClick={() =>
+                        void perform(async () => {
+                          setOfflineIssue(undefined);
+                          try {
+                            const result = await controller.run(true);
+                            setStatus(result);
+                            const shell =
+                              result === "idle"
+                                ? await prepareStudyShell()
+                                : "unavailable";
+                            if (shell === "quota")
+                              throw new DOMException(
+                                "Brak miejsca",
+                                "QuotaExceededError",
+                              );
+                            if (shell !== "ready") throw new Error();
+                            await repository.markOfflineDeck(deck.id);
+                            setOfflineReady(
+                              await repository.readOfflineDecks(),
+                            );
+                          } catch (err) {
+                            setOfflineIssue({
+                              id: deck.id,
+                              quota:
+                                err instanceof DOMException &&
+                                err.name === "QuotaExceededError",
+                            });
+                          }
+                        })
+                      }
+                    >
+                      Przygotuj zestaw offline
+                    </button>
+                  )}
+                  {offlineIssue?.id === deck.id && (
+                    <p role="alert">
+                      {offlineIssue.quota
+                        ? "Brakuje miejsca na urządzeniu. Zwolnij miejsce i spróbuj ponownie."
+                        : "Nie udało się przygotować zestawu offline. Sprawdź połączenie i ponów próbę."}
+                    </p>
+                  )}
+                  <div className={styles.actions}>
+                    <Link href={`/import?deck=${deck.id}`}>
+                      Importuj CSV do zestawu
+                    </Link>
+                    <button
+                      className="auth-secondary"
+                      disabled={busy}
+                      onClick={() => setDeckForm(deck)}
+                    >
+                      Edytuj zestaw
+                    </button>
+                    <ConfirmAction
+                      label="Usuń zestaw"
+                      title="Usunąć zestaw?"
+                      description={`Usuniesz zestaw „${deck.name}” i wszystkie jego fiszki.`}
+                      disabled={busy}
+                      onConfirm={() => remove(deck)}
+                    />
+
+                    <button
+                      className="auth-secondary"
+                      disabled={!cards.length}
+                      onClick={download}
+                    >
+                      Eksportuj CSV
+                    </button>
+                  </div>
+                </details>
+              </>
+            )}
+            {cardForm !== undefined && (
+              <form
+                className="auth-form"
+                key={cardForm?.id ?? "new-card-" + savedCards}
+                onSubmit={saveCard}
+              >
+                <header className={styles.formIntro}>
+                  <h1>
+                    {cardForm
+                      ? "Edytuj fiszkę"
+                      : cards.length
+                        ? "Nowa fiszka"
+                        : "Pierwsza fiszka"}
+                  </h1>
+                  <p>{deck.name}</p>
+                </header>
+                <NotebookSheet deckId={deck?.id} className={styles.fields}>
+                  <div className={styles.pair}>
+                    <ValidatedField
+                      label="Strona A"
+                      hint="Wpisz treść strony A."
+                    >
+                      <textarea
+                        autoFocus
+                        name="sideA"
+                        defaultValue={cardForm?.sideA}
+                        maxLength={4000}
+                        required
+                      />
+                    </ValidatedField>
+                    <ValidatedField
+                      label="Strona B"
+                      hint="Wpisz odpowiedź ze strony B."
+                    >
+                      <textarea
+                        name="sideB"
+                        defaultValue={cardForm?.sideB}
+                        maxLength={4000}
+                        required
+                      />
+                    </ValidatedField>
+                  </div>
+                  <details open={cardForm ? true : undefined}>
+                    <summary>Przykłady (opcjonalne)</summary>
+                    <div className={styles.pair}>
+                      <label>
+                        Przykład A
+                        <input
+                          name="exampleA"
+                          defaultValue={cardForm?.exampleA ?? ""}
+                          maxLength={8000}
+                        />
+                      </label>
+                      <label>
+                        Przykład B
+                        <input
+                          name="exampleB"
+                          defaultValue={cardForm?.exampleB ?? ""}
+                          maxLength={8000}
+                        />
+                      </label>
+                    </div>
+                  </details>
+                  {cardForm && (
+                    <details>
+                      <summary>Postęp i usuwanie</summary>
+                      <div className="action-row">
+                        {data?.progress
+                          .filter((p) => p.cardId === cardForm.id)
+                          .map((p) => (
+                            <ConfirmAction
+                              key={p.direction}
+                              label={`Zresetuj ${p.direction === "a-b" ? "A → B" : "B → A"}`}
+                              title="Zresetować postęp kierunku?"
+                              description="Historia ocen pozostanie zapisana. Wybrany kierunek rozpocznie naukę od początku."
+                              disabled={busy}
+                              onConfirm={() => reset(cardForm, p.direction)}
+                            />
+                          ))}
+                        <ConfirmAction
+                          label="Usuń fiszkę"
+                          title="Usunąć fiszkę?"
+                          description="Obie strony fiszki zostaną usunięte z zestawu."
+                          disabled={busy}
+                          onConfirm={() => remove(currentCardVersion(cardForm))}
+                        />
+                      </div>
+                    </details>
+                  )}
+                  <button className="primary" disabled={busy}>
+                    Zapisz fiszkę
+                  </button>
+                  <button
+                    className="auth-secondary"
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setCardForm(undefined)}
+                  >
+                    Anuluj
+                  </button>
+                </NotebookSheet>
+              </form>
+            )}
+            {cardForm === undefined && <h2>Fiszki</h2>}
+            {cardForm === undefined && (
+              <ul className={styles.list} aria-label="Fiszki">
+                {cards.map((card) => (
+                  <li className={styles.card} key={card.id}>
+                    <strong>{card.sideA}</strong>
+                    <span>{card.sideB}</span>
+                    <div className={styles.actions}>
+                      <button
+                        className="auth-secondary"
+                        disabled={busy}
+                        onClick={() => setCardForm(card)}
+                      >
+                        Edytuj fiszkę
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {cardForm === undefined && !cards.length && (
+              <p>W zestawie nie ma fiszek.</p>
+            )}
+          </section>
+        )}
+      </div>
+      {message && <p role="status">{message}</p>}
     </div>
   );
 }

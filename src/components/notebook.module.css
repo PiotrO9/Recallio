@@ -40,7 +40,7 @@
 .sheet {
   position: relative;
   border: 1px solid #d5cdd5;
-  background: #fffcf6;
+  background: var(--surface);
   border-radius: 5px 17px 14px 6px;
   box-shadow:
     0 4px 0 -1px #e7dfe5,

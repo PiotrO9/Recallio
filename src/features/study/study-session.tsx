@@ -535,7 +535,7 @@ function StudyBoard({
   );
   if (ended)
     return (
-      <section className={"notebook-view " + styles.finished}>
+      <section className={styles.finished}>
         <NotebookSheet
           deckId={currentDeck?.id}
           tab={deckLink}
@@ -557,7 +557,7 @@ function StudyBoard({
       </section>
     );
   return (
-    <div className={"notebook-view " + styles.board}>
+    <div className={styles.board}>
       {settings?.showDue && dueToday !== null && (
         <p>Powtórki na dziś: {dueToday}</p>
       )}

@@ -1,16 +1,17 @@
 :root {
   --display: "Manrope Variable", sans-serif;
-  --ink: #20283d;
-  --muted: #515d73;
-  --brand: #344dc0;
-  --brand-hover: #263ca0;
-  --rust: #9f3c3a;
-  --line: #dce2ed;
-  --control-line: #8590a6;
-  --accent: #ffdf82;
-  --background: #f5f7fb;
-  --surface: #fff;
-  --focus: #2159c1;
+  --ink: #29233a;
+  --muted: #645e70;
+  --brand: #584080;
+  --brand-hover: #453067;
+  --line: #dcd5df;
+  --control-line: #90829b;
+  --accent: #efa880;
+  --focus: #65428e;
+  --background: #f6f3f7;
+  --surface: #fffcf6;
+  --rust: #983a3b;
+  --lavender: #e5dff0;
   color: var(--ink);
   background: var(--background);
   font-family: var(--display);
@@ -67,7 +68,7 @@ p {
   justify-content: center;
   align-items: center;
   min-height: 46px;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 0.72rem 1.35rem;
   background: var(--brand);
   color: white;
@@ -111,7 +112,7 @@ p {
   content: "";
   position: absolute;
   z-index: -1;
-  background: white;
+  background: #fbf9fb;
   inset: 0 calc((100% - 100vw) / 2);
   border-bottom: 1px solid var(--line);
 }
@@ -159,8 +160,8 @@ p {
 }
 .masthead nav a[aria-current="page"],
 .masthead nav a:hover {
-  background: #eaf0ff;
-  color: #263e9a;
+  background: #ede8f2;
+  color: var(--brand);
 }
 .action-row a:not(.primary),
 .section-heading a,
@@ -186,70 +187,6 @@ p {
   font-size: clamp(1.35rem, 2.8vw, 1.9rem);
   letter-spacing: -0.045em;
   margin: 0;
-}
-.deck-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
-  gap: 1rem;
-}
-.deck-grid:not(:empty) {
-  margin-top: 0.75rem;
-}
-.catalog-row {
-  --cover: #6a83de;
-  --paper: #dce6ff;
-  display: grid;
-  width: 100%;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: white;
-  color: var(--ink);
-  text-align: left;
-  font: 750 1.02rem/1.4 var(--display);
-  box-shadow: 0 3px 10px #24366706;
-}
-.catalog-row::before {
-  content: "";
-  width: 2.2rem;
-  height: 2.65rem;
-  border-radius: 4px 6px 6px 4px;
-  border-left: 5px solid var(--cover);
-  background:
-    linear-gradient(var(--cover), var(--cover)) center 32% / 50% 3px no-repeat,
-    var(--paper);
-  transform: rotate(-4deg);
-}
-.catalog-row:nth-child(3n + 2),
-li:nth-child(3n + 2) > .catalog-row {
-  --cover: #b96651;
-  --paper: #ffe1d1;
-}
-.catalog-row:nth-child(3n),
-li:nth-child(3n) > .catalog-row {
-  --cover: #348979;
-  --paper: #c9f1df;
-}
-.catalog-row:hover {
-  border-color: #a7b8df;
-  box-shadow: 0 4px 14px #344dc015;
-}
-.catalog-row span {
-  overflow-wrap: anywhere;
-}
-.catalog-row small {
-  color: var(--brand);
-  font-size: 0.8rem;
-}
-.item-count {
-  display: block;
-  color: var(--muted);
-  font-size: 0.8rem;
-  font-weight: 500;
-  margin-top: 0.2rem;
 }
 .confirm-discard,
 .action-dialog {
@@ -287,6 +224,7 @@ textarea[aria-invalid="true"] {
   }
   .masthead {
     min-height: 62px;
+    flex-wrap: wrap;
     gap: 0.35rem;
   }
   .masthead nav {
@@ -303,27 +241,4 @@ textarea[aria-invalid="true"] {
     width: 27px;
     height: 30px;
   }
-}
-
-/* The notebook palette follows the signed-in study flow, including its offline shell. */
-:root:has(.notebook-view) {
-  --ink: #29233a;
-  --muted: #645e70;
-  --brand: #584080;
-  --brand-hover: #453067;
-  --line: #dcd5df;
-  --control-line: #90829b;
-  --accent: #efa880;
-  --focus: #65428e;
-  --background: #f6f3f7;
-}
-.notebook-view .primary {
-  border-radius: 8px;
-}
-:root:has(.notebook-view) .masthead::before {
-  background: #fbf9fb;
-}
-:root:has(.notebook-view) .masthead nav a:hover {
-  background: #ede8f2;
-  color: var(--brand);
 }

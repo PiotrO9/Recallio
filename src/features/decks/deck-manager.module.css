@@ -37,21 +37,7 @@
   display: none;
 }
 .list li {
-  border-bottom: 1px solid var(--line);
-}
-.list li > button[aria-pressed] {
-  width: 100%;
-  text-align: left;
-  padding: 0.7rem 1rem;
-  font-family: var(--display);
-  font-size: 1.55rem;
-  border: 0;
-  border-inline-start: 3px solid transparent;
-  border-radius: 0;
-}
-.list li > button[aria-pressed="true"] {
-  border-inline-start-color: var(--rust);
-  background: var(--surface);
+  border-bottom: 0;
 }
 .card {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -91,8 +77,10 @@
 .fields {
   display: grid;
   gap: 1rem;
-  border-top: 3px double var(--control-line);
-  padding-top: 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: white;
+  padding: clamp(1rem, 3vw, 2rem);
 }
 .pair {
   display: grid;
@@ -135,4 +123,24 @@
   min-height: 18px;
   height: 18px;
   accent-color: var(--ink);
+}
+
+.list:has(:global(.catalog-row)) {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+  gap: 0.9rem;
+}
+.list:has(.card) {
+  gap: 0.65rem;
+}
+.list .card {
+  background: white;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+}
+.toolbar {
+  padding: 1rem 1.2rem;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 16px;
 }

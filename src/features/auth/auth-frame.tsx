@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { PageShell } from "@/components/page-shell";
-import { EjiriPrint } from "@/components/ejiri-print";
+import { CardArt } from "@/components/card-art";
 import styles from "./auth.module.css";
 
 export function AuthFrame({
@@ -18,7 +18,7 @@ export function AuthFrame({
         {title && <h1>{title}</h1>}
         <div className={styles.content}>{children}</div>
       </div>
-      {variant === "auth" && <EjiriPrint />}
+      {variant === "auth" && <CardArt />}
     </PageShell>
   );
 }

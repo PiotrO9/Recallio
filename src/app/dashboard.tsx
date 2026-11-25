@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { EjiriPrint } from "@/components/ejiri-print";
+import { CardArt } from "@/components/card-art";
 import {
   createLocalRepository,
   type SnapshotData,
@@ -165,12 +165,10 @@ export function Dashboard({ userId }: { userId: string }) {
       : null;
   return (
     <>
-      <div className={styles.spread} data-empty={decks?.length === 0}>
+      <h1 className={styles.title}>Panel nauki</h1>
+      <section className={styles.spread}>
         <div className={styles.intro}>
-          <h1>
-            Panel <em>nauki</em>
-          </h1>
-          <div className="section-rule">
+          <div>
             {issue && (
               <p role="status">
                 Aktualizacja biblioteki jest chwilowo niedostępna.
@@ -198,25 +196,39 @@ export function Dashboard({ userId }: { userId: string }) {
             )}
           </div>
         </div>
-        <EjiriPrint />
-      </div>
-      <section className="section-rule">
+        <CardArt />
+      </section>
+      <section className={styles.library}>
         <div className="section-heading">
           <h2>Biblioteka</h2>
           <Link href="/import">Importuj CSV</Link>
         </div>
-        {decks?.map((d) => (
-          <Link key={d.id} className="catalog-row" href={"/decks?deck=" + d.id}>
-            <span>
-              {d.name}
-              <span className="item-count">
-                Fiszki: {counts.get(d.id) ?? 0}
+        <div className="deck-grid">
+          {decks?.map((d) => (
+            <Link
+              key={d.id}
+              className="catalog-row"
+              href={"/decks?deck=" + d.id}
+            >
+              <span>
+                {d.name}
+                <span className="item-count">
+                  Fiszki: {counts.get(d.id) ?? 0}
+                </span>
               </span>
+              <small>Otwórz</small>
+            </Link>
+          ))}
+        </div>
+        {item && !decks?.length && (
+          <Link className={styles.empty} href="/decks?new=1">
+            <span aria-hidden="true" className={styles.miniDeck} />
+            <span>
+              <strong>Twój pierwszy zestaw</strong>
+              <small>Dodaj fiszki, do których chcesz wracać.</small>
             </span>
-            <small>Otwórz</small>
           </Link>
-        ))}
-        {item && !decks?.length && <p>Tu pojawią się Twoje zestawy.</p>}
+        )}
       </section>
     </>
   );

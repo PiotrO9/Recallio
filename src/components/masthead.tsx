@@ -1,5 +1,8 @@
+"use client";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 export function Masthead() {
+  const path = usePathname();
   return (
     <header className="masthead">
       <Link href="/" className="brand" title="Panel nauki">
@@ -9,8 +12,18 @@ export function Masthead() {
         recallio
       </Link>
       <nav aria-label="Nawigacja główna">
-        <Link href="/decks">Moje zestawy</Link>
-        <Link href="/account">Moje konto</Link>
+        <Link
+          href="/decks"
+          aria-current={path === "/decks" ? "page" : undefined}
+        >
+          Moje zestawy
+        </Link>
+        <Link
+          href="/account"
+          aria-current={path === "/account" ? "page" : undefined}
+        >
+          Moje konto
+        </Link>
       </nav>
     </header>
   );

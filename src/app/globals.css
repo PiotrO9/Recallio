@@ -163,3 +163,110 @@ p {
     font-size: 0.75rem;
   }
 }
+
+.masthead nav,
+.action-row,
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.65rem, 2vw, 1.6rem);
+  flex-wrap: wrap;
+}
+.masthead nav a,
+.text-action,
+.action-row a:not(.primary),
+.section-heading a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.22em;
+}
+.text-action {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  justify-self: start;
+}
+.section-rule {
+  border-top: 3px double var(--control-line);
+  padding-top: 1rem;
+}
+.section-heading {
+  justify-content: space-between;
+}
+.section-heading h2 {
+  font: 400 2.4rem var(--display);
+  margin: 0;
+}
+.catalog-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  padding: 1rem 0.2rem;
+  color: var(--ink);
+  background: none;
+  text-align: left;
+  font: 400 1.75rem/1.2 var(--display);
+}
+.catalog-row span {
+  overflow-wrap: anywhere;
+}
+.catalog-row small {
+  font:
+    600 0.9rem "Manrope Variable",
+    sans-serif;
+  text-decoration: underline;
+}
+.catalog-row:hover {
+  background: #edefe5;
+}
+textarea:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 4px;
+}
+.masthead {
+  border-color: var(--line);
+}
+.brand-mark {
+  border-radius: 5px;
+  width: 34px;
+  height: 35px;
+}
+@media (max-width: 440px) {
+  .masthead {
+    min-height: 60px;
+  }
+  .brand {
+    font-size: 1.2rem;
+    gap: 0.4rem;
+  }
+  .brand-mark {
+    width: 28px;
+    height: 30px;
+  }
+  .masthead nav a {
+    font-size: 0.8rem;
+  }
+}
+
+.confirm-discard {
+  background: #f4eae1;
+  border-left: 3px solid var(--rust);
+  padding: 1.25rem;
+}
+.danger-action {
+  background: var(--rust);
+  color: var(--surface);
+  border: 0;
+  border-radius: 4px;
+  padding: 0.6rem 1rem;
+}

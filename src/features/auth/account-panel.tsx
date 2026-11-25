@@ -6,6 +6,7 @@ import { createSyncController } from "@/sync/controller";
 
 export function AccountPanel({ accountId }: { accountId: string }) {
   const [pending, setPending] = useState<number | null>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [ready, setReady] = useState(false);
@@ -73,6 +74,31 @@ export function AccountPanel({ accountId }: { accountId: string }) {
         >
           Wyloguj się
         </button>
+      ) : confirmDiscard ? (
+        <section
+          className="confirm-discard"
+          aria-label="Potwierdź odrzucenie zmian"
+        >
+          <h2>Odrzucić niewysłane zmiany?</h2>
+          <p>Zmiany zapisane tylko na tym urządzeniu zostaną utracone.</p>
+          <div className="action-row">
+            <button
+              className="auth-secondary"
+              autoFocus
+              disabled={busy}
+              onClick={() => setConfirmDiscard(false)}
+            >
+              Anuluj
+            </button>
+            <button
+              className="danger-action"
+              disabled={busy}
+              onClick={() => void logout("discard")}
+            >
+              Odrzuć zmiany i wyloguj się
+            </button>
+          </div>
+        </section>
       ) : (
         <>
           <p role="status">
@@ -89,7 +115,7 @@ export function AccountPanel({ accountId }: { accountId: string }) {
           <button
             className="auth-secondary"
             disabled={busy}
-            onClick={() => void logout("discard")}
+            onClick={() => setConfirmDiscard(true)}
           >
             Odrzuć zmiany i wyloguj się
           </button>

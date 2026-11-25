@@ -527,51 +527,20 @@ function StudyBoard({
   }
   return (
     <div className={styles.board}>
+      {currentDeck && (
+        <div className="section-heading">
+          <a href={`/decks?deck=${currentDeck.id}`}>{currentDeck.name}</a>
+          <span>
+            {offlineShell || syncState === "offline" ? "Offline" : "Trening"}
+          </span>
+        </div>
+      )}
       <div role="status">
         {status && <p>{status}</p>}
         {workspace?.progress.length ? (
           <p>Zapisany postęp: {workspace.progress.length}</p>
         ) : null}
       </div>
-      {currentDeck &&
-        (offlineDecks.includes(currentDeck.id) ? (
-          <p role="status">Zestaw jest dostępny offline.</p>
-        ) : (
-          !offlineShell && (
-            <button
-              className="auth-secondary"
-              type="button"
-              disabled={preparingOffline || updating || syncState === "offline"}
-              onClick={() => void prepareOffline(currentDeck.id)}
-            >
-              {preparingOffline
-                ? "Przygotowywanie zestawu…"
-                : "Przygotuj zestaw offline"}
-            </button>
-          )
-        ))}
-      {offlineError && (
-        <p role="alert">
-          Nie udało się przygotować zestawu offline. Sprawdź połączenie i wolne
-          miejsce, a następnie ponów próbę.
-        </p>
-      )}
-      {waitingWorker && !revealed && !busy && !saveError && (
-        <button
-          className="auth-secondary"
-          type="button"
-          disabled={preparingOffline || updating}
-          onClick={() => void applyUpdate()}
-        >
-          {updating ? "Aktualizowanie aplikacji…" : "Zaktualizuj aplikację"}
-        </button>
-      )}
-      {updateError && (
-        <p role="alert">
-          Nie udało się zaktualizować aplikacji. Spróbuj ponownie po odzyskaniu
-          połączenia.
-        </p>
-      )}
       {offlineShell && workspace && !selectDeck(workspace) && (
         <p>Ten zestaw wymaga przygotowania z dostępem do internetu.</p>
       )}
@@ -587,13 +556,16 @@ function StudyBoard({
       {settings?.showSession && <p>Odpowiedzi w sesji: {sessionCount}</p>}
       {ended ? (
         <div className={styles.card}>
-          <p>Sesja zakończona.</p>
+          <h2>Sesja zakończona.</h2>
           <button ref={restartButton} className="primary" onClick={restart}>
             Rozpocznij nową sesję
           </button>
         </div>
       ) : candidate ? (
         <div className={styles.card}>
+          <small>
+            {candidate.direction === "a-b" ? "Strona A" : "Strona B"}
+          </small>
           <h2>
             {candidate.direction === "a-b"
               ? candidate.card.sideA
@@ -602,7 +574,10 @@ function StudyBoard({
           <div className={styles.answer} aria-live="polite">
             {revealed && (
               <>
-                <p>
+                <small>
+                  {candidate.direction === "a-b" ? "Strona B" : "Strona A"}
+                </small>
+                <p className={styles.translation}>
                   {candidate.direction === "a-b"
                     ? candidate.card.sideB
                     : candidate.card.sideA}
@@ -712,6 +687,45 @@ function StudyBoard({
         )}
       {workspace && (
         <StudySettings settings={workspace.settings} save={saveSettings} />
+      )}
+      {currentDeck &&
+        (offlineDecks.includes(currentDeck.id) ? (
+          <p role="status">Zestaw jest dostępny offline.</p>
+        ) : (
+          !offlineShell && (
+            <button
+              className="auth-secondary"
+              type="button"
+              disabled={preparingOffline || updating || syncState === "offline"}
+              onClick={() => void prepareOffline(currentDeck.id)}
+            >
+              {preparingOffline
+                ? "Przygotowywanie zestawu…"
+                : "Przygotuj zestaw offline"}
+            </button>
+          )
+        ))}
+      {offlineError && (
+        <p role="alert">
+          Nie udało się przygotować zestawu offline. Sprawdź połączenie i wolne
+          miejsce, a następnie ponów próbę.
+        </p>
+      )}
+      {waitingWorker && !revealed && !busy && !saveError && (
+        <button
+          className="auth-secondary"
+          type="button"
+          disabled={preparingOffline || updating}
+          onClick={() => void applyUpdate()}
+        >
+          {updating ? "Aktualizowanie aplikacji…" : "Zaktualizuj aplikację"}
+        </button>
+      )}
+      {updateError && (
+        <p role="alert">
+          Nie udało się zaktualizować aplikacji. Spróbuj ponownie po odzyskaniu
+          połączenia.
+        </p>
       )}
     </div>
   );

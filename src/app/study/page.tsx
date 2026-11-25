@@ -12,7 +12,7 @@ export default async function StudyPage({
   if (!identity) redirect("/auth/login?status=session");
   const { deck } = await searchParams;
   return (
-    <AuthFrame title="Nauka">
+    <AuthFrame title="Nauka" variant="study">
       <StudySession accountId={identity.id} deckId={deck} />
     </AuthFrame>
   );

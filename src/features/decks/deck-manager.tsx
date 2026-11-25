@@ -1,5 +1,6 @@
 "use client";
 
+import { prepareStudyShell } from "@/features/study/offline";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
@@ -18,15 +19,31 @@ import {
 import { createSyncController, type SyncStatus } from "@/sync/controller";
 import styles from "./deck-manager.module.css";
 
-export function DeckManager({ userId }: { userId: string }) {
+export function DeckManager({
+  userId,
+  initialDeck,
+  createDeck,
+  createCard,
+}: {
+  userId: string;
+  initialDeck?: string;
+  createDeck?: boolean;
+  createCard?: boolean;
+}) {
   const [data, setData] = useState<SnapshotData>();
-  const [selected, setSelected] = useState<string>();
+  const [selected, setSelected] = useState<string | undefined>(initialDeck);
   const [search, setSearch] = useState("");
-  const [deckForm, setDeckForm] = useState<Deck | null | undefined>();
-  const [cardForm, setCardForm] = useState<Card | null | undefined>();
+  const [deckForm, setDeckForm] = useState<Deck | null | undefined>(
+    createDeck ? null : undefined,
+  );
+  const [cardForm, setCardForm] = useState<Card | null | undefined>(
+    createCard ? null : undefined,
+  );
   const [status, setStatus] = useState<SyncStatus>("idle");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  const [offlineReady, setOfflineReady] = useState<readonly string[]>([]);
+  const [offlineIssue, setOfflineIssue] = useState<string>();
   const lock = useRef(false);
   const repository = useMemo(
     () =>
@@ -62,6 +79,10 @@ export function DeckManager({ userId }: { userId: string }) {
     }
   }
   useEffect(() => {
+    void repository
+      .readOfflineDecks()
+      .then(setOfflineReady)
+      .catch(() => {});
     void repository
       .readWorkspace()
       .then(setData)
@@ -104,7 +125,7 @@ export function DeckManager({ userId }: { userId: string }) {
   }
 
   const decks = data?.decks.filter((deck) => !deck.deletedAt) ?? [];
-  const deck = decks.find((item) => item.id === selected) ?? decks[0];
+  const deck = decks.find((item) => item.id === selected);
   const found = decks.filter((item) =>
     item.name
       .toLocaleLowerCase("pl")
@@ -149,6 +170,7 @@ export function DeckManager({ userId }: { userId: string }) {
         expected,
       );
       setSelected(entityId);
+      if (!expected) setCardForm(null);
       setDeckForm(undefined);
     });
   }
@@ -257,35 +279,35 @@ export function DeckManager({ userId }: { userId: string }) {
           Nie udało się zapisać zmiany. Sprawdź dane lub odśwież listę.
         </p>
       )}
-      <div className={styles.toolbar}>
-        <label>
-          Wyszukaj zestaw
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </label>
-        <button
-          className="primary"
-          disabled={busy}
-          onClick={() => setDeckForm(null)}
-        >
-          Dodaj zestaw
-        </button>
-        <Link
-          className={styles.link}
-          href={deck ? `/import?deck=${deck.id}` : "/import"}
-        >
-          Importuj CSV
-        </Link>
-      </div>
+      {!deck && deckForm === undefined && (
+        <div className={styles.toolbar}>
+          <label>
+            Wyszukaj zestaw
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() => setDeckForm(null)}
+          >
+            Dodaj zestaw
+          </button>
+          <Link className={styles.link} href="/import">
+            Importuj CSV
+          </Link>
+        </div>
+      )}
       {deckForm !== undefined && (
         <form
           className="auth-form"
           key={deckForm?.id ?? "new-deck"}
           onSubmit={saveDeck}
         >
+          <h2>{deckForm ? "Edytuj zestaw" : "Nowy zestaw"}</h2>
           <label>
             Nazwa zestawu
             <input
@@ -319,68 +341,138 @@ export function DeckManager({ userId }: { userId: string }) {
           </button>
         </form>
       )}
-      <ul className={styles.list} aria-label="Zestawy">
-        {found.map((item) => (
-          <li key={item.id}>
-            <button
-              className="auth-secondary"
-              aria-pressed={deck?.id === item.id}
-              onClick={() => {
-                setSelected(item.id);
-                setCardForm(undefined);
-                setDeckForm(undefined);
-              }}
-            >
-              {item.name}
-            </button>
-          </li>
-        ))}
-      </ul>
-      {deck ? (
+      {!deck && deckForm === undefined && (
+        <ul className={styles.list} aria-label="Zestawy">
+          {found.map((item) => (
+            <li key={item.id}>
+              <button
+                className="catalog-row"
+                onClick={() => {
+                  setSelected(item.id);
+                  setCardForm(undefined);
+                  setDeckForm(undefined);
+                }}
+              >
+                <span>{item.name}</span>
+                <small>Otwórz</small>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!deck && decks.length > 0 && !found.length && (
+        <p>Brak zestawów pasujących do wyszukiwania.</p>
+      )}
+      {deck && deckForm === undefined ? (
         <section className={styles.body} aria-label={deck.name}>
+          <button
+            className="text-action"
+            onClick={() => {
+              setSelected(undefined);
+              setCardForm(undefined);
+            }}
+          >
+            Wróć do zestawów
+          </button>
           <h2>{deck.name}</h2>
-          <div className={styles.actions}>
-            <button
-              className="auth-secondary"
-              disabled={busy}
-              onClick={() => setDeckForm(deck)}
-            >
-              Edytuj zestaw
-            </button>
-            <button
-              className="auth-secondary"
-              disabled={busy}
-              onClick={() => remove(deck)}
-            >
-              Usuń zestaw
-            </button>
-            <a href={`/study?deck=${deck.id}`} className={styles.link}>
-              Ucz się z tego zestawu
-            </a>
-            <button
-              className="auth-secondary"
-              disabled={!cards.length}
-              onClick={download}
-            >
-              Eksportuj CSV
-            </button>
-            <button
-              className="primary"
-              disabled={busy}
-              onClick={() => setCardForm(null)}
-            >
-              Dodaj fiszkę
-            </button>
-          </div>
+          {cardForm === undefined && (
+            <>
+              <div className={styles.actions}>
+                {!!cards.length && (
+                  <a className="primary" href={`/study?deck=${deck.id}`}>
+                    Ucz się z tego zestawu
+                  </a>
+                )}
+                <button
+                  className={cards.length ? "auth-secondary" : "primary"}
+                  disabled={busy}
+                  onClick={() => setCardForm(null)}
+                >
+                  {cards.length ? "Dodaj fiszkę" : "Dodaj pierwszą fiszkę"}
+                </button>
+              </div>
+              <details>
+                <summary>Zarządzaj zestawem</summary>
+                {offlineReady.includes(deck.id) ? (
+                  <p role="status">
+                    Zestaw jest gotowy do nauki offline na tym urządzeniu.
+                  </p>
+                ) : (
+                  <button
+                    className="auth-secondary"
+                    disabled={busy || !cards.length}
+                    onClick={() =>
+                      void perform(async () => {
+                        setOfflineIssue(undefined);
+                        try {
+                          const result = await controller.run(true);
+                          setStatus(result);
+                          if (result !== "idle" || !(await prepareStudyShell()))
+                            throw new Error();
+                          await repository.markOfflineDeck(deck.id);
+                          setOfflineReady(await repository.readOfflineDecks());
+                        } catch {
+                          setOfflineIssue(deck.id);
+                        }
+                      })
+                    }
+                  >
+                    Przygotuj zestaw offline
+                  </button>
+                )}
+                {offlineIssue === deck.id && (
+                  <p role="alert">
+                    Nie udało się przygotować zestawu offline. Sprawdź
+                    połączenie i wolne miejsce, a następnie ponów próbę.
+                  </p>
+                )}
+                <div className={styles.actions}>
+                  <Link href={`/import?deck=${deck.id}`}>
+                    Importuj CSV do zestawu
+                  </Link>
+                  <button
+                    className="auth-secondary"
+                    disabled={busy}
+                    onClick={() => setDeckForm(deck)}
+                  >
+                    Edytuj zestaw
+                  </button>
+                  <button
+                    className="auth-secondary"
+                    disabled={busy}
+                    onClick={() => remove(deck)}
+                  >
+                    Usuń zestaw
+                  </button>
+
+                  <button
+                    className="auth-secondary"
+                    disabled={!cards.length}
+                    onClick={download}
+                  >
+                    Eksportuj CSV
+                  </button>
+                </div>
+              </details>
+            </>
+          )}
           {cardForm !== undefined && (
             <form
               className="auth-form"
               key={cardForm?.id ?? "new-card"}
               onSubmit={saveCard}
             >
+              <h3>
+                {cardForm
+                  ? "Edytuj fiszkę"
+                  : cards.length
+                    ? "Nowa fiszka"
+                    : "Pierwsza fiszka"}
+              </h3>
               <label>
                 Strona A
-                <input
+                <textarea
+                  autoFocus
                   name="sideA"
                   defaultValue={cardForm?.sideA}
                   maxLength={4000}
@@ -389,7 +481,7 @@ export function DeckManager({ userId }: { userId: string }) {
               </label>
               <label>
                 Strona B
-                <input
+                <textarea
                   name="sideB"
                   defaultValue={cardForm?.sideB}
                   maxLength={4000}
@@ -425,50 +517,57 @@ export function DeckManager({ userId }: { userId: string }) {
               </button>
             </form>
           )}
-          <ul className={styles.list} aria-label="Fiszki">
-            {cards.map((card) => (
-              <li className={styles.card} key={card.id}>
-                <strong>{card.sideA}</strong>
-                <span>{card.sideB}</span>
-                <div className={styles.actions}>
-                  <button
-                    className="auth-secondary"
-                    disabled={busy}
-                    onClick={() => setCardForm(card)}
-                  >
-                    Edytuj fiszkę
-                  </button>
-                  <button
-                    className="auth-secondary"
-                    disabled={busy}
-                    onClick={() => remove(card)}
-                  >
-                    Usuń fiszkę
-                  </button>
-                  {data?.progress
-                    .filter((entry) => entry.cardId === card.id)
-                    .map(({ direction }) => (
-                      <button
-                        className="auth-secondary"
-                        key={direction}
-                        disabled={busy}
-                        onClick={() => reset(card, direction)}
-                      >
-                        Zresetuj {direction === "a-b" ? "A → B" : "B → A"}
-                      </button>
-                    ))}
-                </div>
-              </li>
-            ))}
-          </ul>
-          {!cards.length && <p>W zestawie nie ma fiszek.</p>}
+          {cardForm === undefined && (
+            <ul className={styles.list} aria-label="Fiszki">
+              {cards.map((card) => (
+                <li className={styles.card} key={card.id}>
+                  <strong>{card.sideA}</strong>
+                  <span>{card.sideB}</span>
+                  <div className={styles.actions}>
+                    <button
+                      className="auth-secondary"
+                      disabled={busy}
+                      onClick={() => setCardForm(card)}
+                    >
+                      Edytuj fiszkę
+                    </button>
+                    <button
+                      className="auth-secondary"
+                      disabled={busy}
+                      onClick={() => remove(card)}
+                    >
+                      Usuń fiszkę
+                    </button>
+                    {data?.progress
+                      .filter((entry) => entry.cardId === card.id)
+                      .map(({ direction }) => (
+                        <button
+                          className="auth-secondary"
+                          key={direction}
+                          disabled={busy}
+                          onClick={() => reset(card, direction)}
+                        >
+                          Zresetuj {direction === "a-b" ? "A → B" : "B → A"}
+                        </button>
+                      ))}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {cardForm === undefined && !cards.length && (
+            <p>W zestawie nie ma fiszek.</p>
+          )}
         </section>
       ) : (
-        <p>
-          {data
-            ? "Utwórz pierwszy zestaw lub zaimportuj fiszki z pliku CSV."
-            : "Wczytywanie zestawów…"}
-        </p>
+        !decks.length &&
+        deckForm === undefined && (
+          <p>
+            {data
+              ? "Utwórz pierwszy zestaw lub zaimportuj fiszki z pliku CSV."
+              : "Wczytywanie zestawów…"}
+          </p>
+        )
       )}
     </div>
   );

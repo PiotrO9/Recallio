@@ -101,7 +101,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
     await page.goto("/");
     await expect(page).toHaveURL(baseURL + "/");
     await expectAccessible(page);
-    await page.getByRole("link", { name: "Przejdź do nauki" }).click();
+    await page.getByRole("link", { name: "Poznaj nowe fiszki" }).click();
     await expect(page.getByRole("heading", { name: "pies" })).toBeVisible();
     await expectAccessible(page);
     const manifestResponse = await request.get("/manifest.webmanifest");
@@ -296,13 +296,35 @@ test("a review survives an offline reload and synchronizes once to a second devi
       timezone: "Europe/Warsaw",
       newLimit: 0,
     });
+    await otherPage.goto("/");
+    await otherPage
+      .getByRole("link", { name: "Utwórz pierwszy zestaw" })
+      .click();
+    await otherPage.getByLabel("Nazwa zestawu").fill("Włoski w kawiarni");
+    await otherPage.getByRole("button", { name: "Zapisz zestaw" }).click();
+    await otherPage.getByLabel("Strona A").fill("un conto");
+    await otherPage.getByLabel("Strona B").fill("rachunek");
+    await otherPage.getByRole("button", { name: "Zapisz fiszkę" }).click();
+    await expect(
+      otherPage.getByText("rachunek", { exact: true }),
+    ).toBeVisible();
+    await otherPage.goto("/");
+    await expect(
+      otherPage.getByText("Nowe fiszki są wyłączone."),
+    ).toBeVisible();
+    await otherPage.getByRole("link", { name: "Otwórz zestaw" }).click();
+    await expect(
+      otherPage.getByRole("heading", { name: "Włoski w kawiarni" }),
+    ).toBeVisible();
     await page.goto("/decks");
-    await expect(page.getByRole("heading", { name: "Nauka" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Nauka Otwórz" }),
+    ).toBeVisible();
     await expectAccessible(page);
     const search = page.getByRole("searchbox", { name: "Wyszukaj zestaw" });
     await search.fill("brak dopasowania");
     await expect(
-      page.getByRole("button", { name: "Nauka", exact: true }),
+      page.getByRole("button", { name: "Nauka Otwórz", exact: true }),
     ).toHaveCount(0);
     await search.clear();
     await page.getByRole("button", { name: "Dodaj zestaw" }).click();
@@ -312,6 +334,8 @@ test("a review survives an offline reload and synchronizes once to a second devi
       page.getByRole("button", { name: "Niewysłany szkic" }),
     ).toHaveCount(0);
 
+    await page.getByRole("button", { name: "Nauka Otwórz" }).click();
+    await page.getByText("Zarządzaj zestawem", { exact: true }).click();
     await page.getByRole("button", { name: "Edytuj zestaw" }).click();
     await page.getByLabel("Nazwa zestawu").fill("Zaktualizowany zestaw");
     await page.getByLabel("Kierunek zestawu").selectOption("mixed");
@@ -421,8 +445,9 @@ test("a review survives an offline reload and synchronizes once to a second devi
     ).toBeVisible();
     await page.getByRole("link", { name: "Wróć do zestawów" }).click();
     await page
-      .getByRole("button", { name: "Z pliku CSV", exact: true })
+      .getByRole("button", { name: "Z pliku CSV Otwórz", exact: true })
       .click();
+    await page.getByText("Zarządzaj zestawem", { exact: true }).click();
     const downloaded = page.waitForEvent("download");
     await page.getByRole("button", { name: "Eksportuj CSV" }).click();
     const output = await readFile(await (await downloaded).path(), "utf8");

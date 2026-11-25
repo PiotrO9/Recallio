@@ -48,7 +48,9 @@ export async function POST(request: NextRequest) {
     if (!password.success)
       return authRedirect("/auth/new-password?status=invalid");
     const { error } = await client.auth.updateUser({ password: password.data });
-    return authRedirect(error ? "/auth/new-password?status=error" : "/account");
+    return authRedirect(
+      error ? "/auth/new-password?status=error" : "/account?status=password",
+    );
   }
   if (intent === "reset") {
     if (!email.success)

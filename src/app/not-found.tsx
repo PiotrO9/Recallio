@@ -5,7 +5,9 @@ export default function NotFound() {
   return (
     <AuthFrame title="Nie znaleziono strony" variant="auth">
       <p>Sprawdź adres lub przejdź na stronę główną Recallio.</p>
-      <Link href="/">Strona główna</Link>
+      <Link className="primary" href="/">
+        Strona główna
+      </Link>
     </AuthFrame>
   );
 }

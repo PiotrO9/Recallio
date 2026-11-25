@@ -52,9 +52,7 @@ async function login(page: Page, email: string, password: string) {
     page.getByRole("heading", { name: "Panel nauki" }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Moje konto" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Twoje konto" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Moje konto" })).toBeVisible();
   await expect(page.getByText(email, { exact: true })).toBeVisible();
 }
 
@@ -135,9 +133,7 @@ test("account requires a verified session, sign-up and reset links stay on the l
     page.getByRole("heading", { name: "Panel nauki" }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Moje konto" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Twoje konto" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Moje konto" })).toBeVisible();
   await expect(page.getByText(email, { exact: true })).toBeVisible();
   const account = await page.request.get("/account");
   expect(account.headers()["cache-control"]).toContain("no-store");
@@ -160,9 +156,7 @@ test("account requires a verified session, sign-up and reset links stay on the l
   await page.goto(recovery);
   await page.getByLabel("Nowe hasło").fill(replacement);
   await page.getByRole("button", { name: "Zapisz hasło" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Twoje konto" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Moje konto" })).toBeVisible();
   await expireSession(page, baseURL!);
   await page.goto("/account");
   await expect(page).toHaveURL(/\/auth\/login\?status=session$/);

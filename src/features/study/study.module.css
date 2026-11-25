@@ -27,7 +27,7 @@
   padding-block: 0.85rem 0.15rem;
   border-top: 1px solid var(--line);
 }
-.answer p:first-child {
+.translation {
   color: var(--rust);
   font: 400 clamp(1.65rem, 3vw, 2.25rem)/1.25 var(--display);
 }
@@ -46,4 +46,29 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.card small {
+  color: var(--muted);
+  font-weight: 600;
+}
+.card {
+  border-top: 3px double var(--control-line);
+}
+.answer .translation {
+  font-size: clamp(2.15rem, 4vw, 3.5rem);
+  margin-block: 0.4rem;
+}
+.grades button {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--control-line);
+}
+.grades button:hover {
+  background: #e9eddf;
+}
+@media (min-width: 650px) {
+  .grades {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }

@@ -1,105 +1,31 @@
 .spread {
   display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr);
   align-items: center;
-  gap: clamp(2rem, 6vw, 5.5rem);
-  padding-block: clamp(2.5rem, 5.5vw, 5rem);
-}
-.intro h1,
-.library h2,
-.library strong {
-  margin: 0;
-  font-family: var(--display);
-  font-weight: 400;
+  gap: 6%;
+  padding-block: clamp(2rem, 4vw, 4rem);
 }
 .intro h1 {
-  font-size: clamp(4.5rem, 8.4vw, 7.5rem);
-  line-height: 0.99;
-  letter-spacing: -0.037em;
+  font: 400 clamp(4rem, 7.7vw, 7rem)/0.99 var(--display);
+  letter-spacing: -0.04em;
+  margin: 0 0 1.75rem;
 }
-.intro h1 em {
+.intro em {
   color: var(--rust);
 }
+.intro h2 {
+  font: 400 clamp(2.1rem, 3.2vw, 3rem)/1.12 var(--display);
+  margin: 0.3rem 0 1rem;
+  overflow-wrap: anywhere;
+}
 .intro p {
-  max-width: 33ch;
-  margin: 1.1rem 0 1.75rem;
-  font-size: 1.0625rem;
-  line-height: 1.6;
+  margin: 0;
 }
-.library {
-  display: grid;
-  grid-template-columns: 0.8fr 1fr 1fr;
-  align-items: start;
-  margin-bottom: 3rem;
-  border-top: 3px double var(--ink);
-  border-bottom: 1px solid var(--line);
-  padding-block: 1.5rem;
-}
-.library h2 {
-  font-size: 2rem;
-}
-.library a {
-  display: grid;
-  align-content: start;
-  gap: 0.5rem;
-  padding: 0.15rem 1.5rem;
-  border-left: 1px solid var(--line);
-}
-.library strong {
-  font-size: 1.8rem;
-  line-height: 1.2;
-}
-.library span {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-@media (max-width: 720px) {
+@media (max-width: 650px) {
   .spread {
-    grid-template-columns: 1fr;
-    gap: 2rem;
+    grid-template-columns: minmax(0, 1fr);
   }
-  .library {
-    grid-template-columns: 1fr 1fr;
-    row-gap: 1.2rem;
+  .spread:not([data-empty="true"]) figure {
+    display: none;
   }
-  .library h2 {
-    grid-column: 1 / -1;
-  }
-  .library a:first-of-type {
-    border-left: 0;
-    padding-left: 0;
-  }
-}
-@media (max-width: 440px) {
-  .spread {
-    padding-block: 2rem 1.5rem;
-  }
-  .intro h1 {
-    font-size: clamp(3.6rem, 18vw, 4.5rem);
-  }
-  .library {
-    grid-template-columns: 1fr;
-    gap: 0;
-    padding-bottom: 0;
-  }
-  .library h2 {
-    margin-bottom: 0.4rem;
-  }
-  .library a {
-    border-left: 0;
-    padding: 1rem 0;
-  }
-  .library a + a {
-    border-top: 1px solid var(--line);
-  }
-}
-
-.library strong {
-  text-decoration: underline;
-  text-decoration-color: var(--control-line);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.22em;
-}
-.library a:hover strong {
-  text-decoration-color: currentColor;
 }

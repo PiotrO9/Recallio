@@ -13,8 +13,16 @@ export default async function AccountPage({
   if (!account) redirect("/auth/login?status=session");
   const { status } = await searchParams;
   return (
-    <AuthFrame title="Twoje konto">
-      {account.email && <p>{account.email}</p>}
+    <AuthFrame title="Moje konto">
+      {account.email && (
+        <div>
+          <small>Adres e-mail</small>
+          <p>
+            <strong>{account.email}</strong>
+          </p>
+        </div>
+      )}
+      {status === "password" && <p role="status">Hasło zostało zmienione.</p>}
       {status === "logout" && (
         <p role="alert">Nie udało się wylogować. Spróbuj ponownie.</p>
       )}

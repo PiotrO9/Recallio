@@ -47,7 +47,7 @@ export function CsvImport({
   const [page, setPage] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState<string>();
   const running = useRef(false);
   const repository = useMemo(
     () =>
@@ -147,7 +147,7 @@ export function CsvImport({
   }
 
   async function readFile(input?: File) {
-    setDone(false);
+    setDone(undefined);
     setError("");
     setFile(undefined);
     setDecisions({});
@@ -184,7 +184,7 @@ export function CsvImport({
     }
     if (current?.id !== plan.id) return;
     await repository.forgetImport(plan.id);
-    setDone(true);
+    setDone(plan.deckId);
     setActive(null);
     setFile(undefined);
     setWorkspace(await repository.readWorkspace());
@@ -284,10 +284,41 @@ export function CsvImport({
   return (
     <div className={styles.body}>
       <Link href="/decks">Wróć do zestawów</Link>
+      <ol className={styles.steps} aria-label="Etapy importu">
+        {["Wybór pliku", "Podgląd", "Wynik"].map((step, i) => (
+          <li
+            key={step}
+            aria-current={
+              i === (active || done ? 2 : file ? 1 : 0) ? "step" : undefined
+            }
+          >
+            {step}
+          </li>
+        ))}
+      </ol>
       {error && <p role="alert">{error}</p>}
-      {done && <p role="status">Import zapisany na tym urządzeniu.</p>}
+      {done && (
+        <section className="section-rule">
+          <h2>Import zakończony</h2>
+          <p role="status">Import zapisany na tym urządzeniu.</p>
+          <div className="action-row">
+            <Link href={`/decks?deck=${done}`} className="primary">
+              Otwórz zestaw
+            </Link>
+            <button className="text-action" onClick={() => setDone(undefined)}>
+              Importuj kolejny plik
+            </button>
+          </div>
+        </section>
+      )}
       {active ? (
         <div className={styles.body}>
+          <h2>{busy ? "Trwa import" : "Import wstrzymany"}</h2>
+          <progress
+            max={active.total || 1}
+            value={active.next}
+            aria-label="Zapisane kroki"
+          />
           <p role="status">
             Zapisane kroki: {active.next} z {active.total}
           </p>
@@ -321,175 +352,204 @@ export function CsvImport({
           </button>
         </div>
       ) : (
-        <form className={`auth-form ${styles.body}`} onSubmit={submit}>
-          <label>
-            Zestaw docelowy
-            <select
-              value={target?.id ?? ""}
-              onChange={({ target }) => {
-                setDeckId(target.value);
-                setDecisions({});
-                setPage(0);
-              }}
-            >
-              <option value="">Nowy zestaw</option>
-              {workspace?.decks
-                .filter((item) => !item.deletedAt)
-                .map((item) => (
-                  <option value={item.id} key={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-          {!target && (
+        !done && (
+          <form className={`auth-form ${styles.body}`} onSubmit={submit}>
             <label>
-              Nazwa zestawu
-              <input name="name" maxLength={120} required />
-            </label>
-          )}
-          <label>
-            Plik CSV
-            <input
-              type="file"
-              accept=".csv,text/csv"
-              onChange={({ target }) => void readFile(target.files?.[0])}
-            />
-          </label>
-          <p>
-            CSV UTF-8 do 1 MiB. Wymagane są obie strony fiszki. Przykłady są
-            opcjonalne.{" "}
-            <a href="/examples/fiszki.csv" download>
-              Pobierz wzór CSV
-            </a>
-          </p>
-          {file && (
-            <>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={skipDuplicates}
-                  onChange={({ target }) => setSkipDuplicates(target.checked)}
-                />{" "}
-                Pomiń duplikaty
-              </label>
-              <p>
-                Separator: {file.delimiter === "," ? "przecinek" : "średnik"}.
-                Do zapisu: {accepted} z {rows.length}.
-              </p>
-              <ol className={styles.rows}>
-                {rows
-                  .slice(page * pageSize, (page + 1) * pageSize)
-                  .map((row) => {
-                    const choice = decision(row);
-                    const targets = matching(row, choice.kind);
-                    const needsTarget =
-                      choice.kind === "update_examples" ||
-                      choice.kind === "replace_content";
-                    return (
-                      <li key={row.row} className={styles.row}>
-                        <strong>
-                          Wiersz {row.row} · {labels[row.classification]}
-                        </strong>
-                        <span>
-                          {row.content.sideA} → {row.content.sideB}
-                        </span>
-                        {row.errors.join(" ")}
-                        {row.matchesTruncated && (
-                          <span>Dopasowania: {row.matchCount}</span>
-                        )}
-                        {row.classification !== "invalid" && (
-                          <label>
-                            Akcja wiersza {row.row}
-                            <select
-                              value={choice.kind}
-                              onChange={({ target }) =>
-                                setDecisions((old) => ({
-                                  ...old,
-                                  [row.row]: {
-                                    kind: target.value as Decision["kind"],
-                                  },
-                                }))
-                              }
-                            >
-                              <option value="" disabled>
-                                Wybierz działanie
-                              </option>
-                              <option value="skip">Pomiń</option>
-                              <option value="create">Dodaj fiszkę</option>
-                              {matching(row, "update_examples").length > 0 && (
-                                <option value="update_examples">
-                                  Zmień przykłady
-                                </option>
-                              )}
-                              {matching(row, "replace_content").length > 0 && (
-                                <option value="replace_content">
-                                  Zastąp treść
-                                </option>
-                              )}
-                            </select>
-                          </label>
-                        )}
-                        {needsTarget && (
-                          <label>
-                            Fiszka do aktualizacji
-                            <select
-                              value={choice.target ?? ""}
-                              onChange={({ target }) =>
-                                setDecisions((old) => ({
-                                  ...old,
-                                  [row.row]: {
-                                    ...choice,
-                                    target: target.value,
-                                  },
-                                }))
-                              }
-                            >
-                              <option value="" disabled>
-                                Wybierz fiszkę
-                              </option>
-                              {targets.map((card) => (
-                                <option key={card.id} value={card.id}>
-                                  {card.sideA} → {card.sideB} ·{" "}
-                                  {card.id.slice(-6)}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
-                      </li>
-                    );
-                  })}
-              </ol>
-              {rows.length > pageSize && (
-                <div className={styles.pages}>
-                  <button
-                    className="auth-secondary"
-                    type="button"
-                    disabled={page === 0}
-                    onClick={() => setPage(page - 1)}
-                  >
-                    Poprzednia
-                  </button>
-                  <button
-                    className="auth-secondary"
-                    type="button"
-                    disabled={(page + 1) * pageSize >= rows.length}
-                    onClick={() => setPage(page + 1)}
-                  >
-                    Następna
-                  </button>
-                </div>
-              )}
-              <button
-                className="primary"
-                disabled={!workspace || unresolved || !accepted || busy}
+              Zestaw docelowy
+              <select
+                value={target?.id ?? ""}
+                onChange={({ target }) => {
+                  setDeckId(target.value);
+                  setDecisions({});
+                  setPage(0);
+                }}
               >
-                Zatwierdź import
-              </button>
-            </>
-          )}
-        </form>
+                <option value="">Nowy zestaw</option>
+                {workspace?.decks
+                  .filter((item) => !item.deletedAt)
+                  .map((item) => (
+                    <option value={item.id} key={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            {!target && (
+              <label>
+                Nazwa zestawu
+                <input name="name" maxLength={120} required />
+              </label>
+            )}
+            <label>
+              Plik CSV
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={({ target }) => void readFile(target.files?.[0])}
+              />
+            </label>
+            <p>
+              CSV UTF-8 do 1 MiB. Wymagane są obie strony fiszki. Przykłady są
+              opcjonalne.{" "}
+              <a href="/examples/fiszki.csv" download>
+                Pobierz wzór CSV
+              </a>
+            </p>
+            {file && (
+              <>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={skipDuplicates}
+                    onChange={({ target }) => setSkipDuplicates(target.checked)}
+                  />{" "}
+                  Pomiń duplikaty
+                </label>
+                <p>
+                  Separator: {file.delimiter === "," ? "przecinek" : "średnik"}.
+                  Do zapisu: {accepted} z {rows.length}.
+                </p>
+                <h2>Podgląd importu</h2>
+                <ol className={styles.rows}>
+                  {rows
+                    .slice(page * pageSize, (page + 1) * pageSize)
+                    .map((row) => {
+                      const choice = decision(row);
+                      const targets = matching(row, choice.kind);
+                      const needsTarget =
+                        choice.kind === "update_examples" ||
+                        choice.kind === "replace_content";
+                      return (
+                        <li key={row.row} className={styles.row}>
+                          <strong>
+                            Wiersz {row.row} · {labels[row.classification]}
+                          </strong>
+                          <div className={styles.compare}>
+                            <div>
+                              <b>W pliku</b>
+                              <p>
+                                {row.content.sideA} / {row.content.sideB}
+                              </p>
+                              {row.content.exampleA} {row.content.exampleB}
+                            </div>
+                            {targets.length > 0 && (
+                              <div>
+                                <b>W zestawie</b>
+                                {(choice.target
+                                  ? targets.filter(
+                                      (c) => c.id === choice.target,
+                                    )
+                                  : targets.slice(0, 1)
+                                ).map((c) => (
+                                  <div key={c.id}>
+                                    <p>
+                                      {c.sideA} / {c.sideB}
+                                    </p>
+                                    {c.exampleA} {c.exampleB}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          {row.errors.join(" ")}
+                          {row.matchesTruncated && (
+                            <span>Dopasowania: {row.matchCount}</span>
+                          )}
+                          {row.classification !== "invalid" && (
+                            <label>
+                              Akcja wiersza {row.row}
+                              <select
+                                value={choice.kind}
+                                onChange={({ target }) =>
+                                  setDecisions((old) => ({
+                                    ...old,
+                                    [row.row]: {
+                                      kind: target.value as Decision["kind"],
+                                    },
+                                  }))
+                                }
+                              >
+                                <option value="" disabled>
+                                  Wybierz działanie
+                                </option>
+                                <option value="skip">Pomiń</option>
+                                <option value="create">Dodaj fiszkę</option>
+                                {matching(row, "update_examples").length >
+                                  0 && (
+                                  <option value="update_examples">
+                                    Zmień przykłady
+                                  </option>
+                                )}
+                                {matching(row, "replace_content").length >
+                                  0 && (
+                                  <option value="replace_content">
+                                    Zastąp treść
+                                  </option>
+                                )}
+                              </select>
+                            </label>
+                          )}
+                          {needsTarget && (
+                            <label>
+                              Fiszka do aktualizacji
+                              <select
+                                value={choice.target ?? ""}
+                                onChange={({ target }) =>
+                                  setDecisions((old) => ({
+                                    ...old,
+                                    [row.row]: {
+                                      ...choice,
+                                      target: target.value,
+                                    },
+                                  }))
+                                }
+                              >
+                                <option value="" disabled>
+                                  Wybierz fiszkę
+                                </option>
+                                {targets.map((card) => (
+                                  <option key={card.id} value={card.id}>
+                                    {card.sideA} → {card.sideB} ·{" "}
+                                    {card.id.slice(-6)}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          )}
+                        </li>
+                      );
+                    })}
+                </ol>
+                {rows.length > pageSize && (
+                  <div className={styles.pages}>
+                    <button
+                      className="auth-secondary"
+                      type="button"
+                      disabled={page === 0}
+                      onClick={() => setPage(page - 1)}
+                    >
+                      Poprzednia
+                    </button>
+                    <button
+                      className="auth-secondary"
+                      type="button"
+                      disabled={(page + 1) * pageSize >= rows.length}
+                      onClick={() => setPage(page + 1)}
+                    >
+                      Następna
+                    </button>
+                  </div>
+                )}
+                <button
+                  className="primary"
+                  disabled={!workspace || unresolved || !accepted || busy}
+                >
+                  Zatwierdź import
+                </button>
+              </>
+            )}
+          </form>
+        )
       )}
     </div>
   );

@@ -30,3 +30,42 @@
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+}
+.steps li {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.4rem;
+}
+.steps [aria-current] {
+  border-color: var(--rust);
+  font-weight: 700;
+  color: var(--ink);
+}
+.compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.compare > div {
+  background: var(--surface);
+  padding: 1rem;
+}
+.compare b {
+  font-size: 0.85rem;
+}
+.body progress {
+  width: 100%;
+  accent-color: var(--ink);
+}
+@media (max-width: 650px) {
+  .compare {
+    grid-template-columns: 1fr;
+  }
+}

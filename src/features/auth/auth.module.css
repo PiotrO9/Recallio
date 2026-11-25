@@ -147,3 +147,56 @@
     margin-top: 1.5rem;
   }
 }
+
+.catalog,
+.study {
+  padding-block: clamp(1.5rem, 4vw, 3rem);
+  overflow-wrap: anywhere;
+}
+.catalog h1,
+.study h1 {
+  margin: 0 0 1.3rem;
+  font-size: clamp(2.6rem, 5.5vw, 5rem);
+}
+.study {
+  max-width: 47rem;
+  margin-inline: auto;
+}
+.study h1 {
+  font-size: clamp(2rem, 4vw, 3.25rem);
+}
+.panel textarea {
+  font: inherit;
+  color: var(--ink);
+  padding: 0.7rem;
+  min-height: 5rem;
+  max-width: 100%;
+  resize: vertical;
+  border: 1px solid var(--control-line);
+  background: var(--surface);
+  border-radius: 3px;
+}
+.panel :global(.primary) {
+  text-decoration: none;
+}
+.panel [role="alert"]:not(:empty) {
+  padding: 0.7rem 1rem;
+  border-left: 3px solid var(--rust);
+  background: #f4eae1;
+}
+.entry {
+  border: 0;
+  margin-top: 0;
+  min-height: 90vh;
+}
+.entry .panel h1 {
+  font-size: clamp(3rem, 5.7vw, 5.5rem);
+}
+@media (max-width: 760px) {
+  .entry {
+    min-height: 0;
+  }
+  .panel h1 {
+    font-size: clamp(2.6rem, 11vw, 3.25rem);
+  }
+}

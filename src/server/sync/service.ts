@@ -150,8 +150,8 @@ export async function pull(
       async () => {
         const { rows } = await db.query<PullResponse["changes"][number]>(
           `select sequence::text, entity, entity_id as "entityId", revision::text, payload, deleted
-       from recallio_private.change_log where user_id=${account} and sequence > $1
-       order by sequence limit $2`,
+       from recallio_private.change_log as log where log.user_id=${account} and log.sequence > $1
+       order by log.sequence limit $2`,
           [cursor, limit + 1],
         );
         const changes = rows

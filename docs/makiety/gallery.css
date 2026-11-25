@@ -1,0 +1,143 @@
+body.studio {
+  background: #e8e9e3;
+}
+.studiohead {
+  background: #23362c;
+  color: #f9f8ee;
+  padding: 12px max(20px, 3vw);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.studiohead strong {
+  font-size: 1rem;
+}
+.studiohead a {
+  font-size: 0.86rem;
+  color: inherit;
+}
+.studiohead span {
+  opacity: 0.76;
+  font-weight: 500;
+}
+.studio main {
+  width: min(1580px, 100%);
+  margin: auto;
+  padding: 20px max(16px, 2.7vw) 32px;
+}
+.controls {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) auto;
+  gap: 10px 18px;
+  align-items: end;
+}
+.controls label,
+.controls legend {
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+.controls select {
+  width: 100%;
+  display: block;
+  margin-top: 5px;
+  padding: 8px 10px;
+  background: var(--white);
+  min-height: 42px;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+}
+.devices {
+  margin: 0;
+}
+.devices > div {
+  display: flex;
+}
+.devices button {
+  background: var(--white);
+  padding: 8px 16px;
+  border: 1px solid var(--edge);
+  min-height: 42px;
+}
+.devices button:first-child {
+  border-radius: 3px 0 0 3px;
+}
+.devices button:last-child {
+  border-radius: 0 3px 3px 0;
+  border-left: 0;
+}
+.devices [aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--white);
+}
+.proof {
+  margin: 18px 0;
+  background: #d5d8cf;
+  border: 1px solid #bdc3b5;
+  padding: 14px 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.framebox {
+  overflow: hidden;
+  background: var(--paper);
+  box-shadow: 0 1px 6px #24352625;
+}
+.framebox iframe {
+  border: 0;
+  display: block;
+  transform-origin: top left;
+  background: var(--paper);
+}
+.spec {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 32px;
+}
+.spec p {
+  font-size: 0.92rem;
+  max-width: 82ch;
+}
+.spec strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.cap {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.cap a {
+  padding: 8px 0;
+}
+.studio .proof {
+  margin-top: 4px;
+}
+@media (max-width: 730px) {
+  .controls {
+    grid-template-columns: 1fr 1fr;
+  }
+  .devices {
+    grid-column: 1/-1;
+  }
+  .studio main {
+    padding: 12px;
+  }
+  .studiohead {
+    padding: 12px;
+  }
+  .spec {
+    grid-template-columns: 1fr;
+  }
+  .proof {
+    padding: 8px 0;
+  }
+  .studiohead span {
+    display: none;
+  }
+}

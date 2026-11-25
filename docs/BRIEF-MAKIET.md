@@ -4,6 +4,8 @@
 
 ## 1. Decyzja projektowa
 
+[Otwórz galerię makiet W01–W18](makiety/index.html) · [Instrukcja przekazania do implementacji](makiety/README.md)
+
 **Rozwijamy Recallio jako prywatny zeszyt do nauki z biblioteką własnych fiszek.** Po zalogowaniu użytkownik powinien rozpoznać swoje materiały, zobaczyć sensowny następny krok i móc wykonać go jednym przyciskiem. W czasie powtórki pierwszeństwo mają treść i przypomnienie sobie odpowiedzi. Można skończyć po jednej fiszce albo ćwiczyć dłużej.
 
 Zachowujemy kremowe tło, ciemną zieleń, szeryfowe nagłówki, tekstowe przyciski i drzeworyt na ekranach wejściowych. Największa zmiana dotyczy **hierarchii informacji**. Panel ma odpowiadać na pytanie „czego mogę się teraz uczyć?”, biblioteka na „gdzie jest mój materiał?”, trening na „co pamiętam?”. Każdy z tych ekranów wymaga innej gęstości, nawet jeśli używają wspólnej typografii.

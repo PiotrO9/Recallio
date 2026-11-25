@@ -270,3 +270,39 @@ textarea:focus-visible {
   border-radius: 4px;
   padding: 0.6rem 1rem;
 }
+
+.action-dialog {
+  max-width: min(30rem, calc(100vw - 2rem));
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--control-line);
+  border-top: 3px solid var(--rust);
+  padding: clamp(1.2rem, 3vw, 2rem);
+}
+.action-dialog::backdrop {
+  background: #26382f66;
+}
+.action-dialog .action-row {
+  margin-top: 1.2rem;
+}
+.item-count {
+  display: block;
+  color: var(--muted);
+  font:
+    500 0.85rem/1.5 "Manrope Variable",
+    sans-serif;
+}
+.field-note {
+  font-size: 0.87rem;
+  color: var(--muted);
+}
+
+.field-error {
+  display: block;
+  color: var(--rust);
+  font-weight: 600;
+}
+input[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  outline: 1px solid var(--rust);
+}

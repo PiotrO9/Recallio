@@ -69,3 +69,131 @@
     grid-template-columns: 1fr;
   }
 }
+
+.source {
+  display: grid;
+  gap: 1rem;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.source[hidden] {
+  display: none;
+}
+.source legend {
+  margin-bottom: 1rem;
+  font-weight: 650;
+}
+
+.choose {
+  max-width: 42rem;
+}
+.body > h1 {
+  margin-bottom: 0.7rem;
+}
+.body > section,
+.body > div:has(progress) {
+  max-width: 45rem;
+}
+.row {
+  padding: 1.25rem;
+  background: var(--surface);
+}
+.row label {
+  max-width: 40rem;
+}
+
+.row {
+  background: transparent;
+  padding: 0;
+}
+.record {
+  border: 0 !important;
+}
+.record summary {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.9fr) minmax(8rem, 1.3fr) minmax(
+      6rem,
+      auto
+    );
+  align-items: center;
+  gap: 1rem;
+}
+.record summary span,
+.record summary small {
+  font:
+    500 0.9rem/1.5 "Manrope Variable",
+    sans-serif;
+}
+.record summary small {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.record summary b {
+  font: 400 1.55rem/1.3 var(--display);
+}
+.record[open] {
+  background: var(--surface);
+  padding: 1rem;
+}
+.record label {
+  margin-top: 1rem;
+}
+.record summary::-webkit-details-marker {
+  display: none;
+}
+@media (max-width: 650px) {
+  .record summary {
+    grid-template-columns: 1fr;
+    gap: 0.3rem;
+    padding: 0.65rem 0;
+  }
+}
+
+.intro p {
+  margin-block: 0.75rem;
+}
+.body[data-layout="split"] > .body:has(progress),
+.body[data-layout="split"] > section {
+  padding: 1.5rem;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+@media (min-width: 761px) {
+  .body[data-layout="split"] {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.2fr);
+    column-gap: 8%;
+    align-items: start;
+  }
+  .body[data-layout="split"] > a,
+  .body[data-layout="split"] > .steps {
+    grid-column: 1/-1;
+  }
+  .body[data-layout="split"] > .intro {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .body[data-layout="split"] > form,
+  .body[data-layout="split"] > section,
+  .body[data-layout="split"] > div:not(.intro) {
+    grid-column: 2;
+    grid-row: 3;
+  }
+  .choose {
+    border-top: 3px double var(--control-line);
+    padding-top: 1.25rem;
+  }
+}
+
+.targets label:has(input[type="radio"]) {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 44px;
+}
+.targets label input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  accent-color: var(--ink);
+}

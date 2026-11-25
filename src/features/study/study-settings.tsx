@@ -1,5 +1,6 @@
 "use client";
 
+import { ValidatedField } from "@/components/validated-field";
 import { useState, type FormEvent } from "react";
 import { settingsSchema, type Settings } from "@/contracts";
 import { DEFAULT_NEW_LIMIT } from "@/domain/learning/queue";
@@ -12,6 +13,7 @@ export function StudySettings({
   settings: Settings | null;
   save: (next: Settings) => Promise<void>;
 }) {
+  const [limit, setLimit] = useState<string>();
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<"saved" | "failed" | null>(null);
 
@@ -42,9 +44,10 @@ export function StudySettings({
     <details>
       <summary>Ustawienia nauki</summary>
       <form className="auth-form" onSubmit={(event) => void submit(event)}>
-        <p>Strefa nauki: {STUDY_TIMEZONE}</p>
-        <label>
-          Dzienny limit nowych fiszek
+        <ValidatedField
+          label="Dzienny limit nowych fiszek"
+          hint="Podaj liczbę całkowitą od 0 do 10000."
+        >
           <input
             name="newLimit"
             type="number"
@@ -53,8 +56,9 @@ export function StudySettings({
             step={1}
             required
             defaultValue={settings?.newLimit ?? DEFAULT_NEW_LIMIT}
+            onChange={(e) => setLimit(e.target.value)}
           />
-        </label>
+        </ValidatedField>
         <label>
           <input
             name="showDue"
@@ -71,6 +75,15 @@ export function StudySettings({
           />{" "}
           Pokaż liczbę odpowiedzi w sesji
         </label>
+        {(limit ?? String(settings?.newLimit ?? DEFAULT_NEW_LIMIT)) === "0" && (
+          <p>
+            Nowe fiszki są wyłączone. Zaplanowane powtórki pozostają dostępne.
+          </p>
+        )}
+        <div className="section-rule">
+          <p>Strefa nauki: {STUDY_TIMEZONE}</p>
+          <small>Nowy dzień zaczyna się o północy czasu warszawskiego.</small>
+        </div>
         <button className="primary" disabled={saving}>
           Zapisz ustawienia
         </button>

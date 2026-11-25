@@ -3,7 +3,7 @@ import { StudySession } from "@/features/study/study-session";
 
 export default function OfflineStudyPage() {
   return (
-    <AuthFrame title="Nauka" variant="study">
+    <AuthFrame variant="study">
       <StudySession />
     </AuthFrame>
   );

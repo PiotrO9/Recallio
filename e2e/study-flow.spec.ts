@@ -184,14 +184,14 @@ test("a review survives an offline reload and synchronizes once to a second devi
       page.getByRole("button", { name: "Ponów zapis" }),
     ).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(page.getByText("Zapisany postęp: 1")).toBeVisible();
+    await expect(page.getByText("Zapisany postęp: 1")).toBeAttached();
     const attempts = await page.evaluate(
       () => Reflect.get(window, "recallioTestAttempts") as string[],
     );
     expect(attempts).toHaveLength(2);
     expect(attempts[0]).toBe(attempts[1]);
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.getByText("Zapisany postęp: 1")).toBeVisible();
+    await expect(page.getByText("Zapisany postęp: 1")).toBeAttached();
     await expect(page.getByRole("heading", { name: "pies" })).toBeVisible();
 
     const pushRoute = "**/api/v1/sync/push";
@@ -209,7 +209,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
     ).toBeVisible();
     await primary.setOffline(true);
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.getByText("Zapisany postęp: 1")).toBeVisible();
+    await expect(page.getByText("Zapisany postęp: 1")).toBeAttached();
     await page.goto(`/study?deck=${randomUUID()}`);
     await expect(
       page.getByText(
@@ -234,7 +234,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
     const secondary = await device(owner);
     const secondPage = await secondary.newPage();
     await secondPage.goto("/study");
-    await expect(secondPage.getByText("Zapisany postęp: 1")).toBeVisible();
+    await expect(secondPage.getByText("Zapisany postęp: 1")).toBeAttached();
     await secondPage.getByRole("button", { name: "Zakończ sesję" }).click();
     await expect(secondPage.getByText("Sesja zakończona.")).toBeVisible();
     await secondPage
@@ -306,7 +306,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
     await otherPage.getByLabel("Strona B").fill("rachunek");
     await otherPage.getByRole("button", { name: "Zapisz fiszkę" }).click();
     await expect(
-      otherPage.getByText("rachunek", { exact: true }),
+      otherPage.getByRole("link", { name: "Ucz się z tego zestawu" }),
     ).toBeVisible();
     await otherPage.goto("/");
     await expect(
@@ -318,13 +318,13 @@ test("a review survives an offline reload and synchronizes once to a second devi
     ).toBeVisible();
     await page.goto("/decks");
     await expect(
-      page.getByRole("button", { name: "Nauka Otwórz" }),
+      page.getByRole("button", { name: /^Nauka Fiszki: 1 Otwórz$/ }),
     ).toBeVisible();
     await expectAccessible(page);
     const search = page.getByRole("searchbox", { name: "Wyszukaj zestaw" });
     await search.fill("brak dopasowania");
     await expect(
-      page.getByRole("button", { name: "Nauka Otwórz", exact: true }),
+      page.getByRole("button", { name: /^Nauka Fiszki: 1 Otwórz$/ }),
     ).toHaveCount(0);
     await search.clear();
     await page.getByRole("button", { name: "Dodaj zestaw" }).click();
@@ -334,11 +334,13 @@ test("a review survives an offline reload and synchronizes once to a second devi
       page.getByRole("button", { name: "Niewysłany szkic" }),
     ).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Nauka Otwórz" }).click();
+    await page
+      .getByRole("button", { name: /^Nauka Fiszki: 1 Otwórz$/ })
+      .click();
     await page.getByText("Zarządzaj zestawem", { exact: true }).click();
     await page.getByRole("button", { name: "Edytuj zestaw" }).click();
     await page.getByLabel("Nazwa zestawu").fill("Zaktualizowany zestaw");
-    await page.getByLabel("Kierunek zestawu").selectOption("mixed");
+    await page.getByRole("radio", { name: "Mieszany" }).check();
     await page.getByRole("button", { name: "Zapisz zestaw" }).click();
     await expect(
       page.getByRole("heading", { name: "Zaktualizowany zestaw" }),
@@ -347,6 +349,8 @@ test("a review survives an offline reload and synchronizes once to a second devi
     await page.getByLabel("Strona B").fill("dog (noun)");
     await page.getByRole("button", { name: "Zapisz fiszkę" }).click();
     await expect(page.getByText("dog (noun)", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Edytuj fiszkę" }).click();
+    await page.getByText("Postęp i usuwanie", { exact: true }).click();
     await expect(
       page.getByRole("button", { name: "Zresetuj A → B" }),
     ).toBeVisible();
@@ -367,8 +371,11 @@ test("a review survives an offline reload and synchronizes once to a second devi
       ),
     ).toHaveLength(1);
 
-    page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "Zresetuj A → B" }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Zresetuj A → B" })
+      .click();
     await expect
       .poll(
         async () =>
@@ -377,8 +384,11 @@ test("a review survives an offline reload and synchronizes once to a second devi
           )?.payload.epoch,
       )
       .toBe("1");
-    page.once("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "Usuń fiszkę" }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Usuń fiszkę" })
+      .click();
     await expect(page.getByText("W zestawie nie ma fiszek.")).toBeVisible();
     await expect
       .poll(async () =>
@@ -433,6 +443,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
         "utf8",
       ),
     });
+    await page.getByRole("button", { name: "Pokaż podgląd" }).click();
     await expect(page.getByText("Wiersz 3 · Duplikat")).toBeVisible();
     await expectAccessible(page);
     await page.getByLabel("Pomiń duplikaty").check();
@@ -445,7 +456,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
     ).toBeVisible();
     await page.getByRole("link", { name: "Wróć do zestawów" }).click();
     await page
-      .getByRole("button", { name: "Z pliku CSV Otwórz", exact: true })
+      .getByRole("button", { name: /^Z pliku CSV Fiszki: 2 Otwórz$/ })
       .click();
     await page.getByText("Zarządzaj zestawem", { exact: true }).click();
     const downloaded = page.waitForEvent("download");

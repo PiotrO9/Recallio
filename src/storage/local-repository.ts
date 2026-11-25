@@ -166,6 +166,7 @@ export function createLocalRepository(
     readImportStep(id: string, index: number): Promise<ImportStep>;
     forgetImport(id: string): Promise<void>;
     applyPullPage(expected: string, page: PullResponse): Promise<boolean>;
+    countUnsent(): Promise<number>;
     clearForLogout(discardPending: boolean): Promise<number>;
     discardBlocked(operationId: string): Promise<void>;
     readContent(
@@ -1196,6 +1197,12 @@ export function createLocalRepository(
         await tx.done.catch(() => {});
         throw error;
       }
+    },
+    async countUnsent() {
+      const db = await connect();
+      return (await db.getAll("outbox")).filter(
+        (item) => item.state !== "acknowledged",
+      ).length;
     },
     async clearForLogout(discardPending) {
       const db = await connect();

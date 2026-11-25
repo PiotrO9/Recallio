@@ -45,7 +45,10 @@ self.addEventListener("message", (event) => {
     event.waitUntil(
       prepare().then(
         () => event.ports[0].postMessage("study-ready"),
-        () => event.ports[0].postMessage("unavailable"),
+        (error) =>
+          event.ports[0].postMessage(
+            error?.name === "QuotaExceededError" ? "quota" : "unavailable",
+          ),
       ),
     );
   }

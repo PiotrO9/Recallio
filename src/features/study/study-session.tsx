@@ -33,6 +33,7 @@ import {
   registerStudyWorker,
   savedOfflineAccount,
 } from "./offline";
+import { ConfirmAction } from "@/components/confirm-action";
 import { StudySettings } from "./study-settings";
 import styles from "./study.module.css";
 
@@ -277,7 +278,7 @@ function StudyBoard({
     try {
       const status = await sync.run(true);
       setSyncState(status);
-      if (status !== "idle" || !(await prepareStudyShell()))
+      if (status !== "idle" || (await prepareStudyShell()) !== "ready")
         throw new Error("Offline preparation failed");
       await repository.markOfflineDeck(id);
       await refresh(false);
@@ -444,11 +445,6 @@ function StudyBoard({
 
   function endSession() {
     if (saving.current) return;
-    if (
-      saveError &&
-      !window.confirm("Ocena nie została zapisana. Zakończyć sesję?")
-    )
-      return;
     endedRef.current = true;
     active.current = null;
     previousCard.current = null;
@@ -525,25 +521,58 @@ function StudyBoard({
       );
     }).length;
   }
+  const offlineUnavailable = !!(
+    offlineShell &&
+    workspace &&
+    !selectDeck(workspace)
+  );
+  const hasMaterial = workspace?.cards.some(
+    (c) => !c.deletedAt && (!deckId || c.deckId === deckId),
+  );
+  if (ended)
+    return (
+      <section className={styles.finished}>
+        {currentDeck && (
+          <a href={`/decks?deck=${currentDeck.id}`}>Wróć do zestawu</a>
+        )}
+        <h1>Sesja zakończona.</h1>
+        {currentDeck && <p>{currentDeck.name}</p>}
+        <div className="section-rule">
+          <h2>Możesz tu wrócić w każdej chwili.</h2>
+          {settings?.showSession && <p>Odpowiedzi w sesji: {sessionCount}</p>}
+          <div className="action-row">
+            <button ref={restartButton} className="primary" onClick={restart}>
+              Rozpocznij nową sesję
+            </button>
+            <a href="/decks">Moje zestawy</a>
+          </div>
+        </div>
+      </section>
+    );
   return (
     <div className={styles.board}>
       {currentDeck && (
         <div className="section-heading">
           <a href={`/decks?deck=${currentDeck.id}`}>{currentDeck.name}</a>
           <span>
-            {offlineShell || syncState === "offline" ? "Offline" : "Trening"}
+            {offlineShell || syncState === "offline"
+              ? "Offline"
+              : candidate?.mode === "practice"
+                ? "Ćwiczenie dodatkowe"
+                : "Trening"}
           </span>
         </div>
       )}
       <div role="status">
-        {status && <p>{status}</p>}
-        {workspace?.progress.length ? (
-          <p>Zapisany postęp: {workspace.progress.length}</p>
-        ) : null}
+        {status && (
+          <p>
+            {syncState === "offline" && sessionCount > 0
+              ? "Oceny zapisane na tym urządzeniu. Synchronizacja wznowi się po połączeniu."
+              : status}
+          </p>
+        )}
+        {busy && <p>Zapisywanie oceny na urządzeniu…</p>}
       </div>
-      {offlineShell && workspace && !selectDeck(workspace) && (
-        <p>Ten zestaw wymaga przygotowania z dostępem do internetu.</p>
-      )}
       {settings?.showDue && dueToday !== null && (
         <p>Powtórki na dziś: {dueToday}</p>
       )}
@@ -553,47 +582,45 @@ function StudyBoard({
         candidate?.mode === "practice" && (
           <p>Dzisiejsze powtórki zrobione. Możesz ćwiczyć dalej.</p>
         )}
-      {settings?.showSession && <p>Odpowiedzi w sesji: {sessionCount}</p>}
-      {ended ? (
-        <div className={styles.card}>
-          <h2>Sesja zakończona.</h2>
-          <button ref={restartButton} className="primary" onClick={restart}>
-            Rozpocznij nową sesję
-          </button>
-        </div>
-      ) : candidate ? (
-        <div className={styles.card}>
-          <small>
-            {candidate.direction === "a-b" ? "Strona A" : "Strona B"}
-          </small>
-          <h2>
-            {candidate.direction === "a-b"
-              ? candidate.card.sideA
-              : candidate.card.sideB}
-          </h2>
-          <div className={styles.answer} aria-live="polite">
-            {revealed && (
-              <>
-                <small>
-                  {candidate.direction === "a-b" ? "Strona B" : "Strona A"}
-                </small>
-                <p className={styles.translation}>
-                  {candidate.direction === "a-b"
-                    ? candidate.card.sideB
-                    : candidate.card.sideA}
-                </p>
-                {(candidate.direction === "a-b"
-                  ? candidate.card.exampleB
-                  : candidate.card.exampleA) && (
-                  <p>
+      {!ended && settings?.showSession && (
+        <p>Odpowiedzi w sesji: {sessionCount}</p>
+      )}
+      {candidate ? (
+        <>
+          <div className={styles.card}>
+            <small>
+              {candidate.direction === "a-b" ? "Strona A" : "Strona B"}
+            </small>
+            <h1>
+              {candidate.direction === "a-b"
+                ? candidate.card.sideA
+                : candidate.card.sideB}
+            </h1>
+            <div className={styles.answer} aria-live="polite">
+              {revealed && (
+                <>
+                  <small>
+                    {candidate.direction === "a-b" ? "Strona B" : "Strona A"}
+                  </small>
+                  <p className={styles.translation}>
                     {candidate.direction === "a-b"
-                      ? candidate.card.exampleB
-                      : candidate.card.exampleA}
+                      ? candidate.card.sideB
+                      : candidate.card.sideA}
                   </p>
-                )}
-              </>
-            )}
+                  {(candidate.direction === "a-b"
+                    ? candidate.card.exampleB
+                    : candidate.card.exampleA) && (
+                    <p>
+                      {candidate.direction === "a-b"
+                        ? candidate.card.exampleB
+                        : candidate.card.exampleA}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
           </div>
+          {revealed && !saveError && <p>Jak dobrze pamiętasz odpowiedź?</p>}
           {revealed ? (
             <>
               {saveError ? (
@@ -658,31 +685,61 @@ function StudyBoard({
               Pokaż odpowiedź
             </button>
           )}
-        </div>
+        </>
       ) : (
-        <p>
-          {workspace
-            ? workspace.cards.length
-              ? "W tym zestawie nie ma teraz fiszek w ramach limitu."
-              : "Nie ma dostępnych fiszek do nauki."
-            : "Wczytywanie fiszek…"}
-        </p>
+        <section className={styles.card}>
+          <h1>
+            {!workspace
+              ? "Wczytywanie fiszek…"
+              : offlineUnavailable
+                ? "Zestaw niedostępny offline"
+                : hasMaterial
+                  ? "Limit nowych fiszek"
+                  : "Brak fiszek"}
+          </h1>
+          <p>
+            {workspace
+              ? offlineUnavailable
+                ? "Ten zestaw wymaga przygotowania z dostępem do internetu."
+                : hasMaterial
+                  ? "W tym zestawie nie ma teraz fiszek w ramach limitu."
+                  : "Nie ma dostępnych fiszek do nauki."
+              : "Odczytujemy materiał z urządzenia."}
+          </p>
+          {workspace && !candidate && (
+            <a href={currentDeck ? `/decks?deck=${currentDeck.id}` : "/decks"}>
+              {currentDeck ? "Wróć do zestawu" : "Wróć do zestawów"}
+            </a>
+          )}
+        </section>
       )}
-      {!ended &&
+      {!offlineUnavailable &&
         workspace?.cards.some(
           (card) => !card.deletedAt && (!deckId || card.deckId === deckId),
         ) && (
           <div className={styles.tools}>
-            <button className="auth-secondary" disabled={busy} onClick={addNew}>
-              Dodaj jeszcze jedną nową fiszkę
-            </button>
-            <button
-              className="auth-secondary"
-              disabled={busy}
-              onClick={endSession}
-            >
-              Zakończ sesję
-            </button>
+            {!candidate && (
+              <button className="primary" disabled={busy} onClick={addNew}>
+                Dodaj jeszcze jedną nową fiszkę
+              </button>
+            )}
+            {saveError ? (
+              <ConfirmAction
+                label="Zakończ sesję"
+                title="Zakończyć bez zapisu oceny?"
+                description="Ta odpowiedź nie zostanie uwzględniona w postępie."
+                confirm="Zakończ bez zapisu"
+                onConfirm={endSession}
+              />
+            ) : (
+              <button
+                className="auth-secondary"
+                disabled={busy}
+                onClick={endSession}
+              >
+                Zakończ sesję
+              </button>
+            )}
           </div>
         )}
       {workspace && (
@@ -705,6 +762,12 @@ function StudyBoard({
             </button>
           )
         ))}
+      {workspace && workspace.progress.length > 0 && (
+        <details>
+          <summary>Zapis na urządzeniu</summary>
+          <p>Zapisany postęp: {workspace.progress.length}</p>
+        </details>
+      )}
       {offlineError && (
         <p role="alert">
           Nie udało się przygotować zestawu offline. Sprawdź połączenie i wolne

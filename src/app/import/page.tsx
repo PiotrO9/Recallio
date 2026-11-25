@@ -12,7 +12,7 @@ export default async function ImportPage({
   if (!account) redirect("/auth/login?status=session");
   const { deck } = await searchParams;
   return (
-    <AuthFrame title="Importuj fiszki">
+    <AuthFrame variant="catalog">
       <CsvImport userId={account.id} initialDeck={deck} />
     </AuthFrame>
   );

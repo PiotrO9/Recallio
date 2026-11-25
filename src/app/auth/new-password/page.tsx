@@ -1,4 +1,5 @@
-import { redirect } from "next/navigation";
+import { ValidatedField } from "@/components/validated-field";
+import Link from "next/link";
 import { AuthFrame } from "@/features/auth/auth-frame";
 import { serverAuth, verifiedIdentity } from "@/server/auth/client";
 
@@ -8,7 +9,14 @@ export default async function NewPasswordPage({
   searchParams: Promise<{ status?: string }>;
 }) {
   if (!(await verifiedIdentity(await serverAuth())))
-    redirect("/auth/login?status=session");
+    return (
+      <AuthFrame title="Ustaw nowe hasło" variant="auth">
+        <p role="alert">Sesja zmiany hasła wygasła. Poproś o nową wiadomość.</p>
+        <Link className="primary" href="/auth/forgot-password">
+          Wyślij nowy link
+        </Link>
+      </AuthFrame>
+    );
   const { status } = await searchParams;
   return (
     <AuthFrame title="Ustaw nowe hasło" variant="auth">
@@ -17,8 +25,7 @@ export default async function NewPasswordPage({
       )}
       <form className="auth-form" action="/auth/actions" method="post">
         <input type="hidden" name="intent" value="update-password" />
-        <label>
-          Nowe hasło
+        <ValidatedField label="Nowe hasło" hint="Użyj co najmniej 8 znaków.">
           <input
             name="password"
             type="password"
@@ -27,7 +34,7 @@ export default async function NewPasswordPage({
             maxLength={128}
             required
           />
-        </label>
+        </ValidatedField>
         <button className="primary">Zapisz hasło</button>
       </form>
     </AuthFrame>

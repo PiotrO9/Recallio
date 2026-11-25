@@ -29,3 +29,20 @@
     display: none;
   }
 }
+
+@media (max-width: 650px) {
+  .spread[data-empty="true"] {
+    display: contents;
+  }
+  .spread[data-empty="true"] .intro {
+    padding-block: 2rem;
+  }
+  .spread[data-empty="true"] figure {
+    order: 2;
+    margin-block: 1.5rem;
+  }
+  main:has(> .spread[data-empty="true"]) {
+    display: flex;
+    flex-direction: column;
+  }
+}

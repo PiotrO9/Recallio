@@ -155,6 +155,10 @@ export function Dashboard({ userId }: { userId: string }) {
     };
   }, [userId]);
   const decks = data?.decks.filter((d) => !d.deletedAt);
+  const counts = new Map<string, number>();
+  for (const card of data?.cards ?? [])
+    if (!card.deletedAt)
+      counts.set(card.deckId, (counts.get(card.deckId) ?? 0) + 1);
   const item =
     data && (!issue || decks?.length)
       ? recommend(data, new Date().toISOString())
@@ -203,7 +207,12 @@ export function Dashboard({ userId }: { userId: string }) {
         </div>
         {decks?.map((d) => (
           <Link key={d.id} className="catalog-row" href={"/decks?deck=" + d.id}>
-            <span>{d.name}</span>
+            <span>
+              {d.name}
+              <span className="item-count">
+                Fiszki: {counts.get(d.id) ?? 0}
+              </span>
+            </span>
             <small>Otwórz</small>
           </Link>
         ))}

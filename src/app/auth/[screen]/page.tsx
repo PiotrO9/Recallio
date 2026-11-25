@@ -1,3 +1,4 @@
+import { ValidatedField } from "@/components/validated-field";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AuthFrame } from "@/features/auth/auth-frame";
@@ -30,6 +31,13 @@ export default async function AuthPage({
     reset: "Odzyskaj hasło",
   }[intent];
 
+  if (status === "sent" && intent !== "login")
+    return (
+      <AuthFrame title="Sprawdź pocztę" variant="auth">
+        <p role="status">{statusMessages.sent}</p>
+        <Link href="/auth/login">Wróć do logowania</Link>
+      </AuthFrame>
+    );
   return (
     <AuthFrame title={title} variant="auth">
       {status && Object.hasOwn(statusMessages, status) && (
@@ -37,10 +45,10 @@ export default async function AuthPage({
           {statusMessages[status]}
         </p>
       )}
+      {intent === "reset" && <p>Podaj adres e-mail używany do logowania.</p>}
       <form className="auth-form" method="post" action="/auth/actions">
         <input type="hidden" name="intent" value={intent} />
-        <label>
-          Adres e-mail
+        <ValidatedField label="Adres e-mail" hint="Podaj pełny adres e-mail.">
           <input
             type="email"
             name="email"
@@ -49,10 +57,12 @@ export default async function AuthPage({
             maxLength={254}
             required
           />
-        </label>
+        </ValidatedField>
         {intent !== "reset" && (
-          <label>
-            Hasło
+          <ValidatedField
+            label="Hasło"
+            hint="Wpisz hasło o długości co najmniej 8 znaków."
+          >
             <input
               type="password"
               name="password"
@@ -63,7 +73,7 @@ export default async function AuthPage({
               maxLength={128}
               required
             />
-          </label>
+          </ValidatedField>
         )}
         <button className="primary">
           {intent === "reset" ? "Wyślij link" : title}

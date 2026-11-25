@@ -21,26 +21,35 @@ export async function registerStudyWorker() {
   );
 }
 
-export async function prepareStudyShell(): Promise<boolean> {
+export async function prepareStudyShell(): Promise<
+  "ready" | "quota" | "unavailable"
+> {
   try {
     const registration = await registerStudyWorker();
-    if (!registration) return false;
+    if (!registration) return "unavailable";
     const worker =
       registration.active ?? registration.installing ?? registration.waiting;
-    if (!worker) return false;
+    if (!worker) return "unavailable";
     const channel = new MessageChannel();
-    return await new Promise<boolean>((resolve) => {
-      const finish = (ready: boolean) => {
+    return await new Promise<"ready" | "quota" | "unavailable">((resolve) => {
+      const finish = (ready: "ready" | "quota" | "unavailable") => {
         clearTimeout(timer);
         channel.port1.close();
         resolve(ready);
       };
-      const timer = setTimeout(() => finish(false), 15000);
-      channel.port1.onmessage = ({ data }) => finish(data === "study-ready");
+      const timer = setTimeout(() => finish("unavailable"), 15000);
+      channel.port1.onmessage = ({ data }) =>
+        finish(
+          data === "study-ready"
+            ? "ready"
+            : data === "quota"
+              ? "quota"
+              : "unavailable",
+        );
       worker.postMessage("prepare-study", [channel.port2]);
     });
   } catch {
-    return false;
+    return "unavailable";
   }
 }
 

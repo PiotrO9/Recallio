@@ -200,3 +200,26 @@
     font-size: clamp(2.6rem, 11vw, 3.25rem);
   }
 }
+
+.catalog .content,
+.study .content {
+  border-top: 0;
+  padding-top: 0;
+}
+.study .panel .content h1 {
+  font-size: clamp(2.1rem, 4.2vw, 3.5rem);
+  line-height: 1.08;
+  margin: 0;
+}
+.catalog .panel .content h1 {
+  font-size: clamp(2.55rem, 5.6vw, 5rem);
+}
+.entry .primary {
+  width: 100%;
+}
+.entry a.primary {
+  text-align: center;
+}
+.entry:has(a.primary:only-of-type) .content > a.primary {
+  width: fit-content;
+}

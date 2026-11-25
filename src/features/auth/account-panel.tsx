@@ -4,6 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { createLocalRepository } from "@/storage/local-repository";
 import { createSyncController } from "@/sync/controller";
 
+function accountRepository(accountId: string) {
+  return createLocalRepository({
+    userId: accountId,
+    now: () => new Date(),
+    introduction: () => {
+      throw new Error("Wylogowanie nie wprowadza fiszek");
+    },
+  });
+}
 export function AccountPanel({ accountId }: { accountId: string }) {
   const [pending, setPending] = useState<number | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -12,20 +21,35 @@ export function AccountPanel({ accountId }: { accountId: string }) {
   const [ready, setReady] = useState(false);
   const signingOut = useRef(false);
 
-  useEffect(() => setReady(true), []);
+  const [unsent, setUnsent] = useState<number>();
+  useEffect(() => {
+    let active = true;
+    const repo = accountRepository(accountId);
+    const refresh = () =>
+      void repo
+        .countUnsent()
+        .then((n) => {
+          if (active) setUnsent(n);
+        })
+        .catch(() => {
+          if (active) setUnsent(undefined);
+        });
+    setReady(true);
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", refresh);
+      repo.close();
+    };
+  }, [accountId]);
 
   async function logout(mode: "check" | "discard" | "sync" = "check") {
     if (signingOut.current) return;
     signingOut.current = true;
     setBusy(true);
     setError(false);
-    const repository = createLocalRepository({
-      userId: accountId,
-      now: () => new Date(),
-      introduction: () => {
-        throw new Error("Wylogowanie nie wprowadza fiszek");
-      },
-    });
+    const repository = accountRepository(accountId);
     try {
       if (mode === "sync") {
         const sync = createSyncController({
@@ -60,6 +84,15 @@ export function AccountPanel({ accountId }: { accountId: string }) {
 
   return (
     <div className="auth-form">
+      {pending === null && unsent !== undefined && (
+        <p>
+          <strong>Synchronizacja</strong>
+          <br />
+          {unsent
+            ? `Niewysłane zmiany na urządzeniu: ${unsent}`
+            : "Wszystkie lokalne zmiany wysłane"}
+        </p>
+      )}
       {error && (
         <p role="alert">
           Nie udało się zakończyć wylogowania. Sprawdź połączenie i spróbuj
@@ -110,7 +143,9 @@ export function AccountPanel({ accountId }: { accountId: string }) {
             disabled={busy}
             onClick={() => void logout("sync")}
           >
-            Synchronizuj i wyloguj się
+            {error
+              ? "Ponów synchronizację i wyloguj się"
+              : "Synchronizuj i wyloguj się"}
           </button>
           <button
             className="auth-secondary"

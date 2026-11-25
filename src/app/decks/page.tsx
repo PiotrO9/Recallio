@@ -12,7 +12,7 @@ export default async function DecksPage({
   if (!account) redirect("/auth/login?status=session");
   const params = await searchParams;
   return (
-    <AuthFrame title="Moje zestawy" variant="catalog">
+    <AuthFrame variant="catalog">
       <DeckManager
         key={JSON.stringify([account.id, params])}
         userId={account.id}

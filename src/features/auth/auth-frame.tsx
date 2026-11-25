@@ -8,14 +8,14 @@ export function AuthFrame({
   children,
   variant = "workspace",
 }: {
-  title: string;
+  title?: string;
   children: ReactNode;
   variant?: "workspace" | "auth" | "catalog" | "study";
 }) {
   return (
     <PageShell publicEntry={variant === "auth"} className={styles[variant]}>
       <div className={styles.panel}>
-        <h1>{title}</h1>
+        {title && <h1>{title}</h1>}
         <div className={styles.content}>{children}</div>
       </div>
       {variant === "auth" && <EjiriPrint />}

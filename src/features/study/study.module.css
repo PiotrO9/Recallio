@@ -72,3 +72,20 @@
     grid-template-columns: repeat(4, 1fr);
   }
 }
+
+.finished {
+  padding-top: 1rem;
+}
+.finished h1 {
+  margin-top: 1rem;
+}
+.finished .action-row {
+  margin-top: 1.5rem;
+}
+.card h1 {
+  margin: 0;
+  font: 400 clamp(2.1rem, 4.2vw, 3.5rem)/1.12 var(--display);
+}
+.board .grades button {
+  min-height: 48px;
+}

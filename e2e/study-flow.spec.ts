@@ -138,7 +138,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
       .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller))
       .toBe(true);
     const cachedPaths = await page.evaluate(async () => {
-      const cache = await caches.open("recallio-study-shell-v6");
+      const cache = await caches.open("recallio-study-shell-v7");
       return (await cache.keys()).map((entry) => new URL(entry.url).pathname);
     });
     expect(cachedPaths).toContain("/study/offline");
@@ -176,7 +176,49 @@ test("a review survives an offline reload and synchronizes once to a second devi
         return request;
       };
     });
-    await page.keyboard.press("3");
+    // Hold a competing write transaction until the pending grade is visible.
+    await page.evaluate(
+      (userId) =>
+        new Promise<void>((resolve, reject) => {
+          const open = indexedDB.open("recallio-user-" + userId);
+          open.onerror = () => reject(open.error);
+          open.onsuccess = () => {
+            const db = open.result;
+            const transaction = db.transaction("progress", "readwrite");
+            const store = transaction.objectStore("progress");
+            let hold = true;
+            window.addEventListener(
+              "release-progress-store",
+              () => {
+                hold = false;
+              },
+              { once: true },
+            );
+            function keepOpen() {
+              store.count().onsuccess = () => {
+                resolve();
+                if (hold) keepOpen();
+              };
+            }
+            transaction.oncomplete = () => db.close();
+            keepOpen();
+          };
+        }),
+      owner.id,
+    );
+    try {
+      await page.keyboard.press("3");
+      const grades = page.getByRole("group", { name: "Ocena odpowiedzi" });
+      await expect(
+        grades.getByRole("button", { name: "Dobrze" }),
+      ).toHaveAttribute("aria-busy", "true");
+      await expect(grades.locator('button[aria-busy="true"]')).toHaveCount(1);
+      await expect(grades.locator("button:disabled")).toHaveCount(4);
+    } finally {
+      await page.evaluate(() =>
+        window.dispatchEvent(new Event("release-progress-store")),
+      );
+    }
     await expect(
       page.getByText("Nie udało się zapisać oceny.", { exact: true }),
     ).toBeVisible();

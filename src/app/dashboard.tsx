@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { ActionLink } from "@/components/action-link";
 import { useEffect, useRef, useState } from "react";
 import { NotebookSheet, deckColor } from "@/components/notebook";
 import {
@@ -202,9 +203,9 @@ export function Dashboard({ userId }: { userId: string }) {
                 {item.name}
               </h2>
               <div className="action-row">
-                <Link className="primary" href={item.href}>
+                <ActionLink className="primary" href={item.href}>
                   {item.action}
-                </Link>
+                </ActionLink>
               </div>
             </NotebookSheet>
             {issue && (
@@ -221,11 +222,12 @@ export function Dashboard({ userId }: { userId: string }) {
                 ref={retryButton}
                 className="primary"
                 aria-disabled={refreshing}
+                aria-busy={refreshing || undefined}
                 onClick={() => refreshRef.current?.()}
               >
                 {refreshing ? "Ponawianie…" : "Spróbuj ponownie"}
               </button>
-              <Link href="/decks">Otwórz bibliotekę</Link>
+              <ActionLink href="/decks">Otwórz bibliotekę</ActionLink>
             </div>
           </section>
         ) : data ? (
@@ -238,10 +240,10 @@ export function Dashboard({ userId }: { userId: string }) {
             </div>
             <p>Dodaj fiszki z tym, czego chcesz się nauczyć.</p>
             <div className="action-row">
-              <Link className="primary" href="/decks?new=1">
+              <ActionLink className="primary" href="/decks?new=1">
                 Utwórz zestaw
-              </Link>
-              <Link href="/import">Importuj CSV</Link>
+              </ActionLink>
+              <ActionLink href="/import">Importuj CSV</ActionLink>
             </div>
           </section>
         ) : (

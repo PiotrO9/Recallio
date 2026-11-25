@@ -2,6 +2,7 @@ import { ValidatedField } from "@/components/validated-field";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AuthFrame } from "@/features/auth/auth-frame";
+import { AuthActionForm } from "@/features/auth/auth-action-form";
 
 const statusMessages: Record<string, string> = {
   credentials: "Sprawdź adres e-mail, hasło i potwierdzenie konta.",
@@ -46,7 +47,16 @@ export default async function AuthPage({
         </p>
       )}
       {intent === "reset" && <p>Podaj adres e-mail używany do logowania.</p>}
-      <form className="auth-form" method="post" action="/auth/actions">
+      <AuthActionForm
+        label={intent === "reset" ? "Wyślij link" : title}
+        loadingLabel={
+          {
+            login: "Logowanie…",
+            signup: "Tworzenie konta…",
+            reset: "Wysyłanie linku…",
+          }[intent]
+        }
+      >
         <input type="hidden" name="intent" value={intent} />
         <ValidatedField label="Adres e-mail" hint="Podaj pełny adres e-mail.">
           <input
@@ -75,10 +85,7 @@ export default async function AuthPage({
             />
           </ValidatedField>
         )}
-        <button className="primary">
-          {intent === "reset" ? "Wyślij link" : title}
-        </button>
-      </form>
+      </AuthActionForm>
       <nav aria-label="Opcje konta">
         {intent !== "login" && <Link href="/auth/login">Zaloguj się</Link>}
         {intent !== "signup" && <Link href="/auth/signup">Utwórz konto</Link>}

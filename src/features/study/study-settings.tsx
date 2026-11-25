@@ -2,7 +2,8 @@
 
 import styles from "./study.module.css";
 import { ValidatedField } from "@/components/validated-field";
-import { useState, type FormEvent } from "react";
+import { LoadingButton } from "@/components/loading-button";
+import { useRef, useState, type FormEvent } from "react";
 import { settingsSchema, type Settings } from "@/contracts";
 import { DEFAULT_NEW_LIMIT } from "@/domain/learning/queue";
 import { STUDY_TIMEZONE } from "@/domain/learning/study-time";
@@ -16,12 +17,14 @@ export function StudySettings({
 }) {
   const [limit, setLimit] = useState<string>();
   const [saving, setSaving] = useState(false);
+  const inFlight = useRef(false);
   const [result, setResult] = useState<"saved" | "failed" | null>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving) return;
+    if (inFlight.current) return;
     const fields = new FormData(event.currentTarget);
+    inFlight.current = true;
     setSaving(true);
     setResult(null);
     try {
@@ -37,6 +40,7 @@ export function StudySettings({
     } catch {
       setResult("failed");
     } finally {
+      inFlight.current = false;
       setSaving(false);
     }
   }
@@ -52,6 +56,7 @@ export function StudySettings({
       >
         <input
           name="newLimit"
+          readOnly={saving}
           type="number"
           min={0}
           max={10000}
@@ -61,7 +66,7 @@ export function StudySettings({
           onChange={(e) => setLimit(e.target.value)}
         />
       </ValidatedField>
-      <fieldset>
+      <fieldset disabled={saving}>
         <legend>Liczniki w treningu</legend>
         <label>
           <input
@@ -89,9 +94,13 @@ export function StudySettings({
         <p>Strefa nauki: {STUDY_TIMEZONE}</p>
         <small>Nowy dzień zaczyna się o północy czasu warszawskiego.</small>
       </div>
-      <button className="primary" disabled={saving}>
+      <LoadingButton
+        className="primary"
+        loading={saving}
+        loadingLabel="Zapisywanie ustawień…"
+      >
         Zapisz ustawienia
-      </button>
+      </LoadingButton>
       {result === "saved" && <p role="status">Ustawienia zapisane.</p>}
       {result === "failed" && (
         <p role="alert">Sprawdź limit, potem spróbuj zapisać ponownie.</p>

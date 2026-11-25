@@ -1,11 +1,14 @@
 "use client";
 import { useId, useRef } from "react";
+import { LoadingButton } from "./loading-button";
 export function ConfirmAction({
   label,
   title,
   description,
   confirm = label,
   disabled = false,
+  loading = false,
+  loadingLabel,
   onConfirm,
 }: {
   label: string;
@@ -13,20 +16,24 @@ export function ConfirmAction({
   description: string;
   confirm?: string;
   disabled?: boolean;
+  loading?: boolean;
+  loadingLabel?: string;
   onConfirm: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null),
     id = useId();
   return (
     <>
-      <button
+      <LoadingButton
         type="button"
         className="auth-secondary"
         disabled={disabled}
+        loading={loading}
+        loadingLabel={loadingLabel}
         onClick={() => ref.current?.showModal()}
       >
         {label}
-      </button>
+      </LoadingButton>
       <dialog ref={ref} aria-labelledby={id} className="action-dialog">
         <h2 id={id}>{title}</h2>
         <p>{description}</p>
@@ -42,6 +49,7 @@ export function ConfirmAction({
           <button
             type="button"
             className="danger-action"
+            disabled={disabled || loading}
             onClick={() => {
               ref.current?.close();
               onConfirm();

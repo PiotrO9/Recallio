@@ -1,6 +1,8 @@
 "use client";
 
 import { ConfirmAction } from "@/components/confirm-action";
+import { LoadingButton } from "@/components/loading-button";
+import { ActionLink } from "@/components/action-link";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { Card } from "@/contracts";
@@ -86,12 +88,16 @@ export function CsvImport({
   const [decisions, setDecisions] = useState<Record<number, Decision>>({});
   const [skipDuplicates, setSkipDuplicates] = useState(false);
   const [page, setPage] = useState(0);
-  const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<
+    "start" | "resume" | "finish" | null
+  >(null);
+  const busy = operation !== null;
+  const [readingFile, setReadingFile] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState<StoredImport>();
   const [newName, setNewName] = useState("");
   const [preview, setPreview] = useState(false),
-    [resuming, setResuming] = useState(false),
+    [pausing, setPausing] = useState(false),
     [filename, setFilename] = useState("");
   const running = useRef(false),
     pauseRequested = useRef(false),
@@ -201,6 +207,7 @@ export function CsvImport({
 
   async function readFile(input?: File) {
     const version = ++fileVersion.current;
+    setReadingFile(!!input);
     setDone(undefined);
     setPreview(false);
     setFilename(input?.name ?? "");
@@ -226,6 +233,8 @@ export function CsvImport({
           ? `Wiersz ${problem.row}. ${problem.message}`
           : "Nie udało się odczytać pliku. Zapisz plik w kodowaniu UTF-8 i wybierz go ponownie.",
       );
+    } finally {
+      if (version === fileVersion.current) setReadingFile(false);
     }
   }
 
@@ -251,10 +260,13 @@ export function CsvImport({
     void sync.run();
   }
 
-  async function guarded(action: () => Promise<void>) {
+  async function guarded(
+    name: "start" | "resume" | "finish",
+    action: () => Promise<void>,
+  ) {
     if (running.current) return;
     running.current = true;
-    setBusy(true);
+    setOperation(name);
     setError("");
     try {
       await action();
@@ -268,7 +280,8 @@ export function CsvImport({
       );
     } finally {
       running.current = false;
-      setBusy(false);
+      setOperation(null);
+      setPausing(false);
     }
   }
 
@@ -276,7 +289,7 @@ export function CsvImport({
     event.preventDefault();
     if (!preview || unresolved || !accepted) return;
     const form = new FormData(event.currentTarget);
-    void guarded(async () => {
+    void guarded("start", async () => {
       const id = target?.id ?? crypto.randomUUID();
       const steps: ImportStep[] = [];
       if (!target) {
@@ -367,9 +380,11 @@ export function CsvImport({
               : "Import zakończony częściowo"
             : active
               ? busy
-                ? resuming
-                  ? "Wznowiono import"
-                  : "Trwa import"
+                ? operation === "finish"
+                  ? "Kończenie importu"
+                  : operation === "resume"
+                    ? "Wznowiono import"
+                    : "Trwa import"
                 : "Import wstrzymany"
               : preview
                 ? "Podgląd importu"
@@ -394,7 +409,7 @@ export function CsvImport({
               : "Zapisane kroki pozostają na tym urządzeniu."}
           </p>
           <div className="action-row">
-            <Link
+            <ActionLink
               href={
                 workspace?.decks.some(
                   (d) => d.id === done.deckId && !d.deletedAt,
@@ -409,14 +424,13 @@ export function CsvImport({
               )
                 ? "Otwórz zestaw"
                 : "Moje zestawy"}
-            </Link>
+            </ActionLink>
             <button
               className="text-action"
               onClick={() => {
                 setDone(undefined);
                 setNewName("");
                 setPreview(false);
-                setResuming(false);
               }}
             >
               Importuj kolejny plik
@@ -434,22 +448,24 @@ export function CsvImport({
           <p role="status">
             Zapisane kroki: {active.next} z {active.total}
           </p>
-          {busy ? (
-            <button
+          {operation === "start" || operation === "resume" ? (
+            <LoadingButton
               className="auth-secondary"
+              loading={pausing}
+              loadingLabel="Wstrzymywanie…"
               onClick={() => {
                 pauseRequested.current = true;
+                setPausing(true);
               }}
             >
               Wstrzymaj import
-            </button>
+            </LoadingButton>
           ) : (
             <button
               className="primary"
               disabled={busy}
               onClick={() => {
-                setResuming(true);
-                void guarded(() => run(active));
+                void guarded("resume", () => run(active));
               }}
             >
               Wznów import
@@ -457,11 +473,13 @@ export function CsvImport({
           )}
           <ConfirmAction
             label="Zakończ import"
+            loading={operation === "finish"}
+            loadingLabel="Kończenie importu…"
             title="Zakończyć import?"
             description="Zapisane fiszki zostaną w zestawie. Pozostałe kroki zostaną pominięte."
             disabled={busy}
             onConfirm={() => {
-              void guarded(async () => {
+              void guarded("finish", async () => {
                 await repository.forgetImport(active.id);
                 setDone(active);
                 setActive(null);
@@ -478,7 +496,11 @@ export function CsvImport({
             className={`auth-form ${styles.body} ${preview ? "" : styles.choose}`}
             onSubmit={submit}
           >
-            <fieldset hidden={preview} className={styles.source}>
+            <fieldset
+              hidden={preview}
+              disabled={busy}
+              className={styles.source}
+            >
               <legend>Miejsce importu</legend>
               <div className={styles.targets}>
                 <label>
@@ -547,9 +569,11 @@ export function CsvImport({
               </p>
             </fieldset>
             {!preview && (
-              <button
+              <LoadingButton
                 className="primary"
                 type="button"
+                loading={readingFile}
+                loadingLabel="Odczytywanie pliku…"
                 disabled={!file || !workspace}
                 onClick={(event) => {
                   if (event.currentTarget.form?.reportValidity())
@@ -557,7 +581,7 @@ export function CsvImport({
                 }}
               >
                 Pokaż podgląd
-              </button>
+              </LoadingButton>
             )}
             {file && preview && (
               <>
@@ -565,6 +589,7 @@ export function CsvImport({
                   <input
                     type="checkbox"
                     checked={skipDuplicates}
+                    disabled={busy}
                     onChange={({ target }) => setSkipDuplicates(target.checked)}
                   />{" "}
                   Pomiń duplikaty
@@ -579,6 +604,7 @@ export function CsvImport({
                 <button
                   className="text-action"
                   type="button"
+                  disabled={busy}
                   onClick={() => setPreview(false)}
                 >
                   Zmień plik lub zestaw
@@ -667,6 +693,7 @@ export function CsvImport({
                                 <select
                                   aria-label={`Akcja wiersza ${row.row}`}
                                   value={choice.kind}
+                                  disabled={busy}
                                   onChange={({ target }) =>
                                     setDecisions((old) => ({
                                       ...old,
@@ -701,6 +728,7 @@ export function CsvImport({
                                 Fiszka do aktualizacji
                                 <select
                                   value={choice.target ?? ""}
+                                  disabled={busy}
                                   onChange={({ target }) =>
                                     setDecisions((old) => ({
                                       ...old,
@@ -736,7 +764,7 @@ export function CsvImport({
                     <button
                       className="auth-secondary"
                       type="button"
-                      disabled={page === 0}
+                      disabled={busy || page === 0}
                       onClick={() => setPage(page - 1)}
                     >
                       Poprzednia
@@ -744,19 +772,21 @@ export function CsvImport({
                     <button
                       className="auth-secondary"
                       type="button"
-                      disabled={(page + 1) * pageSize >= rows.length}
+                      disabled={busy || (page + 1) * pageSize >= rows.length}
                       onClick={() => setPage(page + 1)}
                     >
                       Następna
                     </button>
                   </div>
                 )}
-                <button
+                <LoadingButton
                   className="primary"
-                  disabled={!workspace || unresolved || !accepted || busy}
+                  loading={operation === "start"}
+                  loadingLabel="Rozpoczynanie importu…"
+                  disabled={!workspace || unresolved || !accepted}
                 >
                   Zatwierdź import
-                </button>
+                </LoadingButton>
               </>
             )}
           </form>

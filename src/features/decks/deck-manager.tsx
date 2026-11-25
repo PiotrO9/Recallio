@@ -4,6 +4,7 @@ import { NotebookSheet, deckColor } from "@/components/notebook";
 import { ValidatedField } from "@/components/validated-field";
 import { prepareStudyShell } from "@/features/study/offline";
 import { ConfirmAction } from "@/components/confirm-action";
+import { LoadingButton } from "@/components/loading-button";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
@@ -21,6 +22,15 @@ import {
 } from "@/storage/local-repository";
 import { createSyncController, type SyncStatus } from "@/sync/controller";
 import styles from "./deck-manager.module.css";
+
+type DeckAction =
+  | "saveDeck"
+  | "saveCard"
+  | "deleteDeck"
+  | "deleteCard"
+  | "offline"
+  | "reset-a-b"
+  | "reset-b-a";
 
 export function DeckManager({
   userId,
@@ -44,7 +54,8 @@ export function DeckManager({
     createCard ? null : undefined,
   );
   const [status, setStatus] = useState<SyncStatus>("idle");
-  const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<DeckAction | null>(null);
+  const busy = operation !== null;
   const [error, setError] = useState(false);
   const [offlineReady, setOfflineReady] = useState<readonly string[]>([]);
   const [offlineIssue, setOfflineIssue] = useState<{
@@ -116,10 +127,10 @@ export function DeckManager({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repository, controller]);
 
-  async function perform(action: () => Promise<void>) {
+  async function perform(name: DeckAction, action: () => Promise<void>) {
     if (lock.current) return;
     lock.current = true;
-    setBusy(true);
+    setOperation(name);
     setError(false);
     try {
       await action();
@@ -129,7 +140,7 @@ export function DeckManager({
       setError(true);
     } finally {
       lock.current = false;
-      setBusy(false);
+      setOperation(null);
     }
   }
 
@@ -164,7 +175,7 @@ export function DeckManager({
     if (deckForm === undefined) return;
     const fields = new FormData(event.currentTarget);
     const expected = deckForm;
-    void perform(async () => {
+    void perform("saveDeck", async () => {
       const entityId = expected?.id ?? crypto.randomUUID();
       await commit(
         {
@@ -203,7 +214,7 @@ export function DeckManager({
     const fields = new FormData(event.currentTarget);
     const expected = cardForm && currentCardVersion(cardForm);
     const text = (name: string) => String(fields.get(name) ?? "");
-    void perform(async () => {
+    void perform("saveCard", async () => {
       await commit(
         {
           type: expected ? "card.update" : "card.create",
@@ -228,7 +239,7 @@ export function DeckManager({
 
   function remove(item: Deck | Card) {
     const isCard = "contentRevision" in item;
-    void perform(async () => {
+    void perform(isCard ? "deleteCard" : "deleteDeck", async () => {
       await commit(
         {
           type: isCard ? "card.delete" : "deck.delete",
@@ -248,7 +259,7 @@ export function DeckManager({
   }
 
   function reset(card: Card, direction: "a-b" | "b-a") {
-    void perform(async () => {
+    void perform(`reset-${direction}`, async () => {
       const { progress, localVersion } = await repository.readProgressVersion(
         card.id,
         direction,
@@ -338,6 +349,7 @@ export function DeckManager({
                 <li key={item.id}>
                   <button
                     className={styles.deckRow}
+                    disabled={busy}
                     style={deckColor(item.id)}
                     aria-current={deck?.id === item.id ? "true" : undefined}
                     ref={(el) => {
@@ -443,9 +455,14 @@ export function DeckManager({
                   </label>
                 ))}
               </fieldset>
-              <button className="primary" disabled={busy}>
+              <LoadingButton
+                className="primary"
+                disabled={busy}
+                loading={operation === "saveDeck"}
+                loadingLabel="Zapisywanie zestawu…"
+              >
                 Zapisz zestaw
-              </button>
+              </LoadingButton>
               <button
                 className="auth-secondary"
                 type="button"
@@ -462,6 +479,7 @@ export function DeckManager({
           <section className={styles.detail} aria-label={deck.name}>
             <button
               className="text-action"
+              disabled={busy}
               onClick={() => {
                 if (cardForm === undefined) {
                   rowToFocus.current = deck.id;
@@ -531,11 +549,13 @@ export function DeckManager({
                       Zestaw jest gotowy do nauki offline na tym urządzeniu.
                     </p>
                   ) : (
-                    <button
+                    <LoadingButton
                       className="auth-secondary"
                       disabled={busy || !cards.length}
+                      loading={operation === "offline"}
+                      loadingLabel="Przygotowywanie zestawu…"
                       onClick={() =>
-                        void perform(async () => {
+                        void perform("offline", async () => {
                           setOfflineIssue(undefined);
                           try {
                             const result = await controller.run(true);
@@ -566,7 +586,7 @@ export function DeckManager({
                       }
                     >
                       Przygotuj zestaw offline
-                    </button>
+                    </LoadingButton>
                   )}
                   {offlineIssue?.id === deck.id && (
                     <p role="alert">
@@ -588,6 +608,8 @@ export function DeckManager({
                     </button>
                     <ConfirmAction
                       label="Usuń zestaw"
+                      loading={operation === "deleteDeck"}
+                      loadingLabel="Usuwanie zestawu…"
                       title="Usunąć zestaw?"
                       description={`Usuniesz zestaw „${deck.name}” i wszystkie jego fiszki.`}
                       disabled={busy}
@@ -596,7 +618,7 @@ export function DeckManager({
 
                     <button
                       className="auth-secondary"
-                      disabled={!cards.length}
+                      disabled={busy || !cards.length}
                       onClick={download}
                     >
                       Eksportuj CSV
@@ -677,6 +699,8 @@ export function DeckManager({
                           .map((p) => (
                             <ConfirmAction
                               key={p.direction}
+                              loading={operation === `reset-${p.direction}`}
+                              loadingLabel="Resetowanie…"
                               label={`Zresetuj ${p.direction === "a-b" ? "A → B" : "B → A"}`}
                               title="Zresetować postęp kierunku?"
                               description="Historia ocen pozostanie zapisana. Wybrany kierunek rozpocznie naukę od początku."
@@ -686,6 +710,8 @@ export function DeckManager({
                           ))}
                         <ConfirmAction
                           label="Usuń fiszkę"
+                          loading={operation === "deleteCard"}
+                          loadingLabel="Usuwanie fiszki…"
                           title="Usunąć fiszkę?"
                           description="Obie strony fiszki zostaną usunięte z zestawu."
                           disabled={busy}
@@ -694,9 +720,14 @@ export function DeckManager({
                       </div>
                     </details>
                   )}
-                  <button className="primary" disabled={busy}>
+                  <LoadingButton
+                    className="primary"
+                    disabled={busy}
+                    loading={operation === "saveCard"}
+                    loadingLabel="Zapisywanie fiszki…"
+                  >
                     Zapisz fiszkę
-                  </button>
+                  </LoadingButton>
                   <button
                     className="auth-secondary"
                     type="button"

@@ -1,6 +1,7 @@
 import { ValidatedField } from "@/components/validated-field";
-import Link from "next/link";
+import { ActionLink } from "@/components/action-link";
 import { AuthFrame } from "@/features/auth/auth-frame";
+import { AuthActionForm } from "@/features/auth/auth-action-form";
 import { serverAuth, verifiedIdentity } from "@/server/auth/client";
 
 export default async function NewPasswordPage({
@@ -12,9 +13,9 @@ export default async function NewPasswordPage({
     return (
       <AuthFrame title="Ustaw nowe hasło" variant="auth">
         <p role="alert">Sesja zmiany hasła wygasła. Poproś o nową wiadomość.</p>
-        <Link className="primary" href="/auth/forgot-password">
+        <ActionLink className="primary" href="/auth/forgot-password">
           Wyślij nowy link
-        </Link>
+        </ActionLink>
       </AuthFrame>
     );
   const { status } = await searchParams;
@@ -23,7 +24,7 @@ export default async function NewPasswordPage({
       {status && (
         <p role="alert">Nie udało się zmienić hasła. Spróbuj ponownie.</p>
       )}
-      <form className="auth-form" action="/auth/actions" method="post">
+      <AuthActionForm label="Zapisz hasło" loadingLabel="Zapisywanie hasła…">
         <input type="hidden" name="intent" value="update-password" />
         <ValidatedField label="Nowe hasło" hint="Użyj co najmniej 8 znaków.">
           <input
@@ -35,8 +36,7 @@ export default async function NewPasswordPage({
             required
           />
         </ValidatedField>
-        <button className="primary">Zapisz hasło</button>
-      </form>
+      </AuthActionForm>
     </AuthFrame>
   );
 }

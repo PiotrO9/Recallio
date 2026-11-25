@@ -35,6 +35,7 @@ import {
 } from "./offline";
 import { NotebookSheet } from "@/components/notebook";
 import { ConfirmAction } from "@/components/confirm-action";
+import { LoadingButton } from "@/components/loading-button";
 import { StudySettings } from "./study-settings";
 import styles from "./study.module.css";
 
@@ -96,7 +97,13 @@ function StudyBoard({
   const [workspace, setWorkspace] = useState<SnapshotData>();
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [revealed, setRevealed] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [savingRating, setSavingRating] = useState<Rating | null>(null);
+  const busy = savingRating !== null;
+  const [cardRequest, setCardRequest] = useState<"extra" | "restart" | null>(
+    null,
+  );
+  const loadingCard = useRef(false);
+  const [cardReadError, setCardReadError] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [syncState, setSyncState] = useState<SyncStatus>("idle");
   const [offlineDecks, setOfflineDecks] = useState<readonly string[]>([]);
@@ -320,8 +327,7 @@ function StudyBoard({
     if (!selected || saving.current || updatingRef.current) return;
     saving.current = true;
     selectedRating.current ??= rating;
-    setBusy(true);
-    setSaveError(false);
+    setSavingRating(selectedRating.current);
     let saved = false;
     try {
       if (!prepared.current) {
@@ -368,6 +374,7 @@ function StudyBoard({
       const command = prepared.current;
       await repository.commitReview(command);
       saved = true;
+      setSaveError(false);
       prepared.current = null;
       selectedRating.current = null;
       returns.current = recordSessionAnswer(returns.current, command.event);
@@ -413,7 +420,7 @@ function StudyBoard({
         setSaveError(true);
       }
     } finally {
-      setBusy(false);
+      setSavingRating(null);
       saving.current = false;
     }
   }
@@ -434,18 +441,42 @@ function StudyBoard({
     void synchronize(true);
   }
 
-  function addNew() {
-    const dayStart = getStudyPeriod(new Date().toISOString()).start;
-    extra.current = {
-      dayStart,
-      count:
-        (extra.current?.dayStart === dayStart ? extra.current.count : 0) + 1,
-    };
-    void refresh(false).catch(() => setSyncState("failed"));
+  async function loadNext(mode: "extra" | "restart") {
+    if (loadingCard.current || saving.current || updatingRef.current) return;
+    loadingCard.current = true;
+    setCardRequest(mode);
+    setCardReadError(false);
+    const previousExtra = extra.current;
+    if (mode === "extra") {
+      const dayStart = getStudyPeriod(new Date().toISOString()).start;
+      extra.current = {
+        dayStart,
+        count:
+          (previousExtra?.dayStart === dayStart ? previousExtra.count : 0) + 1,
+      };
+    } else {
+      endedRef.current = false;
+    }
+    try {
+      moveToCard.current = true;
+      await refresh(mode === "restart");
+      if (mode === "restart") {
+        setSessionCount(0);
+        setEnded(false);
+      }
+    } catch {
+      extra.current = previousExtra;
+      if (mode === "restart") endedRef.current = true;
+      setCardReadError(true);
+    } finally {
+      loadingCard.current = false;
+      setCardRequest(null);
+    }
   }
 
   function endSession() {
     if (saving.current) return;
+    setCardReadError(false);
     endedRef.current = true;
     active.current = null;
     previousCard.current = null;
@@ -456,14 +487,6 @@ function StudyBoard({
     setRevealed(false);
     setSaveError(false);
     setEnded(true);
-  }
-
-  function restart() {
-    endedRef.current = false;
-    moveToCard.current = true;
-    setEnded(false);
-    setSessionCount(0);
-    void refresh(true).catch(() => setSyncState("failed"));
   }
 
   useEffect(() => {
@@ -544,15 +567,24 @@ function StudyBoard({
           <h1>Sesja zakończona.</h1>
           {settings?.showSession && <p>Odpowiedzi w sesji: {sessionCount}</p>}
           <div className="action-row">
-            <button ref={restartButton} className="primary" onClick={restart}>
+            <LoadingButton
+              ref={restartButton}
+              className="primary"
+              loading={cardRequest === "restart"}
+              loadingLabel="Wczytywanie fiszek…"
+              onClick={() => void loadNext("restart")}
+            >
               Rozpocznij nową sesję
-            </button>
+            </LoadingButton>
             {currentDeck ? (
               <a href={`/decks?deck=${currentDeck.id}`}>Wróć do zestawu</a>
             ) : (
               <a href="/decks">Moje zestawy</a>
             )}
           </div>
+          {cardReadError && (
+            <p role="alert">Nie udało się wczytać fiszek. Spróbuj ponownie.</p>
+          )}
         </NotebookSheet>
       </section>
     );
@@ -620,18 +652,19 @@ function StudyBoard({
             <>
               {saveError ? (
                 <>
-                  <p role="alert">Nie udało się zapisać oceny.</p>
-                  <button
+                  {!busy && <p role="alert">Nie udało się zapisać oceny.</p>}
+                  <LoadingButton
                     ref={retryButton}
                     className="primary"
-                    disabled={busy}
+                    loading={busy}
+                    loadingLabel="Zapisywanie…"
                     onClick={() => {
                       if (selectedRating.current !== null)
                         void rate(selectedRating.current);
                     }}
                   >
                     Ponów zapis
-                  </button>
+                  </LoadingButton>
                 </>
               ) : (
                 <div
@@ -656,16 +689,17 @@ function StudyBoard({
                   }}
                 >
                   {grades.map(([value, label], index) => (
-                    <button
+                    <LoadingButton
                       className="primary"
                       key={value}
                       aria-keyshortcuts={String(value)}
                       ref={index === 0 ? firstGrade : undefined}
                       disabled={busy}
+                      loading={savingRating === value}
                       onClick={() => void rate(value)}
                     >
                       {label}
-                    </button>
+                    </LoadingButton>
                   ))}
                 </div>
               )}
@@ -718,9 +752,20 @@ function StudyBoard({
         ) && (
           <div className={styles.tools}>
             {!candidate && (
-              <button className="primary" disabled={busy} onClick={addNew}>
+              <LoadingButton
+                className="primary"
+                disabled={busy || updating}
+                loading={cardRequest === "extra"}
+                loadingLabel="Wczytywanie fiszki…"
+                onClick={() => void loadNext("extra")}
+              >
                 Dodaj jeszcze jedną nową fiszkę
-              </button>
+              </LoadingButton>
+            )}
+            {cardReadError && (
+              <p role="alert">
+                Nie udało się wczytać fiszek. Spróbuj ponownie.
+              </p>
             )}
             {saveError ? (
               <ConfirmAction
@@ -728,12 +773,13 @@ function StudyBoard({
                 title="Zakończyć bez zapisu oceny?"
                 description="Ta odpowiedź nie zostanie uwzględniona w postępie."
                 confirm="Zakończ bez zapisu"
+                disabled={busy}
                 onConfirm={endSession}
               />
             ) : (
               <button
                 className="auth-secondary"
-                disabled={busy}
+                disabled={busy || cardRequest !== null || updating}
                 onClick={endSession}
               >
                 Zakończ sesję
@@ -760,18 +806,18 @@ function StudyBoard({
               <p role="status">Zestaw jest dostępny offline.</p>
             ) : (
               !offlineShell && (
-                <button
+                <LoadingButton
                   className="auth-secondary"
                   type="button"
+                  loading={preparingOffline}
+                  loadingLabel="Przygotowywanie zestawu…"
                   disabled={
                     preparingOffline || updating || syncState === "offline"
                   }
                   onClick={() => void prepareOffline(currentDeck.id)}
                 >
-                  {preparingOffline
-                    ? "Przygotowywanie zestawu…"
-                    : "Przygotuj zestaw offline"}
-                </button>
+                  Przygotuj zestaw offline
+                </LoadingButton>
               )
             ))}
           {workspace && workspace.progress.length > 0 && (
@@ -789,14 +835,16 @@ function StudyBoard({
         </details>
       )}
       {waitingWorker && !revealed && !busy && !saveError && (
-        <button
+        <LoadingButton
           className="auth-secondary"
           type="button"
-          disabled={preparingOffline || updating}
+          disabled={preparingOffline || cardRequest !== null}
+          loading={updating}
+          loadingLabel="Aktualizowanie aplikacji…"
           onClick={() => void applyUpdate()}
         >
-          {updating ? "Aktualizowanie aplikacji…" : "Zaktualizuj aplikację"}
-        </button>
+          Zaktualizuj aplikację
+        </LoadingButton>
       )}
       {updateError && (
         <p role="alert">

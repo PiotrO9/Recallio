@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { LoadingButton } from "@/components/loading-button";
 import { createLocalRepository } from "@/storage/local-repository";
 import { createSyncController } from "@/sync/controller";
 
@@ -16,7 +17,10 @@ function accountRepository(accountId: string) {
 export function AccountPanel({ accountId }: { accountId: string }) {
   const [pending, setPending] = useState<number | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<
+    "check" | "discard" | "sync" | null
+  >(null);
+  const busy = operation !== null;
   const [error, setError] = useState(false);
   const [ready, setReady] = useState(false);
   const signingOut = useRef(false);
@@ -37,9 +41,14 @@ export function AccountPanel({ accountId }: { accountId: string }) {
     setReady(true);
     refresh();
     window.addEventListener("focus", refresh);
+    const restore = (event: PageTransitionEvent) => {
+      if (event.persisted && signingOut.current) window.location.reload();
+    };
+    window.addEventListener("pageshow", restore);
     return () => {
       active = false;
       window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", restore);
       repo.close();
     };
   }, [accountId]);
@@ -47,9 +56,10 @@ export function AccountPanel({ accountId }: { accountId: string }) {
   async function logout(mode: "check" | "discard" | "sync" = "check") {
     if (signingOut.current) return;
     signingOut.current = true;
-    setBusy(true);
+    setOperation(mode);
     setError(false);
     const repository = accountRepository(accountId);
+    let navigating = false;
     try {
       if (mode === "sync") {
         const sync = createSyncController({
@@ -73,12 +83,15 @@ export function AccountPanel({ accountId }: { accountId: string }) {
       const response = await fetch("/auth/actions", { method: "POST", body });
       if (!response.ok) throw new Error("Wylogowanie nie powiodło się");
       window.location.assign(response.url);
+      navigating = true;
     } catch {
       setError(true);
     } finally {
       repository.close();
-      signingOut.current = false;
-      setBusy(false);
+      if (!navigating) {
+        signingOut.current = false;
+        setOperation(null);
+      }
     }
   }
 
@@ -100,13 +113,15 @@ export function AccountPanel({ accountId }: { accountId: string }) {
         </p>
       )}
       {pending === null ? (
-        <button
+        <LoadingButton
           className="primary"
+          loading={operation === "check"}
+          loadingLabel="Wylogowywanie…"
           disabled={!ready || busy}
           onClick={() => void logout()}
         >
           Wyloguj się
-        </button>
+        </LoadingButton>
       ) : confirmDiscard ? (
         <section
           className="confirm-discard"
@@ -123,13 +138,15 @@ export function AccountPanel({ accountId }: { accountId: string }) {
             >
               Anuluj
             </button>
-            <button
+            <LoadingButton
               className="danger-action"
+              loading={operation === "discard"}
+              loadingLabel="Wylogowywanie…"
               disabled={busy}
               onClick={() => void logout("discard")}
             >
               Odrzuć zmiany i wyloguj się
-            </button>
+            </LoadingButton>
           </div>
         </section>
       ) : (
@@ -138,15 +155,17 @@ export function AccountPanel({ accountId }: { accountId: string }) {
             Niewysłane zmiany: {pending}. Odrzucenie usunie je z tego
             urządzenia.
           </p>
-          <button
+          <LoadingButton
             className="primary"
+            loading={operation === "sync"}
+            loadingLabel="Synchronizowanie i wylogowywanie…"
             disabled={busy}
             onClick={() => void logout("sync")}
           >
             {error
               ? "Ponów synchronizację i wyloguj się"
               : "Synchronizuj i wyloguj się"}
-          </button>
+          </LoadingButton>
           <button
             className="auth-secondary"
             disabled={busy}

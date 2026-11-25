@@ -209,11 +209,29 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
     await page.getByRole("link", { name: "Importuj CSV" }).click();
     await frame("W10");
     await page.getByLabel("Nazwa zestawu").fill("Z pliku");
+    await page.evaluate(() => {
+      const read = File.prototype.arrayBuffer;
+      File.prototype.arrayBuffer = async function () {
+        File.prototype.arrayBuffer = read;
+        await new Promise<void>((resolve) =>
+          window.addEventListener("continue-file-read", () => resolve(), {
+            once: true,
+          }),
+        );
+        return read.call(this);
+      };
+    });
     await page.getByLabel("Plik CSV").setInputFiles({
       name: "kawiarnia.csv",
       mimeType: "text/csv",
       buffer: Buffer.from("side_a,side_b\nil tavolo,stolik"),
     });
+    const reading = page.getByRole("button", { name: "Odczytywanie pliku…" });
+    await expect(reading).toBeDisabled();
+    await expect(reading).toHaveAttribute("aria-busy", "true");
+    await page.evaluate(() =>
+      window.dispatchEvent(new Event("continue-file-read")),
+    );
     await page.getByRole("button", { name: "Pokaż podgląd" }).click();
     await expect(page.getByText("Wiersz 2 · Gotowy do importu")).toBeVisible();
     await frame("W11");

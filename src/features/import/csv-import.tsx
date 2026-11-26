@@ -5,16 +5,13 @@ import { LoadingButton } from "@/components/loading-button";
 import { ActionLink } from "@/components/action-link";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import type { Card } from "@/contracts";
+import { reviewImport, matching, type Decision } from "@/domain/import/review";
 import {
   classifyRows,
   CsvError,
   MAX_CSV_BYTES,
-  normalizeCsvText,
   parseCsv,
   type Content,
-  type ImportAction,
-  type ImportRow,
 } from "@/domain/import/csv";
 import {
   createLocalRepository,
@@ -26,7 +23,6 @@ import {
 import { createSyncController } from "@/sync/controller";
 import styles from "./csv-import.module.css";
 
-type Decision = { kind: ImportAction["kind"] | ""; target?: string };
 const labels = {
   valid: "Gotowy do importu",
   exact_duplicate: "Duplikat",
@@ -193,35 +189,10 @@ export function CsvImport({
     [file, existing, skipDuplicates, decisions],
   );
 
-  function decision(row: ImportRow): Decision {
-    if (row.classification === "invalid") return { kind: "skip" };
-    if (row.automaticallySkipped && decisions[row.row]?.kind !== "create")
-      return { kind: "skip" };
-    return (
-      decisions[row.row] ?? {
-        kind: row.classification === "valid" ? "create" : "",
-      }
-    );
-  }
-  const unresolved = rows.filter((row) => {
-    const choice = decision(row);
-    return (
-      !choice.kind ||
-      (choice.kind !== "skip" && choice.kind !== "create" && !choice.target)
-    );
-  });
-  const accepted = rows.filter(
-    (row) => decision(row).kind && decision(row).kind !== "skip",
-  ).length;
-
-  function matching(row: ImportRow, kind: Decision["kind"]): Card[] {
-    return existing.filter(
-      (card) =>
-        normalizeCsvText(card.sideA) === normalizeCsvText(row.content.sideA) &&
-        (kind !== "update_examples" ||
-          normalizeCsvText(card.sideB) === normalizeCsvText(row.content.sideB)),
-    );
-  }
+  const { reviewed, unresolved, accepted } = useMemo(
+    () => reviewImport(rows, decisions, existing),
+    [rows, decisions, existing],
+  );
 
   async function readFile(input?: File) {
     const version = ++fileVersion.current;
@@ -322,9 +293,7 @@ export function CsvImport({
           expected: null,
         });
       }
-      const updated = new Set<string>();
-      for (const row of rows) {
-        const choice = decision(row);
+      for (const { row, choice, card } of reviewed) {
         if (choice.kind === "skip") continue;
         if (choice.kind === "create") {
           steps.push({
@@ -338,12 +307,7 @@ export function CsvImport({
           });
           continue;
         }
-        const card = matching(row, choice.kind).find(
-          (item) => item.id === choice.target,
-        );
-        if (!card || updated.has(card.id))
-          throw new Error("Wybierz jedno uaktualnienie dla każdej fiszki");
-        updated.add(card.id);
+        if (!card) throw new Error("Brak wskazanej fiszki");
         const { sideA, sideB, exampleA, exampleB } = row.content;
         steps.push({
           operation: {
@@ -640,11 +604,10 @@ export function CsvImport({
                   Zmień plik lub zestaw
                 </button>
                 <ol className={styles.rows} aria-label="Wiersze importu">
-                  {rows
+                  {reviewed
                     .slice(page * pageSize, (page + 1) * pageSize)
-                    .map((row) => {
-                      const choice = decision(row);
-                      const targets = matching(row, choice.kind);
+                    .map(({ row, choice, issue }) => {
+                      const targets = matching(existing, row, choice.kind);
                       const needsTarget =
                         choice.kind === "update_examples" ||
                         choice.kind === "replace_content";
@@ -669,7 +632,7 @@ export function CsvImport({
                             className={styles.record}
                             data-row={row.row}
                             data-review={
-                              !choice.kind || row.classification === "invalid"
+                              !!issue || row.classification === "invalid"
                             }
                           >
                             <summary>
@@ -709,6 +672,7 @@ export function CsvImport({
                                 />
                               )}
                             </div>
+                            {issue && <p>{issue}</p>}
                             {row.errors.join(" ")}
                             {row.classification === "invalid" && (
                               <p>
@@ -739,14 +703,14 @@ export function CsvImport({
                                   </option>
                                   <option value="skip">Pomiń</option>
                                   <option value="create">Dodaj fiszkę</option>
-                                  {matching(row, "update_examples").length >
-                                    0 && (
+                                  {matching(existing, row, "update_examples")
+                                    .length > 0 && (
                                     <option value="update_examples">
                                       Zmień przykłady
                                     </option>
                                   )}
-                                  {matching(row, "replace_content").length >
-                                    0 && (
+                                  {matching(existing, row, "replace_content")
+                                    .length > 0 && (
                                     <option value="replace_content">
                                       Zastąp treść
                                     </option>

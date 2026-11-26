@@ -25,6 +25,16 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | RELEASE-LOCAL | DONE | UX-01 | Powiąż kryteria MVP z lokalnymi wynikami i odtwórz testową kopię danych w osobnej bazie. Sprawdź zachowanie fiszki, jej oceny, kursora i izolacji kont. |
 | ENTRY-01 | DONE | AUTH-01, DECK-01 | Wejście do aplikacji prowadzi do logowania lub własnych zestawów. Usunięto publiczny trening przykładowy. |
 | RELEASE-01 | TODO | RELEASE-LOCAL, FLOW-02, SETTINGS-LIMIT, SETTINGS-01 | Uzupełnij dowody dla środowiska docelowego, w tym próbę kopii i odtworzenia oraz test działania aplikacji. Publikacja produkcyjna wymaga osobnego zlecenia. |
+| REFACTOR-1 | DONE | — | Zgodność decyzji CSV w podglądzie i przy zapisie. |
+| REFACTOR-2 | TODO | — | Odróżnienie zapisu od odświeżenia po zapisie. |
+| REFACTOR-3 | TODO | — | Wspólne przygotowanie zestawu offline. |
+| REFACTOR-4 | TODO | — | Przygotowanie i ponowne przeliczenie tej samej oceny poza widokiem. |
+| REFACTOR-5 | TODO | — | Wspólna zmiana treści dla zapisu lokalnego i odtwarzania snapshotu. |
+| REFACTOR-6 | TODO | — | Nawigacja biblioteki wraz z pozycją powrotu. |
+| REFACTOR-7 | TODO | — | Wspólna konfiguracja lokalnych usług konta. |
+| REFACTOR-8 | TODO | — | Limity treści współdzielone przez import, UI i kontrakty. |
+| REFACTOR-9 | TODO | — | Osobne scenariusze E2E i współdzielone przygotowanie kont. |
+| REFACTOR-10 | TODO | — | Pomiar i weryfikacja kosztu opróżniania lokalnej kolejki. |
 
 ## Wyniki i blokady
 
@@ -50,3 +60,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `UX-01` — poprawiono kontrast, fokus, link pomijający nawigację i rozmiary pól dotyku. Ocenianie klawiszami 1–4 działa po przejściu fokusem do ocen. Przeszły typecheck, 74 testy, oba buildy i po 14 E2E z audytem axe oraz kontrolą układu przy 320 px.
 - `RELEASE-LOCAL` — [powiązano kryteria MVP z testami](VERIFICATION.md#odbiór-mvp) i odtworzono syntetyczną kopię PostgreSQL w osobnej bazie. Zachowano fiszkę, ocenę, potwierdzenie, kursor i izolację dwóch kont. `RELEASE-01` czeka na `FLOW-02`.
 - `ENTRY-01` — sprawdzono wejście gościa, bibliotekę po zalogowaniu i potwierdzenie konta. Przeszły typecheck, 73 testy, build i 10 E2E.
+
+- `REFACTOR-1` — Podgląd i zapis używają wspólnej decyzji. E2E obejmuje dwa wiersze przypisane do tej samej fiszki i korektę wyboru.

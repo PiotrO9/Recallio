@@ -353,6 +353,23 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
     await expect(
       page.getByLabel("Akcja wiersza 2", { exact: true }),
     ).toHaveValue("skip");
+    const firstAction = page.getByLabel("Akcja wiersza 2", { exact: true });
+    await firstAction.locator("xpath=ancestor::details/summary").click();
+    await firstAction.selectOption("replace_content");
+    await page.getByLabel("Fiszka do aktualizacji").selectOption({ index: 1 });
+    await expect(
+      page.getByRole("button", { name: "Zatwierdź import" }),
+    ).toBeDisabled();
+    await page.getByRole("button", { name: "Przejdź do wiersza 25" }).click();
+    await expect(
+      page.getByText(/Tę fiszkę aktualizuje już wiersz 2/),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Poprzednia" }).click();
+    await firstAction.locator("xpath=ancestor::details/summary").click();
+    await firstAction.selectOption("skip");
+    await expect(
+      page.getByRole("button", { name: "Zatwierdź import" }),
+    ).toBeEnabled();
     // Interrupt only this browser's import after its first committed card.
     await page.evaluate(() => {
       const put = IDBObjectStore.prototype.put;

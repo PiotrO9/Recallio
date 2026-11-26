@@ -10,6 +10,7 @@ import { getStudyPeriod } from "@/domain/learning/study-time";
 import { fsrsScheduler } from "@/domain/learning/scheduler";
 import styles from "./dashboard.module.css";
 
+import { collectDue } from "@/domain/learning/daily";
 function recommend(data: SnapshotData, now: string) {
   const decks = data.decks.filter((d) => !d.deletedAt);
   const available = new Map(decks.map((d) => [d.id, d]));
@@ -17,16 +18,7 @@ function recommend(data: SnapshotData, now: string) {
     (c) => !c.deletedAt && available.has(c.deckId),
   );
   const byId = new Map(cards.map((c) => [c.id, c]));
-  const due = data.progress
-    .filter((p) => {
-      const card = byId.get(p.cardId);
-      const mode = card && available.get(card.deckId)?.directionMode;
-      return (
-        (mode === "mixed" || mode === p.direction) &&
-        fsrsScheduler.classify(p, now) === "due"
-      );
-    })
-    .sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt));
+  const due = collectDue(data, now);
   const limit = data.settings?.newLimit ?? DEFAULT_NEW_LIMIT;
   const free = remainingNewForDay(
     data.introductions,
@@ -70,13 +62,12 @@ function recommend(data: SnapshotData, now: string) {
   if (due.length)
     return {
       deckId: deck.id,
-      name: deck.name,
+      name: "Dzisiejsze powtórki",
       caption: data.settings?.showDue
-        ? "Kierunki do powtórki w zestawie: " +
-          due.filter((p) => byId.get(p.cardId)?.deckId === deck.id).length
+        ? "Kierunki do powtórki: " + due.length
         : "Powtórka czeka",
-      action: "Powtórz teraz",
-      href: study,
+      action: "Powtórz na dziś",
+      href: "/study?scope=today",
     };
   if (fresh)
     return {

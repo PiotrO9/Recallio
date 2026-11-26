@@ -37,6 +37,12 @@ import { prepareReview, reprojectReview } from "./prepare-review";
 import { StudySettings } from "./study-settings";
 import styles from "./study.module.css";
 
+import {
+  collectDue,
+  dailyChoices,
+  sameDirection,
+  type DueEntry,
+} from "@/domain/learning/daily";
 const grades: readonly [Rating, string][] = [
   [1, "Nie pamiętam"],
   [2, "Trudno"],
@@ -47,18 +53,24 @@ const grades: readonly [Rating, string][] = [
 export function StudySession({
   accountId,
   deckId,
+  daily = false,
 }: {
   accountId?: string;
+  daily?: boolean;
   deckId?: string;
 }) {
   const [offlineId, setOfflineId] = useState<string | null | undefined>(
     undefined,
   );
+  const [offlineDaily, setOfflineDaily] = useState(false);
   const [offlineDeck, setOfflineDeck] = useState<string | undefined>();
   useEffect(() => {
     if (accountId) return;
     const stored = uuidSchema.safeParse(savedOfflineAccount());
     setOfflineId(stored.success ? stored.data : null);
+    setOfflineDaily(
+      new URLSearchParams(window.location.search).get("scope") === "today",
+    );
     setOfflineDeck(
       new URLSearchParams(window.location.search).get("deck") ?? undefined,
     );
@@ -73,9 +85,11 @@ export function StudySession({
       </p>
     );
   const selected = deckId ?? offlineDeck;
+  const today = !selected && (accountId ? daily : offlineDaily);
   return (
     <StudyBoard
-      key={`${id}:${selected ?? ""}`}
+      key={`${id}:${selected ?? ""}:${today}`}
+      daily={today}
       userId={id}
       deckId={selected}
       offlineShell={!accountId}
@@ -87,10 +101,12 @@ function StudyBoard({
   userId,
   deckId,
   offlineShell,
+  daily,
 }: {
   userId: string;
   deckId?: string;
   offlineShell: boolean;
+  daily: boolean;
 }) {
   const [workspace, setWorkspace] = useState<SnapshotData>();
   const [candidate, setCandidate] = useState<Candidate | null>(null);
@@ -136,6 +152,8 @@ function StudyBoard({
     [userId],
   );
 
+  const dailyPending = useRef<DueEntry[] | null>(null);
+  const [dailyCount, setDailyCount] = useState<number | null>(null);
   const availableOffline = useRef<readonly string[]>([]);
 
   function selectDeck(data: SnapshotData) {
@@ -148,8 +166,40 @@ function StudyBoard({
     );
   }
 
-  function choose(data: SnapshotData) {
+  function choose(data: SnapshotData, synchronized: boolean) {
     if (endedRef.current) return null;
+    if (daily) {
+      const offline = offlineShell || !navigator.onLine;
+      const allowed = offline ? new Set(availableOffline.current) : undefined;
+      if (
+        !dailyPending.current &&
+        !offline &&
+        !synchronized &&
+        !data.decks.length
+      )
+        return null;
+      if (
+        offline &&
+        !data.decks.some((deck) => !deck.deletedAt && allowed?.has(deck.id))
+      )
+        return null;
+      const now = new Date().toISOString();
+      dailyPending.current ??= collectDue(data, now, allowed);
+      const selection = dailyChoices(
+        data,
+        dailyPending.current,
+        returns.current,
+        now,
+        previousCard.current,
+        allowed,
+      );
+      setDailyCount(selection.remaining);
+      if (!selection.candidate) {
+        endedRef.current = true;
+        setEnded(true);
+      }
+      return selection.candidate;
+    }
     const deck = selectDeck(data);
     if (!deck) return null;
     const now = new Date().toISOString();
@@ -172,7 +222,7 @@ function StudyBoard({
     });
   }
 
-  async function refresh(advance: boolean) {
+  async function refresh(advance: boolean, synchronized = false) {
     const [data, decks] = await Promise.all([
       repository.readWorkspace(),
       repository.readOfflineDecks(),
@@ -181,7 +231,7 @@ function StudyBoard({
     setOfflineDecks(decks);
     setWorkspace(data);
     if (advance || (!active.current && !saving.current)) {
-      const next = choose(data);
+      const next = choose(data, synchronized);
       active.current = next;
       setCandidate(next);
       setRevealed(false);
@@ -191,8 +241,9 @@ function StudyBoard({
   async function synchronize(afterWrite = false) {
     if (updatingRef.current) return;
     try {
-      setSyncState(await (afterWrite ? sync.flush() : sync.run()));
-      await refresh(false);
+      const status = await (afterWrite ? sync.flush() : sync.run());
+      setSyncState(status);
+      await refresh(false, status === "idle");
     } catch {
       setSyncState("failed");
     }
@@ -321,6 +372,10 @@ function StudyBoard({
       prepared.current = null;
       selectedRating.current = null;
       returns.current = recordSessionAnswer(returns.current, command.event);
+      if (dailyPending.current)
+        dailyPending.current = dailyPending.current.filter(
+          (entry) => !sameDirection(entry, command.event),
+        );
       previousCard.current = selected.card.id;
       moveToCard.current = true;
       active.current = null;
@@ -329,8 +384,10 @@ function StudyBoard({
       await refresh(true);
       void synchronize(true);
     } catch (error) {
-      if (saved) setSyncState("failed");
-      else {
+      if (saved) {
+        setSyncState("failed");
+        setCardReadError(true);
+      } else {
         const command = prepared.current;
         if (error instanceof ReviewProjectionConflict && command) {
           try {
@@ -451,12 +508,19 @@ function StudyBoard({
   const currentDeck =
     workspace?.decks.find(
       (item) =>
-        !item.deletedAt && item.id === (candidate?.card.deckId ?? deckId),
+        !item.deletedAt &&
+        item.id ===
+          (candidate?.card.deckId ??
+            deckId ??
+            (daily &&
+              workspace.cards.find((c) => c.id === previousCard.current)
+                ?.deckId)),
     ) ??
     (workspace && selectDeck(workspace));
   const now = new Date().toISOString();
-  const dueToday =
-    workspace && (settings?.showDue || sessionCount > 0)
+  const dueToday = daily
+    ? dailyCount
+    : workspace && (settings?.showDue || sessionCount > 0)
       ? countDueToday(getStudyPeriod(now).end)
       : null;
 
@@ -503,7 +567,11 @@ function StudyBoard({
           tab={deckLink}
           className={styles.closed}
         >
-          <h1>Sesja zakończona.</h1>
+          <h1>
+            {daily && dailyCount === 0
+              ? "Wszystkie dostępne powtórki zrobione."
+              : "Sesja zakończona."}
+          </h1>
           {settings?.showSession && <p>Odpowiedzi w sesji: {sessionCount}</p>}
           <div className="action-row">
             <a
@@ -513,14 +581,22 @@ function StudyBoard({
             >
               {currentDeck ? "Wróć do zestawu" : "Moje zestawy"}
             </a>
-            <LoadingButton
-              className="text-action"
-              loading={cardRequest === "restart"}
-              loadingLabel="Wczytywanie fiszek…"
-              onClick={() => void loadNext("restart")}
-            >
-              Rozpocznij nową sesję
-            </LoadingButton>
+            {daily ? (
+              currentDeck && (
+                <a href={"/study?deck=" + currentDeck.id}>
+                  Ćwicz dalej w zestawie
+                </a>
+              )
+            ) : (
+              <LoadingButton
+                className="text-action"
+                loading={cardRequest === "restart"}
+                loadingLabel="Wczytywanie fiszek…"
+                onClick={() => void loadNext("restart")}
+              >
+                Rozpocznij nową sesję
+              </LoadingButton>
+            )}
           </div>
           {cardReadError && (
             <p role="alert">Nie udało się wczytać fiszek. Spróbuj ponownie.</p>
@@ -533,7 +609,8 @@ function StudyBoard({
       {settings?.showDue && dueToday !== null && (
         <p>Powtórki na dziś: {dueToday}</p>
       )}
-      {!ended &&
+      {!daily &&
+        !ended &&
         sessionCount > 0 &&
         dueToday === 0 &&
         candidate?.mode === "practice" && (
@@ -666,23 +743,52 @@ function StudyBoard({
           className={styles.card}
         >
           <h1>
-            {!workspace
-              ? "Wczytywanie fiszek…"
-              : offlineUnavailable
-                ? "Zestaw niedostępny offline"
-                : hasMaterial
-                  ? "Limit nowych fiszek"
-                  : "Brak fiszek"}
+            {daily
+              ? workspace &&
+                (offlineShell || syncState === "offline") &&
+                !workspace.decks.some(
+                  (deck) => !deck.deletedAt && offlineDecks.includes(deck.id),
+                )
+                ? "Przygotuj zestaw do nauki offline"
+                : syncState === "failed" ||
+                    syncState === "retry" ||
+                    cardReadError
+                  ? "Nie udało się wczytać powtórek"
+                  : "Wczytywanie powtórek…"
+              : !workspace
+                ? "Wczytywanie fiszek…"
+                : offlineUnavailable
+                  ? "Zestaw niedostępny offline"
+                  : hasMaterial
+                    ? "Limit nowych fiszek"
+                    : "Brak fiszek"}
           </h1>
           <p>
-            {workspace
-              ? offlineUnavailable
-                ? "Ten zestaw wymaga przygotowania z dostępem do internetu."
-                : hasMaterial
-                  ? "W tym zestawie nie ma teraz fiszek w ramach limitu."
-                  : "Nie ma dostępnych fiszek do nauki."
-              : "Odczytujemy materiał z urządzenia."}
+            {daily
+              ? null
+              : workspace
+                ? offlineUnavailable
+                  ? "Ten zestaw wymaga przygotowania z dostępem do internetu."
+                  : hasMaterial
+                    ? "W tym zestawie nie ma teraz fiszek w ramach limitu."
+                    : "Nie ma dostępnych fiszek do nauki."
+                : "Odczytujemy materiał z urządzenia."}
           </p>
+          {daily &&
+            (cardReadError ||
+              syncState === "failed" ||
+              syncState === "retry") && (
+              <button
+                type="button"
+                className="text-action"
+                onClick={() => {
+                  setCardReadError(false);
+                  void synchronize(true);
+                }}
+              >
+                Ponów odczyt
+              </button>
+            )}
           {workspace && !candidate && (
             <a href={currentDeck ? `/decks?deck=${currentDeck.id}` : "/decks"}>
               {currentDeck ? "Wróć do zestawu" : "Wróć do zestawów"}
@@ -695,7 +801,7 @@ function StudyBoard({
           (card) => !card.deletedAt && (!deckId || card.deckId === deckId),
         ) && (
           <div className={styles.tools}>
-            {!candidate && (
+            {!candidate && !daily && (
               <LoadingButton
                 className="primary"
                 disabled={busy || updating}

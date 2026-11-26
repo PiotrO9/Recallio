@@ -46,7 +46,7 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | PASTE-02    | DONE | PASTE-01             | Podłącz wklejanie do istniejącego podglądu i trwałego zapisu. Sprawdź wznowienie oraz rozpoczęcie treningu po zapisie. |
 | TODAY-01    | DONE | QUEUE-01, TRAIN-01   | Dobieraj należne kierunki z wielu zestawów. Sprawdź termin graniczny, powroty po błędzie i zakończenie sesji.          |
 | TODAY-02    | DONE | TODAY-01, PWA-01     | Połącz panel i sesję dzienną online oraz offline. Sprawdź odświeżenie i synchronizację oceny.                          |
-| STUDY-CHECK | TODO | PASTE-02, TODAY-02   | Odbierz przejście od arkusza do nauki oraz dzienną powtórkę dwóch zestawów na desktopie i telefonie.                   |
+| STUDY-CHECK | DONE | PASTE-02, TODAY-02   | Odbierz przejście od arkusza do nauki oraz dzienną powtórkę dwóch zestawów na desktopie i telefonie.                   |
 | SEARCH-01   | TODO | DECK-01              | Wyszukaj fiszkę po dowolnej stronie i przywróć wyniki po edycji. Sprawdź dużą bibliotekę i izolację kont.              |
 | REPAIR-01   | TODO | SYNC-01, SCHED-01    | Wylicz trudne fiszki z kanonicznej historii. Sprawdź świeże urządzenie, zmianę epoki i wynik offline.                  |
 | REPAIR-02   | TODO | SEARCH-01, REPAIR-01 | Pokaż listę „Do poprawy” z powodem i przejściem do edycji. Sprawdź zachowanie postępu po poprawieniu treści.           |
@@ -104,3 +104,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `TODAY-01` — Deterministyczna kolejka rozpoznaje termin, kierunek, epokę i dozwolone zestawy. Przeszły 83 testy, build i typy.
 
 - `TODAY-02` — Panel i sesja dzienna korzystają ze wspólnej puli, również w powłoce offline. Typy, build, 83 testy i 32 E2E przeszły lokalnie.
+
+- `STUDY-CHECK` — Na desktopie i telefonie sprawdzono wklejanie, dwa zestawy, przeładowanie offline, unikalne oceny na drugim urządzeniu i izolację konta. 34 E2E przeszły lokalnie.

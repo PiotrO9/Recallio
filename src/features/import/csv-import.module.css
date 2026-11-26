@@ -215,3 +215,34 @@
     margin-bottom: 0.2rem;
   }
 }
+
+.counts {
+  display: grid;
+  gap: 0.45rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.reviewActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1rem;
+  padding: 0.75rem;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+.reviewActions p {
+  flex: 1 1 12rem;
+}
+@media (min-height: 600px) {
+  .reviewActions {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+  }
+  .record select {
+    scroll-margin-bottom: 10rem;
+  }
+}

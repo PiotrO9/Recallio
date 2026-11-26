@@ -18,6 +18,7 @@ import {
 } from "@/domain/import/csv";
 import {
   createLocalRepository,
+  type ImportReceipt,
   type ImportStep,
   type SnapshotData,
   type StoredImport,
@@ -88,13 +89,30 @@ export function CsvImport({
   const [decisions, setDecisions] = useState<Record<number, Decision>>({});
   const [skipDuplicates, setSkipDuplicates] = useState(false);
   const [page, setPage] = useState(0);
+  const reviewForm = useRef<HTMLFormElement>(null);
+  const [focusRow, setFocusRow] = useState<number | null>(null);
+  useEffect(() => {
+    if (focusRow === null) return;
+    const record = reviewForm.current?.querySelector<HTMLDetailsElement>(
+      `details[data-row="${focusRow}"]`,
+    );
+    if (record) {
+      record.open = true;
+      const input =
+        record.querySelector<HTMLSelectElement>("select[data-target]") ??
+        record.querySelector("select");
+      input?.focus();
+    }
+    setFocusRow(null);
+  }, [focusRow, page]);
+
   const [operation, setOperation] = useState<
     "start" | "resume" | "finish" | null
   >(null);
   const busy = operation !== null;
   const [readingFile, setReadingFile] = useState(false);
   const [error, setError] = useState("");
-  const [done, setDone] = useState<StoredImport>();
+  const [done, setDone] = useState<ImportReceipt>();
   const [newName, setNewName] = useState("");
   const [preview, setPreview] = useState(false),
     [pausing, setPausing] = useState(false),
@@ -185,7 +203,7 @@ export function CsvImport({
       }
     );
   }
-  const unresolved = rows.some((row) => {
+  const unresolved = rows.filter((row) => {
     const choice = decision(row);
     return (
       !choice.kind ||
@@ -252,8 +270,7 @@ export function CsvImport({
       setActive(current);
     }
     if (current?.id !== plan.id) return;
-    await repository.forgetImport(plan.id);
-    setDone(current);
+    setDone(await repository.finishImport(plan.id));
     setActive(null);
     setFile(undefined);
     setWorkspace(await repository.readWorkspace());
@@ -287,7 +304,7 @@ export function CsvImport({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!preview || unresolved || !accepted) return;
+    if (!preview || unresolved.length > 0 || !accepted) return;
     const form = new FormData(event.currentTarget);
     void guarded("start", async () => {
       const id = target?.id ?? crypto.randomUUID();
@@ -344,7 +361,12 @@ export function CsvImport({
           expected: card,
         });
       }
-      const plan = { id: crypto.randomUUID(), deckId: id, steps };
+      const plan = {
+        id: crypto.randomUUID(),
+        deckId: id,
+        steps,
+        skippedRows: rows.length - accepted,
+      };
       await repository.startImport(plan, target, target ? existing : []);
       const stored = await repository.readImport();
       if (stored) {
@@ -400,13 +422,21 @@ export function CsvImport({
       </div>
       {done && (
         <section className={styles.receipt}>
-          <p>
-            Zapisano {done.next} z {done.total} kroków.
-          </p>
+          <h2>{done.deckName ?? "Podsumowanie importu"}</h2>
+          <ul className={styles.counts}>
+            <li>Dodane fiszki: {done.added}</li>
+            <li>Zaktualizowane fiszki: {done.updated}</li>
+            {done.skippedRows !== undefined && (
+              <li>Pominięte wiersze: {done.skippedRows}</li>
+            )}
+            {done.remaining > 0 && (
+              <li>Wiersze pozostałe bez zapisu: {done.remaining}</li>
+            )}
+          </ul>
           <p role="status">
             {done.next === done.total
               ? "Import zapisany na tym urządzeniu."
-              : "Zapisane kroki pozostają na tym urządzeniu."}
+              : "Import częściowy zapisany na tym urządzeniu."}
           </p>
           <div className="action-row">
             <ActionLink
@@ -480,8 +510,7 @@ export function CsvImport({
             disabled={busy}
             onConfirm={() => {
               void guarded("finish", async () => {
-                await repository.forgetImport(active.id);
-                setDone(active);
+                setDone(await repository.finishImport(active.id));
                 setActive(null);
                 setFile(undefined);
                 setWorkspace(await repository.readWorkspace());
@@ -494,6 +523,7 @@ export function CsvImport({
         !done && (
           <form
             className={`auth-form ${styles.body} ${preview ? "" : styles.choose}`}
+            ref={reviewForm}
             onSubmit={submit}
           >
             <fieldset
@@ -637,6 +667,7 @@ export function CsvImport({
                         <li key={row.row} className={styles.row}>
                           <details
                             className={styles.record}
+                            data-row={row.row}
                             data-review={
                               !choice.kind || row.classification === "invalid"
                             }
@@ -727,6 +758,7 @@ export function CsvImport({
                               <label>
                                 Fiszka do aktualizacji
                                 <select
+                                  data-target
                                   value={choice.target ?? ""}
                                   disabled={busy}
                                   onChange={({ target }) =>
@@ -779,14 +811,33 @@ export function CsvImport({
                     </button>
                   </div>
                 )}
-                <LoadingButton
-                  className="primary"
-                  loading={operation === "start"}
-                  loadingLabel="Rozpoczynanie importu…"
-                  disabled={!workspace || unresolved || !accepted}
-                >
-                  Zatwierdź import
-                </LoadingButton>
+                <div className={styles.reviewActions}>
+                  <p role="status">
+                    Wiersze wymagające decyzji: {unresolved.length}
+                  </p>
+                  {unresolved.length > 0 && (
+                    <button
+                      type="button"
+                      className="text-action"
+                      disabled={busy}
+                      onClick={() => {
+                        const first = unresolved[0];
+                        setPage(Math.floor(rows.indexOf(first) / pageSize));
+                        setFocusRow(first.row);
+                      }}
+                    >
+                      Przejdź do wiersza {unresolved[0].row}
+                    </button>
+                  )}
+                  <LoadingButton
+                    className="primary"
+                    loading={operation === "start"}
+                    loadingLabel="Rozpoczynanie importu…"
+                    disabled={!workspace || unresolved.length > 0 || !accepted}
+                  >
+                    Zatwierdź import
+                  </LoadingButton>
+                </div>
               </>
             )}
           </form>

@@ -98,6 +98,13 @@ export type StoredImport = {
   deckId: string;
   next: number;
   total: number;
+  skippedRows?: number;
+  deckName?: string;
+};
+export type ImportReceipt = StoredImport & {
+  added: number;
+  updated: number;
+  remaining: number;
 };
 export type ImportStep = {
   operation: ContentOperation;
@@ -159,12 +166,13 @@ export function createLocalRepository(
     startImport(
       plan: Pick<StoredImport, "id" | "deckId"> & {
         steps: readonly ImportStep[];
+        skippedRows?: number;
       },
       expectedDeck: SnapshotData["decks"][number] | null,
       expectedCards: readonly Card[],
     ): Promise<void>;
     readImportStep(id: string, index: number): Promise<ImportStep>;
-    forgetImport(id: string): Promise<void>;
+    finishImport(id: string): Promise<ImportReceipt>;
     applyPullPage(expected: string, page: PullResponse): Promise<boolean>;
     countUnsent(): Promise<number>;
     clearForLogout(discardPending: boolean): Promise<number>;
@@ -1048,7 +1056,18 @@ export function createLocalRepository(
         steps.map((step, index) => meta.put(step, importKey(id, index))),
       );
       await meta.put(
-        { id, deckId, next: 0, total: steps.length } satisfies StoredImport,
+        {
+          id,
+          deckId,
+          next: 0,
+          total: steps.length,
+          skippedRows: plan.skippedRows,
+          deckName:
+            expectedDeck?.name ??
+            (steps[0]?.operation.type === "deck.create"
+              ? steps[0].operation.payload.name
+              : undefined),
+        } satisfies StoredImport,
         "csvImport",
       );
       await tx.done;
@@ -1060,20 +1079,35 @@ export function createLocalRepository(
       if (!step) throw new Error("Brak kroku importu");
       return step;
     },
-    async forgetImport(id) {
+    async finishImport(id) {
       const db = await connect();
-      const tx = db.transaction("meta", "readwrite");
-      const plan = (await tx.store.get("csvImport")) as
-        StoredImport | undefined;
-      if (plan?.id === id) {
-        await Promise.all(
-          Array.from({ length: plan.total }, (_, index) =>
-            tx.store.delete(importKey(id, index)),
-          ),
-        );
-        await tx.store.delete("csvImport");
+      const tx = db.transaction(["meta", "decks"], "readwrite");
+      const meta = tx.objectStore("meta");
+      const plan = (await meta.get("csvImport")) as StoredImport | undefined;
+      if (!plan || plan.id !== id) throw new Error("Plan importu zmienił się");
+      const keys = Array.from({ length: plan.total }, (_, index) =>
+        importKey(id, index),
+      );
+      const steps = await Promise.all(
+        keys.map((key) => meta.get(key) as Promise<ImportStep | undefined>),
+      );
+      let added = 0,
+        updated = 0,
+        remaining = 0;
+      let deckName =
+        plan.deckName ?? (await tx.objectStore("decks").get(plan.deckId))?.name;
+      for (const [index, step] of steps.entries()) {
+        if (!step) throw new Error("Brak kroku importu");
+        const op = step.operation;
+        if (op.type === "deck.create") deckName ??= op.payload.name;
+        else if (index >= plan.next) remaining++;
+        else if (op.type === "card.create") added++;
+        else if (op.type === "card.update") updated++;
       }
+      await Promise.all(keys.map((key) => meta.delete(key)));
+      await meta.delete("csvImport");
       await tx.done;
+      return { ...plan, deckName, added, updated, remaining };
     },
     async applyPullPage(expected, input) {
       const page = pullResponseSchema.parse(input);

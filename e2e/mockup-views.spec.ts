@@ -279,6 +279,10 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
     await expect(
       page.getByRole("heading", { name: "Import zakończony", exact: true }),
     ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Z pliku" })).toBeVisible();
+    await expect(
+      page.getByText("Dodane fiszki: 1", { exact: true }),
+    ).toBeVisible();
     await frame("W12");
     expect(frames.size).toBe(18);
     await page.getByRole("button", { name: "Importuj kolejny plik" }).click();
@@ -290,20 +294,30 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
       name: "decyzje.csv",
       mimeType: "text/csv",
       buffer: Buffer.from(
-        "side_a,side_b,example_a\nun conto,konto,\nun conto,rachunek,Il conto per favore\n" +
+        "side_a,side_b,example_a\nun conto,konto,\n" +
           Array.from({ length: 22 }, (_, i) => `słowo ${i},opis ${i},`).join(
             "\n",
-          ),
+          ) +
+          "\nun conto,rachunek,Il conto per favore",
       ),
     });
     await page.getByRole("button", { name: "Pokaż podgląd" }).click();
     for (const [row, kind] of [
       [2, "Inna odpowiedź"],
-      [3, "Inny przykład"],
+      [25, "Inny przykład"],
     ] as const) {
+      await expect(
+        page.getByRole("button", { name: "Zatwierdź import" }),
+      ).toBeDisabled();
       await page
-        .getByText("Wiersz " + row + " · " + kind, { exact: true })
+        .getByRole("button", { name: "Przejdź do wiersza " + row, exact: true })
         .click();
+      await expect(
+        page.getByLabel("Akcja wiersza " + row, { exact: true }),
+      ).toBeFocused();
+      await expect(
+        page.getByText("Wiersz " + row + " · " + kind, { exact: true }),
+      ).toBeVisible();
       if (row === 2) {
         const comparison = page
           .locator("details[open]")
@@ -321,9 +335,19 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
       }
       await page
         .getByLabel("Akcja wiersza " + row, { exact: true })
-        .selectOption("skip");
+        .selectOption(row === 2 ? "skip" : "update_examples");
+      if (row === 25) {
+        await page
+          .getByRole("button", { name: "Przejdź do wiersza 25" })
+          .click();
+        const target = page.getByLabel("Fiszka do aktualizacji");
+        await expect(target).toBeFocused();
+        await target.selectOption({ index: 1 });
+      }
     }
-    await page.getByRole("button", { name: "Następna" }).click();
+    await expect(
+      page.getByRole("button", { name: "Zatwierdź import" }),
+    ).toBeEnabled();
     await expect(page.getByText("Strona 2 z 2")).toBeVisible();
     await page.getByRole("button", { name: "Poprzednia" }).click();
     await expect(
@@ -360,11 +384,30 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
         .getByRole("dialog")
         .getByRole("button", { name: "Anuluj" })
         .click();
+      await page.reload();
       await page.getByRole("button", { name: "Wznów import" }).click();
       await expect(
         page.getByRole("heading", { name: "Import zakończony", exact: true }),
       ).toBeVisible();
     }
+    await expect(
+      page.getByRole("heading", { name: "Włoski w kawiarni", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Dodane fiszki: " + (mobile ? 1 : 22), { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Zaktualizowane fiszki: " + (mobile ? 0 : 1), {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Pominięte wiersze: 1", { exact: true }),
+    ).toBeVisible();
+    if (mobile)
+      await expect(
+        page.getByText("Wiersze pozostałe bez zapisu: 22"),
+      ).toBeVisible();
   } finally {
     await request.delete(admin + "/" + id, { headers });
   }

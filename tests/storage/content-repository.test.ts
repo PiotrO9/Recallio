@@ -74,7 +74,17 @@ test("CSV import stores its cursor atomically, reuses operation IDs and detects 
     });
     assert.equal((await resumed.readImport())?.next, 2);
     assert.equal((await resumed.readWorkspace()).cards.length, 2);
-    await resumed.forgetImport(plan.id);
+    const receipt = await resumed.finishImport(plan.id);
+    assert.deepEqual(
+      [
+        receipt.deckName,
+        receipt.added,
+        receipt.updated,
+        receipt.remaining,
+        receipt.skippedRows,
+      ],
+      ["CSV", 2, 0, 0, undefined],
+    );
     assert.equal(await resumed.readImport(), null);
   } finally {
     first.close();

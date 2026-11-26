@@ -238,12 +238,12 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
     const index = page.getByRole("region", { name: "Biblioteka" });
     if (mobile) await expect(index).toBeHidden();
     else
-      await expect(index.locator('button[aria-current="true"]')).toContainText(
+      await expect(index.locator('a[aria-current="true"]')).toContainText(
         "Włoski w kawiarni",
       );
     await page.getByRole("button", { name: "Wróć do zestawów" }).click();
     await expect(
-      page.getByRole("button", { name: /Włoski w kawiarni/ }),
+      page.getByRole("link", { name: /Włoski w kawiarni/ }),
     ).toBeVisible();
     await frame("W02");
     await page.getByRole("link", { name: "Importuj CSV" }).click();

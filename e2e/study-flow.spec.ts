@@ -334,13 +334,13 @@ test("a review survives an offline reload and synchronizes once to a second devi
     ).toBeVisible();
     await page.goto("/decks");
     await expect(
-      page.getByRole("button", { name: /^Nauka Fiszki: 1 Otwórz$/ }),
+      page.getByRole("link", { name: /^Nauka Fiszki: 1 Otwórz$/ }),
     ).toBeVisible();
     await expectAccessible(page);
     const search = page.getByRole("searchbox", { name: "Wyszukaj zestaw" });
     await search.fill("brak dopasowania");
     await expect(
-      page.getByRole("button", { name: /^Nauka Fiszki: 1 Otwórz$/ }),
+      page.getByRole("link", { name: /^Nauka Fiszki: 1 Otwórz$/ }),
     ).toHaveCount(0);
     await search.clear();
     await page.getByRole("button", { name: "Dodaj zestaw" }).click();
@@ -350,9 +350,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
       page.getByRole("button", { name: "Niewysłany szkic" }),
     ).toHaveCount(0);
 
-    await page
-      .getByRole("button", { name: /^Nauka Fiszki: 1 Otwórz$/ })
-      .click();
+    await page.getByRole("link", { name: /^Nauka Fiszki: 1 Otwórz$/ }).click();
     await page.getByText("Zarządzaj zestawem", { exact: true }).click();
     await page.getByRole("button", { name: "Edytuj zestaw" }).click();
     await page.getByLabel("Nazwa zestawu").fill("Zaktualizowany zestaw");
@@ -472,7 +470,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
     ).toBeVisible();
     await page.getByRole("link", { name: "Wróć do zestawów" }).click();
     await page
-      .getByRole("button", { name: /^Z pliku CSV Fiszki: 2 Otwórz$/ })
+      .getByRole("link", { name: /^Z pliku CSV Fiszki: 2 Otwórz$/ })
       .click();
     await page.getByText("Zarządzaj zestawem", { exact: true }).click();
     const downloaded = page.waitForEvent("download");

@@ -6,7 +6,14 @@ import { prepareStudyShell } from "@/features/study/offline";
 import { ConfirmAction } from "@/components/confirm-action";
 import { LoadingButton } from "@/components/loading-button";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type MouseEvent,
+} from "react";
 import {
   directionModeSchema,
   operationSchema,
@@ -23,6 +30,22 @@ import {
 import { createSyncController, type SyncStatus } from "@/sync/controller";
 import styles from "./deck-manager.module.css";
 import { discardDraft, draftKey, readDraft, rememberDraft } from "./card-draft";
+
+type LibraryPosition = {
+  userId: string;
+  search: string;
+  rowId: string;
+  scrollY: number | null;
+};
+
+function libraryPosition(userId: string): LibraryPosition | undefined {
+  const position = window.history.state?.libraryPosition;
+  return position?.userId === userId ? position : undefined;
+}
+
+function deckHref(id: string) {
+  return "/decks?deck=" + encodeURIComponent(id);
+}
 
 type DeckAction =
   | "saveDeck"
@@ -46,7 +69,7 @@ export function DeckManager({
 }) {
   const [data, setData] = useState<SnapshotData>();
   const [selected, setSelected] = useState<string | undefined>(initialDeck);
-  const rowToFocus = useRef<string | undefined>(undefined);
+  const returnPosition = useRef<LibraryPosition | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [deckForm, setDeckForm] = useState<Deck | null | undefined>(
     createDeck ? null : undefined,
@@ -201,6 +224,12 @@ export function DeckManager({
         },
         expected,
       );
+      if (!expected)
+        window.history.replaceState(
+          { libraryPosition: libraryPosition(userId) },
+          "",
+          deckHref(entityId) + "&card=new",
+        );
       setSelected(entityId);
       if (!expected) setCardForm(null);
       setDeckForm(undefined);
@@ -265,6 +294,8 @@ export function DeckManager({
         discardDraft(draftKey(userId, item.deckId, item.id));
         setCardForm(undefined);
       } else {
+        window.history.replaceState({}, "", "/decks");
+        setSelected(undefined);
         setDeckForm(undefined);
         setCardForm(undefined);
       }
@@ -314,11 +345,81 @@ export function DeckManager({
   const previewCard =
     preview && data?.cards.find((c) => !c.deletedAt && c.deckId === preview.id);
   const focusSelection = useRef(false);
-  function openDeck(id: string) {
-    if (id === selected) return;
+  useEffect(() => {
+    function restoreLocation() {
+      if (window.location.pathname !== "/decks") return;
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("deck") ?? undefined;
+      const position = libraryPosition(userId);
+      returnPosition.current = id ? undefined : position;
+      focusSelection.current = !!id;
+      setSearch(position?.search ?? "");
+      setSelected(id);
+      setDeckForm(params.get("new") === "1" ? null : undefined);
+      setCardForm(params.get("card") === "new" ? null : undefined);
+    }
+    restoreLocation();
+    window.addEventListener("popstate", restoreLocation);
+    return () => window.removeEventListener("popstate", restoreLocation);
+  }, [userId]);
+
+  function openDeck(event: MouseEvent<HTMLAnchorElement>, id: string) {
+    if (
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey ||
+      event.button !== 0
+    )
+      return;
+    event.preventDefault();
+    if (busy || id === selected) return;
+    const position = { userId, rowId: id, search, scrollY: window.scrollY };
+    if (!selected) {
+      window.history.replaceState({ libraryPosition: position }, "", "/decks");
+      window.history.pushState(
+        { libraryPosition: position, fromLibrary: true },
+        "",
+        deckHref(id),
+      );
+    } else {
+      window.history.replaceState(
+        {
+          libraryPosition: libraryPosition(userId),
+          fromLibrary: window.history.state?.fromLibrary,
+        },
+        "",
+        deckHref(id),
+      );
+    }
     focusSelection.current = true;
     setSelected(id);
     setCardForm(undefined);
+  }
+
+  function closeCardForm() {
+    if (selected && new URLSearchParams(window.location.search).has("card")) {
+      window.history.replaceState(
+        {
+          libraryPosition: libraryPosition(userId),
+          fromLibrary: window.history.state?.fromLibrary,
+        },
+        "",
+        deckHref(selected),
+      );
+    }
+    setCardForm(undefined);
+  }
+
+  function returnToList(id: string) {
+    if (window.history.state?.fromLibrary && libraryPosition(userId)) {
+      window.history.back();
+      return;
+    }
+    const position = { userId, rowId: id, search, scrollY: null };
+    window.history.replaceState({ libraryPosition: position }, "", "/decks");
+    returnPosition.current = position;
+    setSelected(undefined);
   }
 
   return (
@@ -360,18 +461,23 @@ export function DeckManager({
             <ul className={styles.list} aria-label="Zestawy">
               {found.map((item) => (
                 <li key={item.id}>
-                  <button
+                  <a
                     className={styles.deckRow}
-                    disabled={busy}
+                    href={deckHref(item.id)}
+                    aria-disabled={busy || undefined}
                     style={deckColor(item.id)}
                     aria-current={deck?.id === item.id ? "true" : undefined}
                     ref={(el) => {
-                      if (el && rowToFocus.current === item.id) {
-                        el.focus();
-                        rowToFocus.current = undefined;
+                      const position = returnPosition.current;
+                      if (el && !selected && position?.rowId === item.id) {
+                        returnPosition.current = undefined;
+                        el.focus({ preventScroll: true });
+                        if (position.scrollY === null)
+                          el.scrollIntoView({ block: "nearest" });
+                        else window.scrollTo(0, position.scrollY);
                       }
                     }}
-                    onClick={() => openDeck(item.id)}
+                    onClick={(event) => openDeck(event, item.id)}
                   >
                     <span>
                       {item.name}
@@ -380,7 +486,7 @@ export function DeckManager({
                       </span>
                     </span>
                     <small>Otwórz</small>
-                  </button>
+                  </a>
                 </li>
               ))}
             </ul>
@@ -418,13 +524,13 @@ export function DeckManager({
                   <span>{previewCard.sideB}</span>
                 </div>
               )}
-              <button
-                type="button"
+              <a
                 className="primary"
-                onClick={() => openDeck(preview.id)}
+                href={deckHref(preview.id)}
+                onClick={(event) => openDeck(event, preview.id)}
               >
                 Otwórz zestaw
-              </button>
+              </a>
             </NotebookSheet>
           </aside>
         )}
@@ -480,7 +586,11 @@ export function DeckManager({
                 className="auth-secondary"
                 type="button"
                 disabled={busy}
-                onClick={() => setDeckForm(undefined)}
+                onClick={() => {
+                  if (createDeck && !selected)
+                    window.history.replaceState({}, "", "/decks");
+                  setDeckForm(undefined);
+                }}
               >
                 Anuluj
               </button>
@@ -494,11 +604,8 @@ export function DeckManager({
               className="text-action"
               disabled={busy}
               onClick={() => {
-                if (cardForm === undefined) {
-                  rowToFocus.current = deck.id;
-                  setSelected(undefined);
-                }
-                setCardForm(undefined);
+                if (cardForm === undefined) returnToList(deck.id);
+                else closeCardForm();
               }}
             >
               {cardForm === undefined ? "Wróć do zestawów" : "Wróć do zestawu"}
@@ -779,7 +886,7 @@ export function DeckManager({
                       disabled={busy}
                       onConfirm={() => {
                         if (editorKey) discardDraft(editorKey);
-                        setCardForm(undefined);
+                        closeCardForm();
                       }}
                     />
                   </div>

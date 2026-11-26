@@ -69,7 +69,7 @@ test("thirty decks at large type on a narrow or wide viewport", async ({
     }
     await page.goto("/decks");
     const index = page.getByRole("list", { name: "Zestawy", exact: true });
-    await expect(index.getByRole("button")).toHaveCount(30);
+    await expect(index.getByRole("link")).toHaveCount(30);
     await page.addStyleTag({ content: ":root {font-size:200% !important;}" });
     const search = page.getByRole("searchbox");
     await search.fill("meteorologia");
@@ -77,9 +77,9 @@ test("thirty decks at large type on a narrow or wide viewport", async ({
       page.getByText("Brak wyników dla „meteorologia”."),
     ).toBeVisible();
     await page.getByRole("button", { name: "Wyczyść wyszukiwanie" }).click();
-    await expect(index.getByRole("button")).toHaveCount(30);
+    await expect(index.getByRole("link")).toHaveCount(30);
     await search.fill("kwalifikacyjnej");
-    const row = index.getByRole("button", { name: new RegExp(longName) });
+    const row = index.getByRole("link", { name: new RegExp(longName) });
     await row.click();
     await expect(
       page.getByRole("heading", { name: longName, exact: true }),
@@ -89,6 +89,35 @@ test("thirty decks at large type on a narrow or wide viewport", async ({
     ).toBeLessThanOrEqual(width);
     await page.getByRole("button", { name: "Wróć do zestawów" }).click();
     await expect(row).toBeFocused();
+    await expect(search).toHaveValue("kwalifikacyjnej");
+    await search.fill("Włoski");
+    const lesson = index.getByRole("link").nth(22);
+    const href = await lesson.getAttribute("href");
+    expect(href).toMatch(/^\/decks\?deck=/);
+    await lesson.scrollIntoViewIfNeeded();
+    const offset = await page.evaluate(() => window.scrollY);
+    expect(offset).toBeGreaterThan(0);
+    await lesson.click();
+    await expect(page).toHaveURL(href!);
+    await page.goBack();
+    await expect(search).toHaveValue("Włoski");
+    await expect(lesson).toBeFocused();
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY))
+      .toBeCloseTo(offset, 0);
+    await page.goForward();
+    await expect(page).toHaveURL(href!);
+    await page.reload();
+    const detail = page.getByRole("region", { name: /^Włoski · Lekcja/ });
+    await expect(detail.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.getByRole("button", { name: "Wróć do zestawów" }).click();
+    await expect(search).toHaveValue("Włoski");
+    await expect(lesson).toBeFocused();
+    await page.goto(href!);
+    await expect(detail.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.getByRole("button", { name: "Wróć do zestawów" }).click();
+    await expect(page).toHaveURL("/decks");
+    await expect(index.locator(`a[href="${href}"]`)).toBeFocused();
   } finally {
     await request.delete(url + "/" + id, { headers });
   }

@@ -77,6 +77,8 @@ OpenNext zgłasza ograniczone wsparcie Windows. Przy problemach z narzędziami b
 
 ## Dostępność
 
+Pomiar bazowy A11Y-01 na lokalnym koncie obejmował 44 wykonane testy E2E i 26 skanów axe na dwóch profilach Chromium. Każdy plik `test-results/**/axe-*.json` podaje stan, regułę, selektor i przyczynę. Wykryto 0 naruszeń automatycznych. W 20 skanach wynik `incomplete` dotyczył kontrastu. Przypadki te wymagają pomiaru na wyrenderowanym tle. Logowanie, błąd pola i potwierdzenie importu miały po dwa skany bez `incomplete`.
+
 `e2e/entry.spec.ts` sprawdza wejście do aplikacji i obsługę logowania klawiaturą. `e2e/study-flow.spec.ts` sprawdza odsłonięcie fiszki, ocenę i ponowienie błędnego zapisu z klawiatury oraz komunikat o nieprawidłowym CSV. Axe analizuje logowanie, trening, zestawy i podgląd importu pod kątem wybranych reguł WCAG A i AA. Testy kontrolują brak przewijania w poziomie przy 320 px. Oba profile Chromium przeszły lokalnie w Next.js i Wranglerze. Testy nie obejmują rzeczywistych czytników ekranu.
 
 ## Odbiór MVP

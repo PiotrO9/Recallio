@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { expectAccessible } from "./accessibility";
 import { expect } from "@playwright/test";
 import { test, signIn } from "./local-accounts";
 import { operationSchema } from "../src/contracts";
@@ -59,6 +60,7 @@ for (const direction of ["a-b", "b-a"] as const) {
       await expect(input).toHaveValue(answer + "3");
       await page.getByRole("button", { name: "Pokaż odpowiedź" }).click();
       await expect(page.getByText(answer + "3", { exact: true })).toBeVisible();
+      await expectAccessible(page, "odpowiedz");
       await expect(
         page.getByText(direction === "a-b" ? "hi" : "cześć", { exact: true }),
       ).toBeVisible();

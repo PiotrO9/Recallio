@@ -52,6 +52,19 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | REPAIR-02   | DONE | SEARCH-01, REPAIR-01 | Pokaż listę „Do poprawy” z powodem i przejściem do edycji. Sprawdź zachowanie postępu po poprawieniu treści.           |
 | TYPE-01     | DONE | TRAIN-01             | Dodaj opcjonalną odpowiedź pisemną przed odsłonięciem. Sprawdź samoocenę, retry i czyszczenie tekstu.                  |
 
+### Dostępność WCAG 2.2 AA
+
+[Specyfikacja i kryteria odbioru](TECHNICAL-PLAN.md#specyfikacja-techniczna-do-wdrożenia).
+
+| ID      | Stan | Zakres                                 |
+| ------- | ---- | -------------------------------------- |
+| A11Y-01 | DONE | Pomiar axe i stany bazowe.             |
+| A11Y-02 | TODO | Nawigacja, tytuły i walidacja.         |
+| A11Y-03 | TODO | Trening, zapis i ponowienie odczytu.   |
+| A11Y-04 | TODO | Wyszukiwanie, import i sugestie.       |
+| A11Y-05 | TODO | Potwierdzenia, preferencje i układ.    |
+| A11Y-06 | TODO | Macierz dowodów i odbiór z czytnikami. |
+
 ## Wyniki i blokady
 
 Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono i weryfikację. Dla `BLOCKED` podaj ID, co udało się zrobić, przyczynę z dowodem oraz sprawdzalny warunek wznowienia. Jeśli część prac zachowano wyłącznie lokalnie, odnotuj jej lokalizację lub hash.
@@ -116,3 +129,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `TYPE-01` — Wpis pozostaje w pamięci pytania. W obu kierunkach desktop i mobilny Chromium potwierdziły zachowanie tekstu po błędzie, samoocenę, wyczyszczenie pola i pojedynczą operację bez wpisanej treści. 85 testów i 44 E2E.
 
 - Odbiór pięciu funkcji po integracji — Wstecz przywraca listę „Do poprawy”, edycja ostatniego trafienia przenosi fokus do wyszukiwarki, a panel po utracie sieci korzysta z przygotowanych zestawów. Sprawdzono 85 testów, 44 scenariusze E2E w Next.js, 16 przebiegów nowych funkcji w lokalnym Wranglerze, rzeczywisty IndexedDB, 21 asercji pgTAP oraz izolację kont przez REST. Oba buildy lokalne przeszły.
+
+- `A11Y-01` — 26 raportów axe, 44/44 E2E na lokalnych kontach.

@@ -1,3 +1,4 @@
+import { expectAccessible } from "./accessibility";
 import { expect } from "@playwright/test";
 import { test } from "./local-accounts";
 import { seedDifficultCard } from "./repair-fixture";
@@ -26,6 +27,8 @@ test("sugestia prowadzi do edytora, wraca po zapisie i działa z pamięci offlin
   await expect(
     page.getByText("A → B · Trudność w 3 różnych dniach"),
   ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Do poprawy" })).toBeVisible();
+  await expectAccessible(page, "do-poprawy");
   await page.getByRole("link", { name: "Edytuj fiszkę" }).click();
   await expect(page.getByLabel("Przykład B")).toBeVisible();
   await page.goBack();

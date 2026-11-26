@@ -9,6 +9,7 @@ test("login shows pending feedback, blocks duplicate submits and recovers after 
   const submit = page.getByRole("button", { name: "Zaloguj się" });
   await submit.click();
   await expect(submit).toBeEnabled();
+  await expectAccessible(page, "blad-pola");
   await page.getByLabel("Adres e-mail").fill("loading@example.test");
   await page.getByLabel("Hasło").fill("password-for-test");
   let release!: () => void;
@@ -62,7 +63,7 @@ test("visitors enter through accessible sign-in at 320px", async ({ page }) => {
   await expect(
     page.getByRole("textbox", { name: "Adres e-mail" }),
   ).toBeFocused();
-  await expectAccessible(page);
+  await expectAccessible(page, "logowanie");
 });
 
 test("account links and old bookmarks open the correct form", async ({

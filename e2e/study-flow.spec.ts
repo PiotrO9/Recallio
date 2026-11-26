@@ -62,10 +62,10 @@ test("a review survives an offline reload and synchronizes once to a second devi
   const page = await primary.newPage();
   await page.goto("/");
   await expect(page).toHaveURL(baseURL + "/");
-  await expectAccessible(page);
+  await expectAccessible(page, "panel");
   await page.getByRole("link", { name: "Poznaj nowe fiszki" }).click();
   await expect(page.getByRole("heading", { name: "pies" })).toBeVisible();
-  await expectAccessible(page);
+  await expectAccessible(page, "pytanie");
   const manifestResponse = await request.get("/manifest.webmanifest");
   expect(manifestResponse.ok()).toBe(true);
   const manifest = await manifestResponse.json();
@@ -414,7 +414,7 @@ test("CSV import skips duplicates and exports the saved cards", async ({
   });
   await page.getByRole("button", { name: "Pokaż podgląd" }).click();
   await expect(page.getByText("Wiersz 3 · Duplikat")).toBeVisible();
-  await expectAccessible(page);
+  await expectAccessible(page, "podglad-csv");
   await page.getByLabel("Pomiń duplikaty").check();
   await expect(
     page.getByText("Separator: średnik. Do zapisu: 2 z 3."),
@@ -481,7 +481,7 @@ test("deck edits preserve progress and deleted cards reject stale changes", asyn
   await expect(
     page.getByRole("link", { name: /^Nauka Fiszki: 1 Otwórz$/ }),
   ).toBeVisible();
-  await expectAccessible(page);
+  await expectAccessible(page, "biblioteka");
   const search = page.getByRole("searchbox", { name: "Wyszukaj zestaw" });
   await search.fill("brak dopasowania");
   await expect(

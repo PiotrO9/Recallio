@@ -88,7 +88,7 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
   await expect(page.getByRole("link", { name: "Utwórz zestaw" })).toHaveCount(
     0,
   );
-  await expectAccessible(page);
+  await expectAccessible(page, "blad-panelu");
   await page.screenshot({
     path: info.outputPath("W01-error.png"),
     scale: "css",
@@ -112,7 +112,7 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
     page.getByRole("heading", { name: "Twój pierwszy zestaw" }),
   ).toBeFocused();
   expect(await page.evaluate(() => performance.timeOrigin)).toBe(loadedAt);
-  await expectAccessible(page);
+  await expectAccessible(page, "pusty-panel");
   if (mobile) await page.setViewportSize({ width, height: 844 });
   await page.reload();
   await expect(
@@ -331,6 +331,8 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
       await page.getByRole("button", { name: "Przejdź do wiersza 25" }).click();
       const target = page.getByLabel("Fiszka do aktualizacji");
       await expect(target).toBeFocused();
+      await expectAccessible(page, "konflikt-importu");
+      await expect(target).toBeFocused();
       await target.selectOption({ index: 1 });
     }
   }
@@ -376,7 +378,10 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
     page.getByRole("heading", { name: "Import wstrzymany" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Zakończ import" }).click();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(
+    page.getByRole("dialog").getByRole("button", { name: "Anuluj" }),
+  ).toBeFocused();
+  await expectAccessible(page, "potwierdzenie-importu");
   if (mobile) {
     await page
       .getByRole("dialog")

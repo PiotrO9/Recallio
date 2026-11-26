@@ -119,9 +119,9 @@ function StudyBoard({
   const endedRef = useRef(false);
   const extra = useRef<{ dayStart: number; count: number } | null>(null);
   const revealButton = useRef<HTMLButtonElement>(null);
-  const firstGrade = useRef<HTMLButtonElement>(null);
+  const gradeGroup = useRef<HTMLDivElement>(null);
   const retryButton = useRef<HTMLButtonElement>(null);
-  const restartButton = useRef<HTMLButtonElement>(null);
+  const returnLink = useRef<HTMLAnchorElement>(null);
   const moveToCard = useRef(false);
   const active = useRef<Candidate | null>(null);
   const previousCard = useRef<string | null>(null);
@@ -491,9 +491,9 @@ function StudyBoard({
 
   useEffect(() => {
     if (busy) return;
-    if (ended) restartButton.current?.focus();
+    if (ended) returnLink.current?.focus();
     else if (saveError) retryButton.current?.focus();
-    else if (revealed) firstGrade.current?.focus({ preventScroll: true });
+    else if (revealed) gradeGroup.current?.focus({ preventScroll: true });
     else if (candidate && moveToCard.current) {
       moveToCard.current = false;
       revealButton.current?.focus();
@@ -567,20 +567,21 @@ function StudyBoard({
           <h1>Sesja zakończona.</h1>
           {settings?.showSession && <p>Odpowiedzi w sesji: {sessionCount}</p>}
           <div className="action-row">
-            <LoadingButton
-              ref={restartButton}
+            <a
+              ref={returnLink}
               className="primary"
+              href={currentDeck ? `/decks?deck=${currentDeck.id}` : "/decks"}
+            >
+              {currentDeck ? "Wróć do zestawu" : "Moje zestawy"}
+            </a>
+            <LoadingButton
+              className="text-action"
               loading={cardRequest === "restart"}
               loadingLabel="Wczytywanie fiszek…"
               onClick={() => void loadNext("restart")}
             >
               Rozpocznij nową sesję
             </LoadingButton>
-            {currentDeck ? (
-              <a href={`/decks?deck=${currentDeck.id}`}>Wróć do zestawu</a>
-            ) : (
-              <a href="/decks">Moje zestawy</a>
-            )}
           </div>
           {cardReadError && (
             <p role="alert">Nie udało się wczytać fiszek. Spróbuj ponownie.</p>
@@ -597,7 +598,7 @@ function StudyBoard({
         sessionCount > 0 &&
         dueToday === 0 &&
         candidate?.mode === "practice" && (
-          <p>Dzisiejsze powtórki zrobione. Możesz ćwiczyć dalej.</p>
+          <p>Powtórki w tym zestawie zrobione. Możesz ćwiczyć dalej.</p>
         )}
       {!ended && settings?.showSession && (
         <p>Odpowiedzi w sesji: {sessionCount}</p>
@@ -647,7 +648,9 @@ function StudyBoard({
               )}
             </div>
           </NotebookSheet>
-          {revealed && !saveError && <p>Jak dobrze pamiętasz odpowiedź?</p>}
+          {revealed && !saveError && (
+            <p id="grade-question">Jak dobrze pamiętasz odpowiedź?</p>
+          )}
           {revealed ? (
             <>
               {saveError ? (
@@ -671,6 +674,9 @@ function StudyBoard({
                   className={styles.grades}
                   role="group"
                   aria-label="Ocena odpowiedzi"
+                  aria-describedby="grade-question"
+                  ref={gradeGroup}
+                  tabIndex={-1}
                   onKeyDown={(event) => {
                     if (
                       event.repeat ||
@@ -688,17 +694,16 @@ function StudyBoard({
                     void rate(grade[0]);
                   }}
                 >
-                  {grades.map(([value, label], index) => (
+                  {grades.map(([value, label]) => (
                     <LoadingButton
                       className="primary"
                       key={value}
                       aria-keyshortcuts={String(value)}
-                      ref={index === 0 ? firstGrade : undefined}
                       disabled={busy}
                       loading={savingRating === value}
                       onClick={() => void rate(value)}
                     >
-                      {label}
+                      <kbd aria-hidden="true">{value}</kbd> {label}
                     </LoadingButton>
                   ))}
                 </div>

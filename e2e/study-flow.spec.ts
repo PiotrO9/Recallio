@@ -139,7 +139,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
       .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller))
       .toBe(true);
     const cachedPaths = await page.evaluate(async () => {
-      const cache = await caches.open("recallio-study-shell-v7");
+      const cache = await caches.open("recallio-study-shell-v8");
       return (await cache.keys()).map((entry) => new URL(entry.url).pathname);
     });
     expect(cachedPaths).toContain("/study/offline");
@@ -160,8 +160,19 @@ test("a review survives an offline reload and synchronizes once to a second devi
     await page.getByRole("button", { name: "Pokaż odpowiedź" }).focus();
     await page.keyboard.press("Space");
     await expect(page.getByText("dog", { exact: true })).toBeVisible();
+    const grades = page.getByRole("group", { name: "Ocena odpowiedzi" });
+    await expect(grades).toBeFocused();
+    for (const key of ["1", "2", "3", "4"]) {
+      const shortcut = grades.locator(`button[aria-keyshortcuts="${key}"] kbd`);
+      await expect(shortcut).toHaveText(key);
+      await expect(shortcut).toBeVisible();
+    }
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Space");
+    await expect(grades).toBeFocused();
+    await page.keyboard.press("Tab");
     await expect(
-      page.getByRole("button", { name: "Nie pamiętam" }),
+      grades.getByRole("button", { name: "Nie pamiętam" }),
     ).toBeFocused();
     await expect(update).toHaveCount(0);
     await page.evaluate(() => {
@@ -181,7 +192,6 @@ test("a review survives an offline reload and synchronizes once to a second devi
     const releaseProgress = await holdStore(page, owner.id, "progress");
     try {
       await page.keyboard.press("3");
-      const grades = page.getByRole("group", { name: "Ocena odpowiedzi" });
       await expect(
         grades.getByRole("button", { name: "Dobrze" }),
       ).toHaveAttribute("aria-busy", "true");
@@ -251,6 +261,9 @@ test("a review survives an offline reload and synchronizes once to a second devi
     await expect(secondPage.getByText("Zapisany postęp: 1")).toBeAttached();
     await secondPage.getByRole("button", { name: "Zakończ sesję" }).click();
     await expect(secondPage.getByText("Sesja zakończona.")).toBeVisible();
+    await expect(
+      secondPage.getByRole("link", { name: "Wróć do zestawu" }),
+    ).toBeFocused();
     await secondPage
       .getByRole("button", { name: "Rozpocznij nową sesję" })
       .click();
@@ -289,6 +302,22 @@ test("a review survives an offline reload and synchronizes once to a second devi
     });
     await openSettings.click();
     await expect(defaultLimit).toHaveValue("20");
+    const unsaved = otherPage.getByText("Niezapisane zmiany", { exact: true });
+    await expect(unsaved).toHaveCount(0);
+    await defaultLimit.fill("8");
+    await expect(unsaved).toBeVisible();
+    await defaultLimit.fill("20");
+    await expect(unsaved).toHaveCount(0);
+    for (const name of [
+      "Pokaż powtórki na dziś",
+      "Pokaż liczbę odpowiedzi w sesji",
+    ]) {
+      const toggle = otherPage.getByRole("checkbox", { name });
+      await toggle.click();
+      await expect(unsaved).toBeVisible();
+      await toggle.click();
+      await expect(unsaved).toHaveCount(0);
+    }
     await expect(
       otherPage.getByText("Strefa nauki: Europe/Warsaw"),
     ).toBeVisible();
@@ -296,7 +325,27 @@ test("a review survives an offline reload and synchronizes once to a second devi
     await saveSettings.click();
     await expect.poll(syncedLimit).toBe(20);
     await defaultLimit.fill("0");
+    await otherPage.evaluate(() => {
+      const put = IDBObjectStore.prototype.put;
+      IDBObjectStore.prototype.put = function (...args) {
+        if (this.name === "settings") {
+          IDBObjectStore.prototype.put = put;
+          throw new DOMException("Quota exceeded", "QuotaExceededError");
+        }
+        return put.apply(this, args);
+      };
+    });
     await saveSettings.click();
+    await expect(
+      otherPage
+        .getByRole("alert")
+        .filter({ hasText: "Nie udało się zapisać ustawień" }),
+    ).toBeVisible();
+    await expect(unsaved).toBeVisible();
+    await expect(defaultLimit).toHaveValue("0");
+    await saveSettings.click();
+    await expect(unsaved).toHaveCount(0);
+    await expect(otherPage.getByText("Ustawienia zapisane.")).toBeVisible();
     await expect.poll(syncedLimit).toBe(0);
     await otherPage.reload();
     await expect(otherPage.locator('input[name="newLimit"]')).toHaveValue("0");

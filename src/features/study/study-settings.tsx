@@ -8,6 +8,8 @@ import { settingsSchema, type Settings } from "@/contracts";
 import { DEFAULT_NEW_LIMIT } from "@/domain/learning/queue";
 import { STUDY_TIMEZONE } from "@/domain/learning/study-time";
 
+type Preferences = { limit: string; showDue: boolean; showSession: boolean };
+
 export function StudySettings({
   settings,
   save,
@@ -15,10 +17,30 @@ export function StudySettings({
   settings: Settings | null;
   save: (next: Settings) => Promise<void>;
 }) {
-  const [limit, setLimit] = useState<string>();
+  const baseline: Preferences = {
+    limit: String(settings?.newLimit ?? DEFAULT_NEW_LIMIT),
+    showDue: settings?.showDue ?? false,
+    showSession: settings?.showSession ?? false,
+  };
+  const [edits, setEdits] = useState<Partial<Preferences>>({});
+  const values = { ...baseline, ...edits };
+  const dirty =
+    values.limit !== baseline.limit ||
+    values.showDue !== baseline.showDue ||
+    values.showSession !== baseline.showSession;
   const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
   const [result, setResult] = useState<"saved" | "failed" | null>(null);
+
+  function edit<K extends keyof Preferences>(field: K, value: Preferences[K]) {
+    setEdits((previous) => {
+      const next = { ...previous };
+      if (value === baseline[field]) delete next[field];
+      else next[field] = value;
+      return next;
+    });
+    setResult(null);
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -36,6 +58,7 @@ export function StudySettings({
         revision: settings?.revision ?? "0",
       });
       await save(next);
+      setEdits({});
       setResult("saved");
     } catch {
       setResult("failed");
@@ -62,8 +85,8 @@ export function StudySettings({
           max={10000}
           step={1}
           required
-          defaultValue={settings?.newLimit ?? DEFAULT_NEW_LIMIT}
-          onChange={(e) => setLimit(e.target.value)}
+          value={values.limit}
+          onChange={(e) => edit("limit", e.target.value)}
         />
       </ValidatedField>
       <fieldset disabled={saving}>
@@ -72,7 +95,8 @@ export function StudySettings({
           <input
             name="showDue"
             type="checkbox"
-            defaultChecked={settings?.showDue}
+            checked={values.showDue}
+            onChange={(e) => edit("showDue", e.target.checked)}
           />{" "}
           Pokaż powtórki na dziś
         </label>
@@ -80,12 +104,13 @@ export function StudySettings({
           <input
             name="showSession"
             type="checkbox"
-            defaultChecked={settings?.showSession}
+            checked={values.showSession}
+            onChange={(e) => edit("showSession", e.target.checked)}
           />{" "}
           Pokaż liczbę odpowiedzi w sesji
         </label>
       </fieldset>
-      {(limit ?? String(settings?.newLimit ?? DEFAULT_NEW_LIMIT)) === "0" && (
+      {values.limit === "0" && (
         <p>
           Nowe fiszki są wyłączone. Zaplanowane powtórki pozostają dostępne.
         </p>
@@ -101,9 +126,15 @@ export function StudySettings({
       >
         Zapisz ustawienia
       </LoadingButton>
-      {result === "saved" && <p role="status">Ustawienia zapisane.</p>}
+      <p role="status" className={styles.saveStatus}>
+        {dirty
+          ? "Niezapisane zmiany"
+          : result === "saved"
+            ? "Ustawienia zapisane."
+            : ""}
+      </p>
       {result === "failed" && (
-        <p role="alert">Sprawdź limit, potem spróbuj zapisać ponownie.</p>
+        <p role="alert">Nie udało się zapisać ustawień. Spróbuj ponownie.</p>
       )}
     </form>
   );

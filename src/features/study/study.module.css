@@ -65,6 +65,24 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.65rem;
 }
+.grades:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+.grades kbd {
+  display: none;
+  font: inherit;
+  font-size: 0.8em;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 0.05em 0.33em;
+}
+.grades:focus-visible kbd,
+.grades:has(:focus-visible) kbd {
+  display: inline-block;
+}
 .grades button {
   background: #f4e6e0;
   color: #533c41;
@@ -164,4 +182,8 @@
 }
 .preferences > button {
   justify-self: start;
+}
+
+.saveStatus:empty {
+  position: absolute;
 }

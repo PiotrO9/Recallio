@@ -121,6 +121,9 @@ function StudyBoard({
 }) {
   const [workspace, setWorkspace] = useState<SnapshotData>();
   const [candidate, setCandidate] = useState<Candidate | null>(null);
+  const [typed, setTyped] = useState(false);
+  const [draftAnswer, setDraftAnswer] = useState("");
+  const answerInput = useRef<HTMLTextAreaElement>(null);
   const [revealed, setRevealed] = useState(false);
   const [savingRating, setSavingRating] = useState<Rating | null>(null);
   const busy = savingRating !== null;
@@ -382,6 +385,7 @@ function StudyBoard({
       const command = prepared.current;
       await repository.commitReview(command);
       saved = true;
+      setDraftAnswer("");
       setSaveError(false);
       prepared.current = null;
       selectedRating.current = null;
@@ -490,6 +494,8 @@ function StudyBoard({
     if (saving.current) return;
     setCardReadError(false);
     endedRef.current = true;
+    setTyped(false);
+    setDraftAnswer("");
     active.current = null;
     previousCard.current = null;
     prepared.current = null;
@@ -508,9 +514,9 @@ function StudyBoard({
     else if (revealed) gradeGroup.current?.focus({ preventScroll: true });
     else if (candidate && moveToCard.current) {
       moveToCard.current = false;
-      revealButton.current?.focus();
+      (typed ? answerInput.current : revealButton.current)?.focus();
     }
-  }, [busy, candidate, ended, revealed, saveError]);
+  }, [busy, candidate, ended, revealed, saveError, typed]);
 
   const status = {
     idle: "",
@@ -669,9 +675,45 @@ function StudyBoard({
                   : candidate.card.sideB}
               </h1>
             </div>
+            {!daily && !revealed && (
+              <div className={styles.writeAnswer}>
+                <label className={styles.toggle}>
+                  <input
+                    type="checkbox"
+                    checked={typed}
+                    onChange={(event) => {
+                      moveToCard.current = event.target.checked;
+                      setTyped(event.target.checked);
+                      setDraftAnswer("");
+                    }}
+                  />
+                  Wpisuj odpowiedź
+                </label>
+                {typed && (
+                  <label>
+                    Twoja odpowiedź
+                    <textarea
+                      ref={answerInput}
+                      value={draftAnswer}
+                      onChange={(event) => setDraftAnswer(event.target.value)}
+                      rows={2}
+                      autoComplete="off"
+                    />
+                  </label>
+                )}
+              </div>
+            )}
             <div className={styles.answer} aria-live="polite">
               {revealed && (
                 <>
+                  {typed && (
+                    <>
+                      <small>Twoja odpowiedź</small>
+                      <p className={styles.written}>
+                        {draftAnswer || "Puste pole"}
+                      </p>
+                    </>
+                  )}
                   <small>
                     Odpowiedź ·{" "}
                     {candidate.direction === "a-b" ? "Strona B" : "Strona A"}

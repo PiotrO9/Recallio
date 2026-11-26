@@ -50,7 +50,7 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | SEARCH-01   | DONE | DECK-01              | Wyszukaj fiszkę po dowolnej stronie i przywróć wyniki po edycji. Sprawdź dużą bibliotekę i izolację kont.              |
 | REPAIR-01   | DONE | SYNC-01, SCHED-01    | Wylicz trudne fiszki z kanonicznej historii. Sprawdź świeże urządzenie, zmianę epoki i wynik offline.                  |
 | REPAIR-02   | DONE | SEARCH-01, REPAIR-01 | Pokaż listę „Do poprawy” z powodem i przejściem do edycji. Sprawdź zachowanie postępu po poprawieniu treści.           |
-| TYPE-01     | TODO | TRAIN-01             | Dodaj opcjonalną odpowiedź pisemną przed odsłonięciem. Sprawdź samoocenę, retry i czyszczenie tekstu.                  |
+| TYPE-01     | DONE | TRAIN-01             | Dodaj opcjonalną odpowiedź pisemną przed odsłonięciem. Sprawdź samoocenę, retry i czyszczenie tekstu.                  |
 
 ## Wyniki i blokady
 
@@ -112,3 +112,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `REPAIR-01` — API, RLS i cache per konto. PostgreSQL 17, 100 tys. ocen: porównanie EXPLAIN 15,32 ms / 34 364 trafienia w buforach → 4,40 ms / 1990 trafień i 6 odczytów po dodaniu indeksu częściowego; 1001 fiszek w JSON zajmuje 189 234 B. Osobno sprawdzono zmianę czasu w Warszawie, dwa konta, reset, usunięcie, retry i spóźniony zapis po wylogowaniu. 85 testów, rzeczywisty IndexedDB i 38 E2E.
 
 - `REPAIR-02` — Lista w podsumowaniu podaje powód dla kierunku, otwiera edytor i wraca po zapisie. Test desktop/mobile objął ponowne użycie offline i odpowiedź 404 starszego serwera. 85 testów i 40 E2E.
+
+- `TYPE-01` — Wpis pozostaje w pamięci pytania. W obu kierunkach desktop i mobilny Chromium potwierdziły zachowanie tekstu po błędzie, samoocenę, wyczyszczenie pola i pojedynczą operację bez wpisanej treści. 85 testów i 44 E2E.

@@ -16,11 +16,7 @@ import {
   studyQueue,
 } from "@/domain/learning/queue";
 import { getStudyDay, getStudyPeriod } from "@/domain/learning/study-time";
-import {
-  FSRS_VERSION,
-  fsrsScheduler,
-  getEffectiveReviewTime,
-} from "@/domain/learning/scheduler";
+import { fsrsScheduler } from "@/domain/learning/scheduler";
 import {
   createLocalRepository,
   ReviewProjectionConflict,
@@ -37,6 +33,7 @@ import {
 import { NotebookSheet } from "@/components/notebook";
 import { ConfirmAction } from "@/components/confirm-action";
 import { LoadingButton } from "@/components/loading-button";
+import { prepareReview, reprojectReview } from "./prepare-review";
 import { StudySettings } from "./study-settings";
 import styles from "./study.module.css";
 
@@ -333,45 +330,13 @@ function StudyBoard({
     let saved = false;
     try {
       if (!prepared.current) {
-        const { card, direction, epoch } = selected;
-        const { progress: previous, localVersion } =
-          await repository.readProgressVersion(card.id, direction);
-        const occurredAt = new Date().toISOString();
-        const effectiveAt = getEffectiveReviewTime(
-          occurredAt,
-          occurredAt,
-          previous,
+        prepared.current = await prepareReview(
+          repository,
+          selected,
+          selectedRating.current,
+          () => new Date().toISOString(),
+          () => crypto.randomUUID(),
         );
-        const mode = fsrsScheduler.classify(previous, effectiveAt);
-        const payload = {
-          direction,
-          rating: selectedRating.current,
-          observedMode: mode,
-          occurredAt,
-          clientSeq: await repository.reserveReviewSequence(),
-          observedContentRevision: card.contentRevision,
-          observedProgressRevision: previous?.revision ?? null,
-          epoch,
-          algorithmVersion: FSRS_VERSION,
-        };
-        const id = crypto.randomUUID();
-        const event = {
-          ...payload,
-          id,
-          cardId: card.id,
-          deviceId: await repository.getDeviceId(() => crypto.randomUUID()),
-        };
-        prepared.current = {
-          event,
-          localVersion,
-          operation: { id, entityId: card.id, type: "review.record", payload },
-          progress: fsrsScheduler.review({
-            previous,
-            event,
-            effectiveAt,
-            mode,
-          }),
-        };
       }
       const command = prepared.current;
       await repository.commitReview(command);
@@ -393,28 +358,7 @@ function StudyBoard({
         const command = prepared.current;
         if (error instanceof ReviewProjectionConflict && command) {
           try {
-            const { event } = command;
-            const { progress: previous, localVersion } =
-              await repository.readProgressVersion(
-                event.cardId,
-                event.direction,
-              );
-            const effectiveAt = getEffectiveReviewTime(
-              event.occurredAt,
-              event.occurredAt,
-              previous,
-            );
-            const mode = fsrsScheduler.classify(previous, effectiveAt);
-            prepared.current = {
-              ...command,
-              localVersion,
-              progress: fsrsScheduler.review({
-                previous,
-                event,
-                effectiveAt,
-                mode,
-              }),
-            };
+            prepared.current = await reprojectReview(repository, command);
           } catch {
             // Keep the original command if a reset or deletion changed its target.
           }

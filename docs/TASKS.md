@@ -28,7 +28,7 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | REFACTOR-1 | DONE | — | Zgodność decyzji CSV w podglądzie i przy zapisie. |
 | REFACTOR-2 | DONE | — | Odróżnienie zapisu od odświeżenia po zapisie. |
 | REFACTOR-3 | DONE | — | Wspólne przygotowanie zestawu offline. |
-| REFACTOR-4 | TODO | — | Przygotowanie i ponowne przeliczenie tej samej oceny poza widokiem. |
+| REFACTOR-4 | DONE | — | Przygotowanie i ponowne przeliczenie tej samej oceny poza widokiem. |
 | REFACTOR-5 | TODO | — | Wspólna zmiana treści dla zapisu lokalnego i odtwarzania snapshotu. |
 | REFACTOR-6 | TODO | — | Nawigacja biblioteki wraz z pozycją powrotu. |
 | REFACTOR-7 | TODO | — | Wspólna konfiguracja lokalnych usług konta. |
@@ -66,3 +66,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `REFACTOR-2` — Błąd odczytu po udanym zapisie ma własne ponowienie. E2E wymusza awarię odświeżenia biblioteki i ustawień.
 
 - `REFACTOR-3` — Wspólne przygotowanie zestawu rozpoznaje brak miejsca. Oba ekrany przeszły próbę nieudanego przygotowania i ponowienia.
+
+- `REFACTOR-4` — Utworzenie zdarzenia i przeliczenie projekcji są osobne. E2E potwierdza ponowienie tej samej oceny po błędzie zapisu.

@@ -29,7 +29,7 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | REFACTOR-2 | DONE | — | Odróżnienie zapisu od odświeżenia po zapisie. |
 | REFACTOR-3 | DONE | — | Wspólne przygotowanie zestawu offline. |
 | REFACTOR-4 | DONE | — | Przygotowanie i ponowne przeliczenie tej samej oceny poza widokiem. |
-| REFACTOR-5 | TODO | — | Wspólna zmiana treści dla zapisu lokalnego i odtwarzania snapshotu. |
+| REFACTOR-5 | DONE | — | Wspólna zmiana treści dla zapisu lokalnego i odtwarzania snapshotu. |
 | REFACTOR-6 | TODO | — | Nawigacja biblioteki wraz z pozycją powrotu. |
 | REFACTOR-7 | TODO | — | Wspólna konfiguracja lokalnych usług konta. |
 | REFACTOR-8 | TODO | — | Limity treści współdzielone przez import, UI i kontrakty. |
@@ -68,3 +68,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `REFACTOR-3` — Wspólne przygotowanie zestawu rozpoznaje brak miejsca. Oba ekrany przeszły próbę nieudanego przygotowania i ponowienia.
 
 - `REFACTOR-4` — Utworzenie zdarzenia i przeliczenie projekcji są osobne. E2E potwierdza ponowienie tej samej oceny po błędzie zapisu.
+
+- `REFACTOR-5` — Zapis i rebase używają tej samej projekcji. Testy repozytorium sprawdzają rollback, konflikt rewizji, usunięcie rodzica i retry.

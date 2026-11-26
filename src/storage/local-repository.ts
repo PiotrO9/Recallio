@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase, type StoreNames } from "idb";
-import { createSnapshotRebaser, type ResetProjection } from "./snapshot-rebase";
+import { applyContent } from "./apply-content";
+import type { ResetProjection } from "./snapshot-rebase";
 import {
   uuidSchema,
   reviewEventSchema,
@@ -700,75 +701,26 @@ export function createLocalRepository(
         ) {
           throw new Error("Docelowy zestaw importu jest niedostępny");
         }
-        const decks = deck ? [deck] : [];
-        const cards = card ? [card] : [];
         const settings =
           (await tx.objectStore("settings").get("current")) ?? null;
         const current = operation.type.startsWith("deck.")
-          ? (decks.find((x) => x.id === operation.entityId) ?? null)
+          ? (deck ?? null)
           : operation.type.startsWith("card.")
-            ? (cards.find((x) => x.id === operation.entityId) ?? null)
+            ? (card ?? null)
             : settings;
         if (canonical(current) !== canonical(expected))
           throw new Error("Lokalna treść zmieniła się");
         const committedAt = options.now().toISOString();
-        const localDecks =
-          operation.type === "deck.delete"
-            ? decks.map((d) =>
-                d.id === operation.entityId
-                  ? { ...d, deletedAt: committedAt }
-                  : d,
-              )
-            : decks;
-        const localCards =
-          operation.type === "card.delete"
-            ? cards.map((c) =>
-                c.id === operation.entityId
-                  ? { ...c, deletedAt: committedAt }
-                  : c,
-              )
-            : cards;
-        const rebase = createSnapshotRebaser({
-          version: "unused",
-          review() {
-            throw new Error("Nieoczekiwana ocena");
-          },
-        });
-        const result = rebase(
-          { decks, cards, settings, progress: [], introductions: [] },
-          [
-            {
-              operation,
-              sequence: 0,
-              state: "pending",
-              deliveryUnknown: false,
-            },
-          ],
-          {
-            reviews: [],
-            introductions: [],
-            decks: localDecks,
-            cards: localCards,
-            settings,
-          },
+        const value = applyContent(
+          operation,
+          { deck, card, settings },
+          () => committedAt,
         );
-        if (operation.type.startsWith("deck.")) {
-          const value = result.data.decks.find(
-            (x) => x.id === operation.entityId,
-          );
-          if (!value) throw new Error("Brak wynikowego zestawu");
-          await tx.objectStore("decks").put(value);
-        } else if (operation.type.startsWith("card.")) {
-          const value = result.data.cards.find(
-            (x) => x.id === operation.entityId,
-          );
-          if (!value) throw new Error("Brak wynikowej fiszki");
+        if ("contentRevision" in value)
           await tx.objectStore("cards").put(value);
-        } else {
-          if (!result.data.settings)
-            throw new Error("Brak wynikowych ustawień");
-          await tx.objectStore("settings").put(result.data.settings, "current");
-        }
+        else if ("directionMode" in value)
+          await tx.objectStore("decks").put(value);
+        else await tx.objectStore("settings").put(value, "current");
         const sequence = Number((await meta.get("outboxSequence")) ?? 0) + 1;
         if (!Number.isSafeInteger(sequence))
           throw new Error("Wyczerpano kolejność outbox");

@@ -1,4 +1,4 @@
-import { STUDY_TIMEZONE } from "../domain/learning/study-time";
+import { applyContent } from "./apply-content";
 import {
   progressSchema,
   reviewEventSchema,
@@ -38,77 +38,33 @@ export function createSnapshotRebaser(
       if (item.state === "blocked")
         throw new Error("Rebase wymaga rozstrzygnięcia zablokowanej operacji");
       switch (operation.type) {
-        case "deck.create": {
-          if (decks.has(operation.entityId))
-            throw new Error("Konflikt tworzenia zestawu");
-          decks.set(operation.entityId, {
-            id: operation.entityId,
-            ...operation.payload,
-            revision: "0",
-            deletedAt: null,
-          });
-          break;
-        }
+        case "deck.create":
         case "deck.update":
-        case "deck.delete": {
-          const deck = decks.get(operation.entityId);
-          if (!deck) throw new Error("Brak zestawu dla operacji");
-          if (deck.deletedAt) break;
-          if (deck.revision !== operation.baseRevision)
-            throw new Error("Konflikt rewizji zestawu");
-          if (operation.type === "deck.update")
-            decks.set(deck.id, { ...deck, ...operation.payload });
-          else {
-            const deletedAt = local.decks.find(
-              (value) => value.id === deck.id,
-            )?.deletedAt;
-            if (!deletedAt) throw new Error("Brak lokalnego tombstone zestawu");
-            decks.set(deck.id, { ...deck, deletedAt });
-          }
-          break;
-        }
-        case "card.create": {
-          if (cards.has(operation.entityId))
-            throw new Error("Konflikt tworzenia fiszki");
-          const deck = decks.get(operation.payload.deckId);
-          if (!deck || deck.deletedAt)
-            throw new Error("Brak aktywnego zestawu dla fiszki");
-          cards.set(operation.entityId, {
-            id: operation.entityId,
-            ...operation.payload,
-            contentRevision: "0",
-            deletedAt: null,
-          });
-          break;
-        }
+        case "deck.delete":
+        case "card.create":
         case "card.update":
-        case "card.delete": {
-          const card = cards.get(operation.entityId);
-          if (!card) throw new Error("Brak fiszki dla operacji");
-          const deck = decks.get(card.deckId);
-          if (!deck) throw new Error("Brak zestawu dla fiszki");
-          if (card.deletedAt || deck.deletedAt) break;
-          if (card.contentRevision !== operation.baseRevision)
-            throw new Error("Konflikt rewizji fiszki");
-          if (operation.type === "card.update")
-            cards.set(card.id, { ...card, ...operation.payload });
-          else {
-            const deletedAt = local.cards.find(
-              (value) => value.id === card.id,
-            )?.deletedAt;
-            if (!deletedAt) throw new Error("Brak lokalnego tombstone fiszki");
-            cards.set(card.id, { ...card, deletedAt });
-          }
-          break;
-        }
+        case "card.delete":
         case "settings.update": {
-          if ((settings?.revision ?? "0") !== operation.baseRevision)
-            throw new Error("Konflikt rewizji ustawień");
-          settings = {
-            ...operation.payload,
-            timezone: STUDY_TIMEZONE,
-            revision: settings?.revision ?? "0",
-          };
+          const card = cards.get(operation.entityId);
+          const deckId =
+            operation.type === "card.create"
+              ? operation.payload.deckId
+              : operation.type.startsWith("card.")
+                ? card?.deckId
+                : operation.entityId;
+          const value = applyContent(
+            operation,
+            { card, deck: deckId ? decks.get(deckId) : undefined, settings },
+            () =>
+              operation.type === "deck.delete"
+                ? local.decks.find((d) => d.id === operation.entityId)
+                    ?.deletedAt
+                : local.cards.find((c) => c.id === operation.entityId)
+                    ?.deletedAt,
+          );
+          if ("contentRevision" in value) cards.set(value.id, value);
+          else if ("directionMode" in value) decks.set(value.id, value);
+          else settings = value;
           break;
         }
         case "progress.reset": {

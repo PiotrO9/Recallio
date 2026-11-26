@@ -87,6 +87,12 @@ test("wyszukuje tłumaczenie w 10 tys. fiszek i wraca z edytora do wyniku", asyn
   await expect(rows).toHaveCount(50);
   await page.getByRole("button", { name: "Pokaż więcej" }).click();
   await expect(rows).toHaveCount(100);
+  await expect(rows.nth(50)).toBeFocused();
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "Znalezione fiszki: 9999. Wyświetlono: 100." }),
+  ).toHaveCount(1);
   const times: number[] = [];
   for (let i = 0; i < 14; i++) {
     await input.evaluate((el) => {
@@ -123,7 +129,13 @@ test("wyszukuje tłumaczenie w 10 tys. fiszek i wraca z edytora do wyniku", asyn
       times[11].toFixed(1) +
       "ms",
   );
+  await input.fill("nieistniejące słowo");
   await input.fill("cześć");
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "Znalezione fiszki: 1. Wyświetlono: 1." }),
+  ).toHaveCount(1);
   await rows.first().click();
   await expect(page).toHaveURL(new RegExp("card=" + cardId));
   await expect(page).toHaveTitle("Edytuj fiszkę · Rozmówki · Recallio");

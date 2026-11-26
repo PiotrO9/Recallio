@@ -14,7 +14,15 @@ test("sugestia prowadzi do edytora, wraca po zapisie i działa z pamięci offlin
   const device = await accounts.device(owner);
   const fixture = await seedDifficultCard(device.request, baseURL!);
   await fixture.third();
+  const second = await seedDifficultCard(device.request, baseURL!, "ieri");
+  await second.third();
   const page = await device.newPage();
+  await page.goto("/decks?deck=" + second.deckId);
+  await page.getByText("Zarządzaj zestawem", { exact: true }).click();
+  await page.getByRole("button", { name: "Przygotuj zestaw offline" }).click();
+  await expect(
+    page.getByText(/Zestaw jest gotowy do nauki offline/),
+  ).toBeVisible();
   await page.goto("/decks?deck=" + fixture.deckId);
   await page.getByText("Zarządzaj zestawem", { exact: true }).click();
   await page.getByRole("button", { name: "Przygotuj zestaw offline" }).click();
@@ -23,28 +31,35 @@ test("sugestia prowadzi do edytora, wraca po zapisie i działa z pamięci offlin
   ).toBeVisible();
   await page.getByRole("link", { name: "Ucz się z tego zestawu" }).click();
   await page.getByRole("button", { name: "Zakończ sesję" }).click();
-  await page.getByRole("button", { name: "Do poprawy (1)" }).click();
+  await page.getByRole("button", { name: "Do poprawy (2)" }).click();
   await expect(
-    page.getByText("A → B · Trudność w 3 różnych dniach"),
+    page.getByText("A → B · Trudność w 3 różnych dniach").first(),
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Do poprawy" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Do poprawy" })).toBeFocused();
   await expectAccessible(page, "do-poprawy");
-  await page.getByRole("link", { name: "Edytuj fiszkę" }).click();
+  const links = page.getByRole("link", { name: /Edytuj fiszkę:/ });
+  await expect(links).toHaveCount(2);
+  const label = await links.nth(1).getAttribute("aria-label");
+  const chosen = page.getByRole("link", { name: label!, exact: true });
+  await chosen.click();
   await expect(page.getByLabel("Przykład B")).toBeVisible();
   await page.goBack();
+  await expect(chosen).toBeFocused();
   await expect(page.getByRole("heading", { name: "Do poprawy" })).toBeVisible();
-  await page.getByRole("link", { name: "Edytuj fiszkę" }).click();
+  await chosen.click();
   await page.getByLabel("Przykład B").fill("Do jutra!");
   await page.getByRole("button", { name: "Zapisz zmiany" }).click();
   await expect(page.getByRole("heading", { name: "Do poprawy" })).toBeVisible();
   await expect(
-    page.getByText("A → B · Trudność w 3 różnych dniach"),
+    page.getByText("A → B · Trudność w 3 różnych dniach").first(),
   ).toBeVisible();
+  await expect(chosen).toBeFocused();
   await device.setOffline(true);
   try {
     await page.reload();
     await expect(
-      page.getByText("A → B · Trudność w 3 różnych dniach"),
+      page.getByText("A → B · Trudność w 3 różnych dniach").first(),
     ).toBeVisible();
     await expect(page.getByText(/Ostatnia aktualizacja listy/)).toBeVisible();
     await expect(page.getByRole("link", { name: "Edytuj fiszkę" })).toHaveCount(
@@ -53,6 +68,7 @@ test("sugestia prowadzi do edytora, wraca po zapisie i działa z pamięci offlin
   } finally {
     await device.setOffline(false);
   }
+  await expect(chosen).toBeVisible();
   const legacy = await accounts.device(owner);
   const older = await legacy.newPage();
   await older.route("**/study/repair-candidates", (route) =>

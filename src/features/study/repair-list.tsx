@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { repairResponseSchema, type RepairResponse } from "@/contracts";
 import type { openLocalAccount } from "../local-account";
 import type { SnapshotData } from "@/storage/local-repository";
@@ -134,6 +134,24 @@ export function RepairList({
       );
   }, [workspace, report, offlineDecks, offlineShell, online]);
 
+  const heading = useRef<HTMLHeadingElement>(null);
+  const focusRestored = useRef(false);
+  const [missingTarget, setMissingTarget] = useState(false);
+  useEffect(() => {
+    if (!open || focusRestored.current || !heading.current) return;
+    const id =
+      (window.history.state?.repairPosition?.userId === userId
+        ? window.history.state.repairPosition.cardId
+        : null) ?? new URLSearchParams(window.location.search).get("focusCard");
+    if (id && state === "loading") return;
+    const link = id && document.getElementById("repair-" + id);
+    focusRestored.current = true;
+    if (link) link.focus();
+    else {
+      heading.current.focus();
+      if (id && online) setMissingTarget(true);
+    }
+  }, [open, state, items, userId, online]);
   if (state === "unsupported") return null;
   if (state === "auth")
     return (
@@ -161,7 +179,14 @@ export function RepairList({
       )}
       {open && (
         <>
-          <h2>Do poprawy</h2>
+          <h2 ref={heading} tabIndex={-1}>
+            Do poprawy
+          </h2>
+          {missingTarget && (
+            <p role="status">
+              Wybrana fiszka nie jest już dostępna na liście do poprawy.
+            </p>
+          )}
           {items.length > 0 && (
             <p>
               Lista wynika z wcześniejszych ocen. Możesz zmienić treść lub
@@ -183,6 +208,24 @@ export function RepairList({
                 ))}
                 {online && (
                   <a
+                    id={"repair-" + card.id}
+                    aria-label={`Edytuj fiszkę: ${card.sideA} · ${card.sideB}, zestaw ${deck}`}
+                    onClick={(event) => {
+                      if (
+                        event.button === 0 &&
+                        !event.ctrlKey &&
+                        !event.shiftKey &&
+                        !event.altKey &&
+                        !event.metaKey
+                      )
+                        window.history.replaceState(
+                          {
+                            ...window.history.state,
+                            repairPosition: { userId, cardId: card.id },
+                          },
+                          "",
+                        );
+                    }}
                     href={
                       deckHref(card.deckId, card.id) +
                       "&from=repair" +

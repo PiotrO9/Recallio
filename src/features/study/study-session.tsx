@@ -484,7 +484,10 @@ function StudyBoard({
       if (mode === "restart") {
         const url = new URL(window.location.href);
         url.searchParams.delete("repair");
-        window.history.replaceState(window.history.state, "", url);
+        url.searchParams.delete("focusCard");
+        const state = { ...window.history.state };
+        delete state.repairPosition;
+        window.history.replaceState(state, "", url);
         setSessionCount(0);
         setEnded(false);
       }

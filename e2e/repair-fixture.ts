@@ -5,6 +5,7 @@ import type { Operation } from "../src/contracts";
 export async function seedDifficultCard(
   api: APIRequestContext,
   origin: string,
+  sideA = "domani",
 ) {
   const deckId = randomUUID(),
     cardId = randomUUID(),
@@ -58,7 +59,7 @@ export async function seedDifficultCard(
       entityId: cardId,
       payload: {
         deckId,
-        sideA: "domani",
+        sideA,
         sideB: "jutro",
         exampleA: null,
         exampleB: null,

@@ -56,14 +56,13 @@ function ContentColumn({
         {fields.map(([key, label]) => {
           if (key.startsWith("example") && !content[key] && !compareWith?.[key])
             return null;
+          const changed = !!compareWith && content[key] !== compareWith[key];
           return (
-            <div
-              key={key}
-              data-different={
-                !!compareWith && content[key] !== compareWith[key]
-              }
-            >
-              <dt>{label}</dt>
+            <div key={key} data-different={changed}>
+              <dt>
+                {label}
+                {changed && " · Zmieniona wartość"}
+              </dt>
               <dd>{content[key] || "Brak"}</dd>
             </div>
           );
@@ -754,7 +753,7 @@ export function CsvImport({
                             </summary>
                             <div className={styles.compare}>
                               <ContentColumn
-                                title="W pliku"
+                                title={paste ? "Wklejone dane" : "W pliku"}
                                 content={row.content}
                                 compareWith={comparison}
                               />
@@ -762,7 +761,7 @@ export function CsvImport({
                                 <ContentColumn
                                   title={
                                     fileMatch
-                                      ? `Wiersz ${fileMatch.row} w tym pliku`
+                                      ? `Wiersz ${fileMatch.row} ${paste ? "we wklejonych danych" : "w tym pliku"}`
                                       : "W zestawie"
                                   }
                                   content={comparison}
@@ -770,7 +769,7 @@ export function CsvImport({
                                 />
                               )}
                             </div>
-                            {issue && <p>{issue}</p>}
+                            {issue && <p id={`issue-${row.row}`}>{issue}</p>}
                             {row.errors.join(" ")}
                             {row.classification === "invalid" && (
                               <p>
@@ -782,9 +781,14 @@ export function CsvImport({
                             )}
                             {row.classification !== "invalid" && (
                               <label>
-                                Akcja wiersza {row.row}
+                                <span id={`action-${row.row}`}>
+                                  Akcja wiersza {row.row}
+                                </span>
                                 <select
-                                  aria-label={`Akcja wiersza ${row.row}`}
+                                  aria-labelledby={`action-${row.row}`}
+                                  aria-describedby={
+                                    issue ? `issue-${row.row}` : undefined
+                                  }
                                   value={choice.kind}
                                   disabled={busy}
                                   onChange={({ target }) =>
@@ -818,8 +822,11 @@ export function CsvImport({
                             )}
                             {needsTarget && (
                               <label>
-                                Fiszka do aktualizacji
+                                Fiszka do aktualizacji · wiersz {row.row}
                                 <select
+                                  aria-describedby={
+                                    issue ? `issue-${row.row}` : undefined
+                                  }
                                   data-target
                                   value={choice.target ?? ""}
                                   disabled={busy}

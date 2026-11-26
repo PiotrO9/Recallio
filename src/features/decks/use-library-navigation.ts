@@ -134,7 +134,8 @@ export function useLibraryNavigation(
       const params = new URLSearchParams(window.location.search);
       const session = params.get("session");
       window.location.replace(
-        "/study?repair=1" +
+        "/study?repair=1&focusCard=" +
+          encodeURIComponent(target) +
           (session === "today"
             ? "&scope=today"
             : session

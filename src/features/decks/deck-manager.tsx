@@ -409,11 +409,34 @@ export function DeckManager(entry: LibraryEntry) {
   }
 
   const browsing = deckForm === undefined && (!deck || cardForm === undefined);
+  const [announcement, setAnnouncement] = useState("");
+  const moreTarget = useRef<string | undefined>(undefined);
+  const total = scope === "cards" ? hits.length : found.length;
+  const shown = scope === "cards" ? Math.min(total, visible) : total;
+  useEffect(() => {
+    if (!browsing || !search.trim()) {
+      setAnnouncement("");
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setAnnouncement(
+        (scope === "cards" ? "Znalezione fiszki: " : "Znalezione zestawy: ") +
+          total +
+          ". Wyświetlono: " +
+          shown +
+          ".",
+      );
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search, scope, browsing, userId, total, shown]);
   const preview = !deck && !searching && found[0];
   const previewCard =
     preview && data?.cards.find((c) => !c.deletedAt && c.deckId === preview.id);
   return (
     <div className={styles.body}>
+      <span className="visually-hidden" role="status" aria-atomic="true">
+        {announcement}
+      </span>
       {missing && <p role="status">Ta fiszka nie jest już dostępna.</p>}
       {target && !linked && !confirmed && (
         <p role="status">
@@ -516,6 +539,10 @@ export function DeckManager(entry: LibraryEntry) {
                           openDeck(event, card.deckId, card.id);
                         }}
                         ref={(el) => {
+                          if (el && moreTarget.current === card.id) {
+                            moreTarget.current = undefined;
+                            el.focus();
+                          }
                           const p = returnPosition.current;
                           if (el && !selected && p?.rowId === card.id) {
                             returnPosition.current = undefined;
@@ -536,7 +563,10 @@ export function DeckManager(entry: LibraryEntry) {
                 {hits.length > visible && (
                   <button
                     className="auth-secondary"
-                    onClick={() => setVisible((n) => n + 50)}
+                    onClick={() => {
+                      moreTarget.current = hits[visible]?.card.id;
+                      setVisible((n) => n + 50);
+                    }}
                   >
                     Pokaż więcej
                   </button>

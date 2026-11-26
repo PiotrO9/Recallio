@@ -61,7 +61,7 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | A11Y-01 | DONE | Pomiar axe i stany bazowe.             |
 | A11Y-02 | DONE | Nawigacja, tytuły i walidacja.         |
 | A11Y-03 | DONE | Trening, zapis i ponowienie odczytu.   |
-| A11Y-04 | TODO | Wyszukiwanie, import i sugestie.       |
+| A11Y-04 | DONE | Wyszukiwanie, import i sugestie.       |
 | A11Y-05 | TODO | Potwierdzenia, preferencje i układ.    |
 | A11Y-06 | TODO | Macierz dowodów i odbiór z czytnikami. |
 
@@ -135,3 +135,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `A11Y-02` — Tytuły tras i edytorów, zachowanie opisu pól i historia przeglądarki sprawdzone w 44/44 E2E.
 
 - `A11Y-03` — Oba kierunki, IME, awaria transakcji i odczytu po zapisie, identyczne ID w historii i outbox oraz sesja offline. 44/44 E2E.
+
+- `A11Y-04` — Wynik 51, powrót z dwóch sugestii i konflikt w fizycznym wierszu 22 wklejki. 44/44 E2E.

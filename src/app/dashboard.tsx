@@ -3,11 +3,8 @@ import Link from "next/link";
 import { ActionLink } from "@/components/action-link";
 import { useEffect, useRef, useState } from "react";
 import { NotebookSheet, deckColor } from "@/components/notebook";
-import {
-  createLocalRepository,
-  type SnapshotData,
-} from "@/storage/local-repository";
-import { createSyncController } from "@/sync/controller";
+import { type SnapshotData } from "@/storage/local-repository";
+import { openLocalAccount } from "@/features/local-account";
 import { DEFAULT_NEW_LIMIT, remainingNewForDay } from "@/domain/learning/queue";
 import { getStudyPeriod } from "@/domain/learning/study-time";
 import { fsrsScheduler } from "@/domain/learning/scheduler";
@@ -116,22 +113,7 @@ export function Dashboard({ userId }: { userId: string }) {
   const resultHeading = useRef<HTMLHeadingElement>(null);
   const focusResult = useRef(false);
   useEffect(() => {
-    const repo = createLocalRepository({
-      userId,
-      now: () => new Date(),
-      introduction() {
-        throw new Error("Panel nie wprowadza fiszek");
-      },
-    });
-    const sync = createSyncController({
-      userId,
-      repository: repo,
-      fetch: (input, init) => fetch(input, init),
-      now: Date.now,
-      random: Math.random,
-      id: () => crypto.randomUUID(),
-      online: () => navigator.onLine,
-    });
+    const { repository: repo, sync } = openLocalAccount(userId);
     let active = true;
     let running = false;
     let timer: number | undefined;
@@ -162,8 +144,11 @@ export function Dashboard({ userId }: { userId: string }) {
       if (running) return;
       running = true;
       setRefreshing(true);
+      waitForRetry();
+    }
+    function waitForRetry() {
       const delay = sync.retryAt() - Date.now();
-      if (delay > 0) timer = window.setTimeout(read, delay);
+      if (delay > 0) timer = window.setTimeout(waitForRetry, Math.ceil(delay));
       else void read();
     }
     refreshRef.current = refresh;

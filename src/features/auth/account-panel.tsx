@@ -3,18 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { LoadingButton } from "@/components/loading-button";
 import { clearAccountDrafts } from "@/features/decks/card-draft";
-import { createLocalRepository } from "@/storage/local-repository";
-import { createSyncController } from "@/sync/controller";
-
-function accountRepository(accountId: string) {
-  return createLocalRepository({
-    userId: accountId,
-    now: () => new Date(),
-    introduction: () => {
-      throw new Error("Wylogowanie nie wprowadza fiszek");
-    },
-  });
-}
+import { openLocalAccount } from "@/features/local-account";
 export function AccountPanel({ accountId }: { accountId: string }) {
   const [pending, setPending] = useState<number | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -29,7 +18,7 @@ export function AccountPanel({ accountId }: { accountId: string }) {
   const [unsent, setUnsent] = useState<number>();
   useEffect(() => {
     let active = true;
-    const repo = accountRepository(accountId);
+    const { repository: repo } = openLocalAccount(accountId);
     const refresh = () =>
       void repo
         .countUnsent()
@@ -59,19 +48,10 @@ export function AccountPanel({ accountId }: { accountId: string }) {
     signingOut.current = true;
     setOperation(mode);
     setError(false);
-    const repository = accountRepository(accountId);
+    const { repository, sync } = openLocalAccount(accountId);
     let navigating = false;
     try {
       if (mode === "sync") {
-        const sync = createSyncController({
-          userId: accountId,
-          repository,
-          fetch: (input, init) => globalThis.fetch(input, init),
-          now: Date.now,
-          random: Math.random,
-          id: () => crypto.randomUUID(),
-          online: () => navigator.onLine,
-        });
         if ((await sync.run()) !== "idle")
           throw new Error("Synchronizacja nie została zakończona");
       }

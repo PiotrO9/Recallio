@@ -14,13 +14,12 @@ import {
   type Content,
 } from "@/domain/import/csv";
 import {
-  createLocalRepository,
   type ImportReceipt,
   type ImportStep,
   type SnapshotData,
   type StoredImport,
 } from "@/storage/local-repository";
-import { createSyncController } from "@/sync/controller";
+import { openLocalAccount } from "@/features/local-account";
 import styles from "./csv-import.module.css";
 
 const labels = {
@@ -116,29 +115,9 @@ export function CsvImport({
   const running = useRef(false),
     pauseRequested = useRef(false),
     fileVersion = useRef(0);
-  const repository = useMemo(
-    () =>
-      createLocalRepository({
-        userId,
-        now: () => new Date(),
-        introduction() {
-          throw new Error("Import nie wprowadza fiszek do nauki");
-        },
-      }),
+  const { repository, sync } = useMemo(
+    () => openLocalAccount(userId),
     [userId],
-  );
-  const sync = useMemo(
-    () =>
-      createSyncController({
-        userId,
-        repository,
-        now: Date.now,
-        random: Math.random,
-        id: () => crypto.randomUUID(),
-        fetch: (input, init) => fetch(input, init),
-        online: () => navigator.onLine,
-      }),
-    [userId, repository],
   );
 
   useEffect(() => {

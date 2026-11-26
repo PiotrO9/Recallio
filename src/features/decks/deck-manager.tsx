@@ -16,11 +16,9 @@ import {
 } from "@/contracts";
 import { resetFsrsProgress } from "@/domain/learning/scheduler";
 import { exportCsv } from "@/domain/import/csv";
-import {
-  createLocalRepository,
-  type SnapshotData,
-} from "@/storage/local-repository";
-import { createSyncController, type SyncStatus } from "@/sync/controller";
+import { type SnapshotData } from "@/storage/local-repository";
+import type { SyncStatus } from "@/sync/controller";
+import { openLocalAccount } from "@/features/local-account";
 import styles from "./deck-manager.module.css";
 import {
   useLibraryNavigation,
@@ -70,29 +68,9 @@ export function DeckManager(entry: LibraryEntry) {
   const [savedCards, setSavedCards] = useState(0);
   const [notice, setNotice] = useState<{ deckId: string; text: string }>();
   const lock = useRef(false);
-  const repository = useMemo(
-    () =>
-      createLocalRepository({
-        userId,
-        now: () => new Date(),
-        introduction() {
-          throw new Error("Edycja materiału nie wprowadza fiszek");
-        },
-      }),
+  const { repository, sync: controller } = useMemo(
+    () => openLocalAccount(userId),
     [userId],
-  );
-  const controller = useMemo(
-    () =>
-      createSyncController({
-        userId,
-        repository,
-        fetch: (input, init) => fetch(input, init),
-        now: Date.now,
-        random: Math.random,
-        id: () => crypto.randomUUID(),
-        online: () => navigator.onLine,
-      }),
-    [repository, userId],
   );
 
   const [readError, setReadError] = useState(false);

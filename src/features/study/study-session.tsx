@@ -15,14 +15,14 @@ import {
   DEFAULT_NEW_LIMIT,
   studyQueue,
 } from "@/domain/learning/queue";
-import { getStudyDay, getStudyPeriod } from "@/domain/learning/study-time";
+import { getStudyPeriod } from "@/domain/learning/study-time";
 import { fsrsScheduler } from "@/domain/learning/scheduler";
 import {
-  createLocalRepository,
   ReviewProjectionConflict,
   type SnapshotData,
 } from "@/storage/local-repository";
-import { createSyncController, type SyncStatus } from "@/sync/controller";
+import type { SyncStatus } from "@/sync/controller";
+import { openLocalAccount } from "@/features/local-account";
 import {
   activateStudyUpdate,
   prepareDeckOffline,
@@ -131,33 +131,9 @@ function StudyBoard({
   const offlinePending = useRef(false);
   const updatingRef = useRef(false);
 
-  const repository = useMemo(
-    () =>
-      createLocalRepository({
-        userId,
-        now: () => new Date(),
-        introduction(event) {
-          return {
-            cardId: event.cardId,
-            firstEffectiveAt: event.occurredAt,
-            studyDay: getStudyDay(event.occurredAt),
-          };
-        },
-      }),
+  const { repository, sync } = useMemo(
+    () => openLocalAccount(userId),
     [userId],
-  );
-  const sync = useMemo(
-    () =>
-      createSyncController({
-        userId,
-        repository,
-        fetch: (input, init) => fetch(input, init),
-        now: Date.now,
-        random: Math.random,
-        id: () => crypto.randomUUID(),
-        online: () => navigator.onLine,
-      }),
-    [repository, userId],
   );
 
   const availableOffline = useRef<readonly string[]>([]);

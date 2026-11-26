@@ -6,14 +6,7 @@ import { prepareDeckOffline, offlineErrors } from "@/features/study/offline";
 import { ConfirmAction } from "@/components/confirm-action";
 import { LoadingButton } from "@/components/loading-button";
 import Link from "next/link";
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type MouseEvent,
-} from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   directionModeSchema,
   operationSchema,
@@ -29,23 +22,12 @@ import {
 } from "@/storage/local-repository";
 import { createSyncController, type SyncStatus } from "@/sync/controller";
 import styles from "./deck-manager.module.css";
+import {
+  useLibraryNavigation,
+  deckHref,
+  type LibraryEntry,
+} from "./use-library-navigation";
 import { discardDraft, draftKey, readDraft, rememberDraft } from "./card-draft";
-
-type LibraryPosition = {
-  userId: string;
-  search: string;
-  rowId: string;
-  scrollY: number | null;
-};
-
-function libraryPosition(userId: string): LibraryPosition | undefined {
-  const position = window.history.state?.libraryPosition;
-  return position?.userId === userId ? position : undefined;
-}
-
-function deckHref(id: string) {
-  return "/decks?deck=" + encodeURIComponent(id);
-}
 
 type DeckAction =
   | "saveDeck"
@@ -56,30 +38,29 @@ type DeckAction =
   | "reset-a-b"
   | "reset-b-a";
 
-export function DeckManager({
-  userId,
-  initialDeck,
-  createDeck,
-  createCard,
-}: {
-  userId: string;
-  initialDeck?: string;
-  createDeck?: boolean;
-  createCard?: boolean;
-}) {
+export function DeckManager(entry: LibraryEntry) {
+  const { userId } = entry;
   const [data, setData] = useState<SnapshotData>();
-  const [selected, setSelected] = useState<string | undefined>(initialDeck);
-  const returnPosition = useRef<LibraryPosition | undefined>(undefined);
-  const [search, setSearch] = useState("");
-  const [deckForm, setDeckForm] = useState<Deck | null | undefined>(
-    createDeck ? null : undefined,
-  );
-  const [cardForm, setCardForm] = useState<Card | null | undefined>(
-    createCard ? null : undefined,
-  );
   const [status, setStatus] = useState<SyncStatus>("idle");
   const [operation, setOperation] = useState<DeckAction | null>(null);
   const busy = operation !== null;
+  const {
+    selected,
+    search,
+    setSearch,
+    deckForm,
+    cardForm,
+    returnPosition,
+    focusSelection,
+    openDeck,
+    returnToList,
+    closeCardForm,
+    openCardForm,
+    openDeckForm,
+    finishDeckSave,
+    leaveDeletedDeck,
+    cancelDeckForm,
+  } = useLibraryNavigation(entry, busy);
   const [error, setError] = useState(false);
   const [offlineReady, setOfflineReady] = useState<readonly string[]>([]);
   const [offlineIssue, setOfflineIssue] = useState<{
@@ -239,15 +220,7 @@ export function DeckManager({
         },
         expected,
       );
-      if (!expected)
-        window.history.replaceState(
-          { libraryPosition: libraryPosition(userId) },
-          "",
-          deckHref(entityId) + "&card=new",
-        );
-      setSelected(entityId);
-      if (!expected) setCardForm(null);
-      setDeckForm(undefined);
+      finishDeckSave(entityId, !expected);
     });
   }
 
@@ -288,7 +261,8 @@ export function DeckManager({
       discardDraft(editorKey);
       setNotice({ deckId: deck.id, text: "Zapisano fiszkę." });
       setSavedCards((n) => n + 1);
-      setCardForm(expected ? undefined : null);
+      if (expected) closeCardForm();
+      else openCardForm(null);
     });
   }
 
@@ -307,12 +281,9 @@ export function DeckManager({
       );
       if (isCard) {
         discardDraft(draftKey(userId, item.deckId, item.id));
-        setCardForm(undefined);
+        closeCardForm();
       } else {
-        window.history.replaceState({}, "", "/decks");
-        setSelected(undefined);
-        setDeckForm(undefined);
-        setCardForm(undefined);
+        leaveDeletedDeck();
       }
     });
   }
@@ -359,84 +330,6 @@ export function DeckManager({
   const preview = !deck && found[0];
   const previewCard =
     preview && data?.cards.find((c) => !c.deletedAt && c.deckId === preview.id);
-  const focusSelection = useRef(false);
-  useEffect(() => {
-    function restoreLocation() {
-      if (window.location.pathname !== "/decks") return;
-      const params = new URLSearchParams(window.location.search);
-      const id = params.get("deck") ?? undefined;
-      const position = libraryPosition(userId);
-      returnPosition.current = id ? undefined : position;
-      focusSelection.current = !!id;
-      setSearch(position?.search ?? "");
-      setSelected(id);
-      setDeckForm(params.get("new") === "1" ? null : undefined);
-      setCardForm(params.get("card") === "new" ? null : undefined);
-    }
-    restoreLocation();
-    window.addEventListener("popstate", restoreLocation);
-    return () => window.removeEventListener("popstate", restoreLocation);
-  }, [userId]);
-
-  function openDeck(event: MouseEvent<HTMLAnchorElement>, id: string) {
-    if (
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.altKey ||
-      event.button !== 0
-    )
-      return;
-    event.preventDefault();
-    if (busy || id === selected) return;
-    const position = { userId, rowId: id, search, scrollY: window.scrollY };
-    if (!selected) {
-      window.history.replaceState({ libraryPosition: position }, "", "/decks");
-      window.history.pushState(
-        { libraryPosition: position, fromLibrary: true },
-        "",
-        deckHref(id),
-      );
-    } else {
-      window.history.replaceState(
-        {
-          libraryPosition: libraryPosition(userId),
-          fromLibrary: window.history.state?.fromLibrary,
-        },
-        "",
-        deckHref(id),
-      );
-    }
-    focusSelection.current = true;
-    setSelected(id);
-    setCardForm(undefined);
-  }
-
-  function closeCardForm() {
-    if (selected && new URLSearchParams(window.location.search).has("card")) {
-      window.history.replaceState(
-        {
-          libraryPosition: libraryPosition(userId),
-          fromLibrary: window.history.state?.fromLibrary,
-        },
-        "",
-        deckHref(selected),
-      );
-    }
-    setCardForm(undefined);
-  }
-
-  function returnToList(id: string) {
-    if (window.history.state?.fromLibrary && libraryPosition(userId)) {
-      window.history.back();
-      return;
-    }
-    const position = { userId, rowId: id, search, scrollY: null };
-    window.history.replaceState({ libraryPosition: position }, "", "/decks");
-    returnPosition.current = position;
-    setSelected(undefined);
-  }
-
   return (
     <div className={styles.body}>
       {readError && (
@@ -481,7 +374,7 @@ export function DeckManager({
               <button
                 className="primary"
                 disabled={busy}
-                onClick={() => setDeckForm(null)}
+                onClick={() => openDeckForm(null)}
               >
                 Dodaj zestaw
               </button>
@@ -618,11 +511,7 @@ export function DeckManager({
                 className="auth-secondary"
                 type="button"
                 disabled={busy}
-                onClick={() => {
-                  if (createDeck && !selected)
-                    window.history.replaceState({}, "", "/decks");
-                  setDeckForm(undefined);
-                }}
+                onClick={cancelDeckForm}
               >
                 Anuluj
               </button>
@@ -672,7 +561,7 @@ export function DeckManager({
                   <button
                     className={cards.length ? "auth-secondary" : "primary"}
                     disabled={busy}
-                    onClick={() => setCardForm(null)}
+                    onClick={() => openCardForm(null)}
                   >
                     {cards.length ? "Dodaj fiszkę" : "Dodaj pierwszą fiszkę"}
                   </button>
@@ -736,7 +625,7 @@ export function DeckManager({
                     <button
                       className="auth-secondary"
                       disabled={busy}
-                      onClick={() => setDeckForm(deck)}
+                      onClick={() => openDeckForm(deck)}
                     >
                       Edytuj zestaw
                     </button>
@@ -918,7 +807,7 @@ export function DeckManager({
                       <button
                         className="auth-secondary"
                         disabled={busy}
-                        onClick={() => setCardForm(card)}
+                        onClick={() => openCardForm(card)}
                       >
                         Edytuj fiszkę
                       </button>

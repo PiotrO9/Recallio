@@ -16,6 +16,8 @@ npm run test:e2e
 
 E2E uruchamia `next start` na porcie 3210 i sprawdza wejście do aplikacji w desktopowym i mobilnym Chromium. Testy kont i treningu wymagają konfiguracji lokalnego Supabase opisanej poniżej.
 
+Pomiar lokalnej kolejki uruchamia `node tests/storage/bench-outbox.mjs`. Chromium mierzy pobranie i potwierdzenie 100 oraz 1000 operacji w IndexedDB, po trzy próby dla każdego rozmiaru. Czas przygotowania danych i połączenie z serwerem są poza pomiarem.
+
 ## Lokalna baza Supabase
 
 W uruchomionym Dockerze utwórz sieć raz, a potem uruchamiaj polecenia dla projektu Recallio:

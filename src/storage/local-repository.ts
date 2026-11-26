@@ -71,7 +71,14 @@ interface Schema extends DBSchema {
   };
   introductions: { key: string; value: Introduction };
   syncedReviews: { key: string; value: z.infer<typeof syncedReviewSchema> };
-  outbox: { key: string; value: OutboxItem };
+  outbox: {
+    key: string;
+    value: OutboxItem;
+    indexes: {
+      stateSequence: [OutboxItem["state"], number];
+      entityStateSequence: [string, OutboxItem["state"], number];
+    };
+  };
   meta: { key: string; value: unknown };
   decks: { key: string; value: SnapshotResponse["decks"][number] };
   settings: { key: string; value: NonNullable<SnapshotResponse["settings"]> };
@@ -111,6 +118,8 @@ export type ImportStep = {
   operation: ContentOperation;
   expected: ContentRecord;
 };
+const outboxRange = (state: OutboxItem["state"]) =>
+  IDBKeyRange.bound([state, 0], [state, Number.MAX_SAFE_INTEGER]);
 const importKey = (id: string, index: number) => `csvImport:${id}:${index}`;
 export type RebaseSnapshot = (
   snapshot: SnapshotData,
@@ -224,7 +233,7 @@ export function createLocalRepository(
   let connection: Promise<IDBPDatabase<Schema>> | undefined;
   const connect = () => {
     if (!connection) {
-      const opened = openDB<Schema>(`recallio-user-${userId}`, 7, {
+      const opened = openDB<Schema>(`recallio-user-${userId}`, 8, {
         upgrade(db, oldVersion, _newVersion, tx) {
           void tx.done.catch(() => {});
           if (oldVersion < 1) {
@@ -352,6 +361,15 @@ export function createLocalRepository(
             db.createObjectStore("contentOperations", {
               keyPath: "operation.id",
             });
+          if (oldVersion < 8) {
+            const outbox = tx.objectStore("outbox");
+            outbox.createIndex("stateSequence", ["state", "sequence"]);
+            outbox.createIndex("entityStateSequence", [
+              "operation.entityId",
+              "state",
+              "sequence",
+            ]);
+          }
         },
         blocked: options.blocked,
         blocking() {
@@ -759,10 +777,17 @@ export function createLocalRepository(
         throw new Error("Nieprawidłowa dzierżawa");
       const db = await connect();
       const tx = db.transaction("outbox", "readwrite");
-      const all = await tx.store.getAll();
+      const byState = tx.store.index("stateSequence");
+      const count = Math.min(limit, 0xffffffff);
+      const [pending, leased, blocked] = await Promise.all([
+        byState.getAll(outboxRange("pending"), count),
+        byState.getAll(outboxRange("leased"), count),
+        byState.get(outboxRange("blocked")),
+      ]);
+      const candidates = pending.concat(leased);
+      if (blocked) candidates.push(blocked);
       const selected: OutboxItem[] = [];
-      for (const item of all.sort((a, b) => a.sequence - b.sequence)) {
-        if (item.state === "acknowledged") continue;
+      for (const item of candidates.sort((a, b) => a.sequence - b.sequence)) {
         if (
           item.state === "blocked" ||
           (item.state === "leased" && (item.leaseUntil ?? Infinity) > now)
@@ -781,13 +806,18 @@ export function createLocalRepository(
         ) {
           const kind = operation.type.split(".")[0];
           if (kind === "deck" || kind === "card" || kind === "settings") {
-            const predecessor = all.findLast(
-              (candidate) =>
-                candidate.state === "acknowledged" &&
-                candidate.sequence < item.sequence &&
-                candidate.operation.entityId === operation.entityId &&
-                candidate.operation.type.split(".")[0] === kind,
+            const range = IDBKeyRange.bound(
+              [operation.entityId, "acknowledged", 0],
+              [operation.entityId, "acknowledged", item.sequence],
+              false,
+              true,
             );
+            let cursor = await tx.store
+              .index("entityStateSequence")
+              .openCursor(range, "prev");
+            while (cursor && cursor.value.operation.type.split(".")[0] !== kind)
+              cursor = await cursor.continue();
+            const predecessor = cursor?.value;
             const prior = predecessor?.operation;
             const revision = predecessor?.receipt?.revision;
             if (
@@ -812,8 +842,10 @@ export function createLocalRepository(
     async releaseLease(owner) {
       const db = await connect();
       const tx = db.transaction("outbox", "readwrite");
-      for (const item of await tx.store.getAll())
-        if (item.state === "leased" && item.leaseOwner === owner) {
+      for (const item of await tx.store
+        .index("stateSequence")
+        .getAll(outboxRange("leased")))
+        if (item.leaseOwner === owner) {
           delete item.leaseOwner;
           delete item.leaseUntil;
           item.state = "pending";
@@ -899,9 +931,11 @@ export function createLocalRepository(
     },
     async listBlocked() {
       const db = await connect();
-      return (await db.getAll("outbox"))
-        .filter((item) => item.state === "blocked")
-        .sort((a, b) => a.sequence - b.sequence);
+      return db.getAllFromIndex(
+        "outbox",
+        "stateSequence",
+        outboxRange("blocked"),
+      );
     },
     async getDeviceId(generate) {
       const db = await connect();

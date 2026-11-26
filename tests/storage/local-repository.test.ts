@@ -884,7 +884,7 @@ test("versionchange closes the existing connection and calls the owner", async (
     blocking: () => called++,
   });
   await local.snapshot(card);
-  const upgraded = await openDB(`recallio-user-${user}`, 8);
+  const upgraded = await openDB(`recallio-user-${user}`, 9);
   assert.equal(called, 1);
   upgraded.close();
   local.close();
@@ -955,4 +955,59 @@ test("aborted migration preserves old data and can be retried", async () => {
   unchanged.close();
   assert.equal((await local.lease("retry", 0, 10, 10)).length, 1);
   local.close();
+});
+
+test("a v7 outbox keeps expired leases, barriers and sequence order after indexing", async () => {
+  const user = "00000000-0000-4000-8000-000000000091";
+  const name = "recallio-user-" + user;
+  const legacy = await openDB(name, 7, {
+    upgrade(db) {
+      db.createObjectStore("outbox", { keyPath: "operation.id" });
+      db.createObjectStore("meta");
+    },
+  });
+  const ids = [4, 3, 2, 1].map(
+    (n) => "00000000-0000-4000-8000-00000000010" + n,
+  );
+  for (const [i, state] of [
+    "acknowledged",
+    "leased",
+    "blocked",
+    "pending",
+  ].entries()) {
+    await legacy.put("outbox", {
+      sequence: i + 1,
+      state,
+      deliveryUnknown: state === "leased",
+      leaseUntil: 10,
+      operation: { ...command.operation, id: ids[i] },
+    });
+  }
+  legacy.close();
+  const local = repo(user);
+  try {
+    assert.deepEqual(await local.lease("new", 9, 10, 4), []);
+    assert.deepEqual(
+      (await local.lease("new", 10, 10, 4)).map((i) => i.sequence),
+      [2],
+    );
+    await local.acknowledge({
+      operationId: ids[1],
+      status: "applied",
+      commitCursor: "2",
+    });
+    assert.deepEqual(await local.lease("new", 10, 10, 4), []);
+    assert.deepEqual(
+      (await local.listBlocked()).map((i) => i.sequence),
+      [3],
+    );
+    await local.discardBlocked(ids[2]);
+    assert.deepEqual(
+      (await local.lease("new", 10, 10, 4)).map((i) => i.sequence),
+      [4],
+    );
+  } finally {
+    local.close();
+    await deleteDB(name);
+  }
 });

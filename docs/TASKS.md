@@ -34,7 +34,7 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | REFACTOR-7 | DONE | — | Wspólna konfiguracja lokalnych usług konta. |
 | REFACTOR-8 | DONE | — | Limity treści współdzielone przez import, UI i kontrakty. |
 | REFACTOR-9 | DONE | — | Osobne scenariusze E2E i współdzielone przygotowanie kont. |
-| REFACTOR-10 | TODO | — | Pomiar i weryfikacja kosztu opróżniania lokalnej kolejki. |
+| REFACTOR-10 | DONE | — | Pomiar i weryfikacja kosztu opróżniania lokalnej kolejki. |
 
 ## Wyniki i blokady
 
@@ -78,3 +78,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `REFACTOR-8` — Limity pól mają jedno źródło. Test porównuje akceptację CSV i kontraktu na granicy oraz o jeden znak powyżej.
 
 - `REFACTOR-9` — Konta i urządzenia mają współdzieloną fixture. Cztery osobne scenariusze sprawdzają trening offline, ustawienia, bibliotekę i import.
+
+- `REFACTOR-10` — Migracja v7→v8 zachowuje kolejność i blokady. W Chromium mediana trzech prób dla 100 operacji spadła z 236 do 76 ms, a dla 1000 z 20 204 do 933 ms. Zakres pomiaru opisano w weryfikacji.

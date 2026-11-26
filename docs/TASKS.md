@@ -114,3 +114,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `REPAIR-02` — Lista w podsumowaniu podaje powód dla kierunku, otwiera edytor i wraca po zapisie. Test desktop/mobile objął ponowne użycie offline i odpowiedź 404 starszego serwera. 85 testów i 40 E2E.
 
 - `TYPE-01` — Wpis pozostaje w pamięci pytania. W obu kierunkach desktop i mobilny Chromium potwierdziły zachowanie tekstu po błędzie, samoocenę, wyczyszczenie pola i pojedynczą operację bez wpisanej treści. 85 testów i 44 E2E.
+
+- Odbiór pięciu funkcji po integracji — Wstecz przywraca listę „Do poprawy”, edycja ostatniego trafienia przenosi fokus do wyszukiwarki, a panel po utracie sieci korzysta z przygotowanych zestawów. Sprawdzono 85 testów, 44 scenariusze E2E w Next.js, 16 przebiegów nowych funkcji w lokalnym Wranglerze, rzeczywisty IndexedDB, 21 asercji pgTAP oraz izolację kont przez REST. Oba buildy lokalne przeszły.

@@ -118,6 +118,7 @@ export function useLibraryNavigation(
   }
 
   function closeCardForm() {
+    setTarget(undefined);
     if (
       target &&
       window.history.state?.fromLibrary &&
@@ -132,7 +133,7 @@ export function useLibraryNavigation(
     ) {
       const params = new URLSearchParams(window.location.search);
       const session = params.get("session");
-      window.location.assign(
+      window.location.replace(
         "/study?repair=1" +
           (session === "today"
             ? "&scope=today"
@@ -142,7 +143,6 @@ export function useLibraryNavigation(
       );
       return;
     }
-    setTarget(undefined);
     if (selected && new URLSearchParams(window.location.search).has("card")) {
       window.history.replaceState(
         {

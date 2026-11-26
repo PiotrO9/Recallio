@@ -46,6 +46,12 @@ export type OutboxItem = {
   leaseUntil?: number;
 };
 
+export class ContentVersionConflict extends Error {
+  constructor() {
+    super("Lokalna treść zmieniła się");
+  }
+}
+
 export class ReviewProjectionConflict extends Error {
   constructor() {
     super("Lokalny postęp zmienił się; przelicz projekcję tej samej oceny");
@@ -735,7 +741,7 @@ export function createLocalRepository(
             ? (card ?? null)
             : settings;
         if (canonical(current) !== canonical(expected))
-          throw new Error("Lokalna treść zmieniła się");
+          throw new ContentVersionConflict();
         const committedAt = options.now().toISOString();
         const value = applyContent(
           operation,

@@ -22,7 +22,10 @@ import {
 import { resetFsrsProgress } from "@/domain/learning/scheduler";
 import { indexCards, searchCards } from "@/domain/card-search";
 import { exportCsv } from "@/domain/import/csv";
-import { type SnapshotData } from "@/storage/local-repository";
+import {
+  ContentVersionConflict,
+  type SnapshotData,
+} from "@/storage/local-repository";
 import type { SyncStatus } from "@/sync/controller";
 import { openLocalAccount } from "@/features/local-account";
 import styles from "./deck-manager.module.css";
@@ -143,14 +146,20 @@ export function DeckManager(entry: LibraryEntry) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repository, controller]);
 
-  async function perform(name: DeckAction, action: () => Promise<void>) {
+  async function perform(
+    name: DeckAction,
+    action: () => Promise<void>,
+    afterRead?: () => void,
+  ) {
     if (lock.current) return;
     lock.current = true;
     setOperation(name);
     setError(false);
     try {
       await action();
-      if (await readAfterSave()) void sync(true);
+      const refreshed = await readAfterSave();
+      afterRead?.();
+      if (refreshed) void sync(true);
     } catch {
       setError(true);
     } finally {
@@ -228,8 +237,37 @@ export function DeckManager(entry: LibraryEntry) {
     failed: "Synchronizacja jest chwilowo niedostępna.",
   }[status];
 
-  function commit(operation: object, expected: ContentRecord) {
-    return repository.commitContent(operationSchema.parse(operation), expected);
+  async function commit(input: object, expected: ContentRecord) {
+    const operation = operationSchema.parse(input);
+    try {
+      return await repository.commitContent(operation, expected);
+    } catch (error) {
+      if (
+        !(error instanceof ContentVersionConflict) ||
+        (operation.type !== "card.update" &&
+          operation.type !== "card.delete") ||
+        !expected ||
+        !("contentRevision" in expected)
+      )
+        throw error;
+      // A sync receipt can advance the revision while the same text is still in the editor.
+      const stored = await repository.readContent("card", operation.entityId);
+      if (
+        !stored ||
+        !("contentRevision" in stored) ||
+        stored.deletedAt ||
+        stored.deckId !== expected.deckId ||
+        stored.sideA !== expected.sideA ||
+        stored.sideB !== expected.sideB ||
+        stored.exampleA !== expected.exampleA ||
+        stored.exampleB !== expected.exampleB
+      )
+        throw error;
+      return repository.commitContent(
+        { ...operation, baseRevision: stored.contentRevision },
+        stored,
+      );
+    }
   }
 
   function saveDeck(event: FormEvent<HTMLFormElement>) {
@@ -258,46 +296,40 @@ export function DeckManager(entry: LibraryEntry) {
     });
   }
 
-  function currentCardVersion(card: Card) {
-    const stored = cards.find((c) => c.id === card.id);
-    return stored &&
-      stored.sideA === card.sideA &&
-      stored.sideB === card.sideB &&
-      stored.exampleA === card.exampleA &&
-      stored.exampleB === card.exampleB
-      ? stored
-      : card;
-  }
   function saveCard(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!deck || cardForm === undefined || !editorKey) return;
     const fields = new FormData(event.currentTarget);
-    const base = restoredDraft?.base ?? cardForm;
-    const expected = base && currentCardVersion(base);
+    const expected = restoredDraft?.base ?? cardForm;
     const text = (name: string) => String(fields.get(name) ?? "");
-    void perform("saveCard", async () => {
-      await commit(
-        {
-          type: expected ? "card.update" : "card.create",
-          id: crypto.randomUUID(),
-          entityId: expected?.id ?? crypto.randomUUID(),
-          ...(expected && { baseRevision: expected.contentRevision }),
-          payload: {
-            ...(!expected && { deckId: deck.id }),
-            sideA: text("sideA"),
-            sideB: text("sideB"),
-            exampleA: text("exampleA") || null,
-            exampleB: text("exampleB") || null,
+    void perform(
+      "saveCard",
+      async () => {
+        await commit(
+          {
+            type: expected ? "card.update" : "card.create",
+            id: crypto.randomUUID(),
+            entityId: expected?.id ?? crypto.randomUUID(),
+            ...(expected && { baseRevision: expected.contentRevision }),
+            payload: {
+              ...(!expected && { deckId: deck.id }),
+              sideA: text("sideA"),
+              sideB: text("sideB"),
+              exampleA: text("exampleA") || null,
+              exampleB: text("exampleB") || null,
+            },
           },
-        },
-        expected,
-      );
-      discardDraft(editorKey);
-      setNotice({ deckId: deck.id, text: "Zapisano fiszkę." });
-      setSavedCards((n) => n + 1);
-      if (expected) closeCardForm();
-      else openCardForm(null);
-    });
+          expected,
+        );
+        discardDraft(editorKey);
+        setNotice({ deckId: deck.id, text: "Zapisano fiszkę." });
+        setSavedCards((n) => n + 1);
+      },
+      () => {
+        if (expected) closeCardForm();
+        else openCardForm(null);
+      },
+    );
   }
 
   function remove(item: Deck | Card) {
@@ -898,9 +930,7 @@ export function DeckManager(entry: LibraryEntry) {
                             title="Usunąć fiszkę?"
                             description="Obie strony fiszki zostaną usunięte z zestawu."
                             disabled={busy}
-                            onConfirm={() =>
-                              remove(currentCardVersion(cardForm))
-                            }
+                            onConfirm={() => remove(cardForm)}
                           />
                         </div>
                       </details>

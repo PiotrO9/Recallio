@@ -84,6 +84,18 @@ test("dwa zestawy przechodzą przez jedną sesję offline i zapisują po jednej 
     (await response.json()).results.map((r: { status: string }) => r.status),
   ).toEqual(Array(6).fill("applied"));
   const page = await first.newPage();
+  await page.goto("/");
+  const dailyLink = page.getByRole("link", { name: "Powtórz na dziś" });
+  await expect(dailyLink).toBeVisible();
+  await first.setOffline(true);
+  try {
+    await expect(
+      page.getByRole("heading", { name: "Przygotuj zestaw do nauki offline" }),
+    ).toBeVisible();
+    await expect(dailyLink).toHaveCount(0);
+  } finally {
+    await first.setOffline(false);
+  }
   for (const { deckId } of seeds) {
     await page.goto("/decks?deck=" + deckId);
     await page.getByText("Zarządzaj zestawem", { exact: true }).click();

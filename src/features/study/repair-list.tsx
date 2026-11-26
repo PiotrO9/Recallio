@@ -139,7 +139,15 @@ export function RepairList({
   return (
     <section className={styles.repairs} aria-label="Fiszki do poprawy">
       {items.length > 0 && !open && (
-        <button className="text-action" onClick={() => setOpen(true)}>
+        <button
+          className="text-action"
+          onClick={() => {
+            const url = new URL(window.location.href);
+            url.searchParams.set("repair", "1");
+            window.history.replaceState(window.history.state, "", url);
+            setOpen(true);
+          }}
+        >
           Do poprawy ({items.length})
         </button>
       )}

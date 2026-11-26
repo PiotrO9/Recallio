@@ -11,14 +11,20 @@ import { fsrsScheduler } from "@/domain/learning/scheduler";
 import styles from "./dashboard.module.css";
 
 import { collectDue } from "@/domain/learning/daily";
-function recommend(data: SnapshotData, now: string) {
-  const decks = data.decks.filter((d) => !d.deletedAt);
+function recommend(
+  data: SnapshotData,
+  now: string,
+  offlineDecks?: ReadonlySet<string>,
+) {
+  const decks = data.decks.filter(
+    (d) => !d.deletedAt && (!offlineDecks || offlineDecks.has(d.id)),
+  );
   const available = new Map(decks.map((d) => [d.id, d]));
   const cards = data.cards.filter(
     (c) => !c.deletedAt && available.has(c.deckId),
   );
   const byId = new Map(cards.map((c) => [c.id, c]));
-  const due = collectDue(data, now);
+  const due = collectDue(data, now, offlineDecks);
   const limit = data.settings?.newLimit ?? DEFAULT_NEW_LIMIT;
   const free = remainingNewForDay(
     data.introductions,
@@ -97,6 +103,10 @@ function recommend(data: SnapshotData, now: string) {
 }
 export function Dashboard({ userId }: { userId: string }) {
   const [data, setData] = useState<SnapshotData>();
+  const [online, setOnline] = useState(true);
+  const [offlineDecks, setOfflineDecks] = useState<ReadonlySet<string>>(
+    new Set(),
+  );
   const [issue, setIssue] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const refreshRef = useRef<(() => void) | null>(null);
@@ -110,8 +120,12 @@ export function Dashboard({ userId }: { userId: string }) {
     let timer: number | undefined;
     async function read() {
       try {
-        const cached = await repo.readWorkspace();
+        const [cached, prepared] = await Promise.all([
+          repo.readWorkspace(),
+          repo.readOfflineDecks(),
+        ]);
         if (!active) return;
+        setOfflineDecks(new Set(prepared));
         if (cached.decks.some((deck) => !deck.deletedAt)) setData(cached);
         const status = await sync.run();
         if (!active) return;
@@ -142,16 +156,23 @@ export function Dashboard({ userId }: { userId: string }) {
       if (delay > 0) timer = window.setTimeout(waitForRetry, Math.ceil(delay));
       else void read();
     }
+    function connectionChanged() {
+      setOnline(navigator.onLine);
+      refresh();
+    }
+    setOnline(navigator.onLine);
     refreshRef.current = refresh;
     refresh();
     window.addEventListener("focus", refresh);
-    window.addEventListener("online", refresh);
+    window.addEventListener("online", connectionChanged);
+    window.addEventListener("offline", connectionChanged);
     return () => {
       active = false;
       refreshRef.current = null;
       window.clearTimeout(timer);
       window.removeEventListener("focus", refresh);
-      window.removeEventListener("online", refresh);
+      window.removeEventListener("online", connectionChanged);
+      window.removeEventListener("offline", connectionChanged);
       repo.close();
     };
   }, [userId]);
@@ -166,7 +187,13 @@ export function Dashboard({ userId }: { userId: string }) {
   for (const card of data?.cards ?? [])
     if (!card.deletedAt)
       counts.set(card.deckId, (counts.get(card.deckId) ?? 0) + 1);
-  const item = data && recommend(data, new Date().toISOString());
+  const item =
+    data &&
+    recommend(
+      data,
+      new Date().toISOString(),
+      online ? undefined : offlineDecks,
+    );
   return (
     <div className={styles.dashboard}>
       <h1 className={styles.title}>Panel nauki</h1>
@@ -189,6 +216,14 @@ export function Dashboard({ userId }: { userId: string }) {
                 Aktualizacja biblioteki jest chwilowo niedostępna.
               </p>
             )}
+          </section>
+        ) : !online && data ? (
+          <section className={styles.stateCard}>
+            <h2>Przygotuj zestaw do nauki offline</h2>
+            <p>
+              Gdy odzyskasz połączenie, otwórz zestaw i wybierz „Przygotuj
+              zestaw offline”.
+            </p>
           </section>
         ) : issue ? (
           <section className={styles.stateCard} aria-labelledby="library-error">

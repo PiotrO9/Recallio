@@ -133,4 +133,16 @@ test("wyszukuje tłumaczenie w 10 tys. fiszek i wraca z edytora do wyniku", asyn
   await expect(input).toHaveValue("cześć");
   await expect(rows.first()).toContainText("salve");
   await expect(rows.first()).toBeFocused();
+  await rows.first().click();
+  await page.getByLabel("Strona B").fill("dzień dobry");
+  await page.getByRole("button", { name: "Zapisz zmiany" }).click();
+  await expect(rows).toHaveCount(0);
+  await expect(input).toBeFocused();
+  const outsider = await accounts.device(await accounts.createAccount());
+  const other = await outsider.newPage();
+  await other.goto("/decks?deck=" + deckId + "&card=" + cardId);
+  await expect(
+    other.getByText("Ta fiszka nie jest już dostępna."),
+  ).toBeVisible();
+  await expect(other.getByLabel("Strona B")).toHaveCount(0);
 });

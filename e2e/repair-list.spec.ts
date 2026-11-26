@@ -27,6 +27,10 @@ test("sugestia prowadzi do edytora, wraca po zapisie i działa z pamięci offlin
     page.getByText("A → B · Trudność w 3 różnych dniach"),
   ).toBeVisible();
   await page.getByRole("link", { name: "Edytuj fiszkę" }).click();
+  await expect(page.getByLabel("Przykład B")).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "Do poprawy" })).toBeVisible();
+  await page.getByRole("link", { name: "Edytuj fiszkę" }).click();
   await page.getByLabel("Przykład B").fill("Do jutra!");
   await page.getByRole("button", { name: "Zapisz zmiany" }).click();
   await expect(page.getByRole("heading", { name: "Do poprawy" })).toBeVisible();

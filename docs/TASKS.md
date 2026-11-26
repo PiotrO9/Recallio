@@ -56,14 +56,14 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 
 [Specyfikacja i kryteria odbioru](TECHNICAL-PLAN.md#specyfikacja-techniczna-do-wdrożenia).
 
-| ID      | Stan | Zakres                                 |
-| ------- | ---- | -------------------------------------- |
-| A11Y-01 | DONE | Pomiar axe i stany bazowe.             |
-| A11Y-02 | DONE | Nawigacja, tytuły i walidacja.         |
-| A11Y-03 | DONE | Trening, zapis i ponowienie odczytu.   |
-| A11Y-04 | DONE | Wyszukiwanie, import i sugestie.       |
-| A11Y-05 | DONE | Potwierdzenia, preferencje i układ.    |
-| A11Y-06 | TODO | Macierz dowodów i odbiór z czytnikami. |
+| ID      | Stan    | Zakres                                 |
+| ------- | ------- | -------------------------------------- |
+| A11Y-01 | DONE    | Pomiar axe i stany bazowe.             |
+| A11Y-02 | DONE    | Nawigacja, tytuły i walidacja.         |
+| A11Y-03 | DONE    | Trening, zapis i ponowienie odczytu.   |
+| A11Y-04 | DONE    | Wyszukiwanie, import i sugestie.       |
+| A11Y-05 | DONE    | Potwierdzenia, preferencje i układ.    |
+| A11Y-06 | BLOCKED | Macierz dowodów i odbiór z czytnikami. |
 
 ## Wyniki i blokady
 
@@ -139,3 +139,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `A11Y-04` — Wynik 51, powrót z dwóch sugestii i konflikt w fizycznym wierszu 22 wklejki. 44/44 E2E.
 
 - `A11Y-05` — Potwierdzenia, powiększenie 400%, pomiary kontrastu i celów, odstępy tekstu, forced colors, ochrona niewysłanych zmian. 46/46 E2E Next.js i 1/1 test IndexedDB.
+
+- `A11Y-06` — Macierz dowodów i scenariusze odbiorcze są w `docs/VERIFICATION.md`. Automatyczny odbiór Next.js i lokalnego Wranglera przeszedł po 46/46 E2E. Otwarty jest odsłuch NVDA z Firefoxem i VoiceOver w Safari na fizycznym iPhonie, w tym próba formularzy z menedżerem haseł. Wznowić po uzyskaniu dostępu do tych konfiguracji i wpisać rzeczywistą kolejność komunikatów oraz fokusu.

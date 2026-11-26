@@ -678,3 +678,46 @@ test("a previously sent dependent operation is never rewritten", async () => {
   );
   a.close();
 });
+
+test("repair cache accepts the latest read only and a late response cannot undo logout", async () => {
+  const one = local(crypto.randomUUID()),
+    other = local(crypto.randomUUID());
+  const empty = { asOf: now, items: [] };
+  const full = {
+    asOf: now,
+    items: [
+      {
+        deckId,
+        cardId,
+        directions: [
+          {
+            direction: "a-b" as const,
+            epoch: "0",
+            failedDays: 3,
+            lastFailedDay: "2026-11-17",
+          },
+        ],
+      },
+    ],
+  };
+  try {
+    assert.equal(await one.readRepairCandidates(), null);
+    await one.beginRepairRead("a");
+    await one.beginRepairRead("b");
+    assert.equal(await one.saveRepairCandidates("b", full), true);
+    assert.equal(await one.saveRepairCandidates("a", empty), false);
+    assert.deepEqual(await one.readRepairCandidates(), full);
+    assert.equal(await other.readRepairCandidates(), null);
+    await one.beginRepairRead("c");
+    assert.deepEqual(await one.readRepairCandidates(), full);
+    await one.saveRepairCandidates("c", empty);
+    assert.deepEqual(await one.readRepairCandidates(), empty);
+    await one.beginRepairRead("d");
+    await one.clearForLogout(true);
+    assert.equal(await one.saveRepairCandidates("d", full), false);
+    assert.equal(await one.readRepairCandidates(), null);
+  } finally {
+    one.close();
+    other.close();
+  }
+});

@@ -17,6 +17,27 @@ export const revisionSchema = z
 export const uuidSchema = z.uuid();
 export const instantSchema = z.iso.datetime({ offset: false });
 export const directionSchema = z.enum(["a-b", "b-a"]);
+export const repairResponseSchema = z.strictObject({
+  asOf: instantSchema,
+  items: z.array(
+    z.strictObject({
+      cardId: uuidSchema,
+      deckId: uuidSchema,
+      directions: z
+        .array(
+          z.strictObject({
+            direction: directionSchema,
+            epoch: revisionSchema,
+            failedDays: z.int().min(3).max(30),
+            lastFailedDay: z.iso.date(),
+          }),
+        )
+        .min(1)
+        .max(2),
+    }),
+  ),
+});
+export type RepairResponse = z.infer<typeof repairResponseSchema>;
 export const directionModeSchema = z.enum(["a-b", "b-a", "mixed"]);
 export const reviewModeSchema = z.enum(["introduction", "due", "practice"]);
 export const ratingSchema = z.union([

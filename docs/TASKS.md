@@ -48,7 +48,7 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | TODAY-02    | DONE | TODAY-01, PWA-01     | Połącz panel i sesję dzienną online oraz offline. Sprawdź odświeżenie i synchronizację oceny.                          |
 | STUDY-CHECK | DONE | PASTE-02, TODAY-02   | Odbierz przejście od arkusza do nauki oraz dzienną powtórkę dwóch zestawów na desktopie i telefonie.                   |
 | SEARCH-01   | DONE | DECK-01              | Wyszukaj fiszkę po dowolnej stronie i przywróć wyniki po edycji. Sprawdź dużą bibliotekę i izolację kont.              |
-| REPAIR-01   | TODO | SYNC-01, SCHED-01    | Wylicz trudne fiszki z kanonicznej historii. Sprawdź świeże urządzenie, zmianę epoki i wynik offline.                  |
+| REPAIR-01   | DONE | SYNC-01, SCHED-01    | Wylicz trudne fiszki z kanonicznej historii. Sprawdź świeże urządzenie, zmianę epoki i wynik offline.                  |
 | REPAIR-02   | TODO | SEARCH-01, REPAIR-01 | Pokaż listę „Do poprawy” z powodem i przejściem do edycji. Sprawdź zachowanie postępu po poprawieniu treści.           |
 | TYPE-01     | TODO | TRAIN-01             | Dodaj opcjonalną odpowiedź pisemną przed odsłonięciem. Sprawdź samoocenę, retry i czyszczenie tekstu.                  |
 
@@ -108,3 +108,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `STUDY-CHECK` — Na desktopie i telefonie sprawdzono wklejanie, dwa zestawy, przeładowanie offline, unikalne oceny na drugim urządzeniu i izolację konta. 34 E2E przeszły lokalnie.
 
 - `SEARCH-01` — Wyszukiwanie A/B, edytor z bezpośrednim adresem i powrót do wyniku. Chromium, 10 tys. kart, po 50 wyników: mediana/p95 desktop 20,3/23,5 ms, emulacja telefonu 19,5/25,4 ms (12 próbek od input do kolejnej klatki). 84 testy i 36 E2E.
+
+- `REPAIR-01` — API, RLS i cache per konto. PostgreSQL 17, 100 tys. ocen: porównanie EXPLAIN 15,32 ms / 34 364 trafienia w buforach → 4,40 ms / 1990 trafień i 6 odczytów po dodaniu indeksu częściowego; 1001 fiszek w JSON zajmuje 189 234 B. Osobno sprawdzono zmianę czasu w Warszawie, dwa konta, reset, usunięcie, retry i spóźniony zapis po wylogowaniu. 85 testów, rzeczywisty IndexedDB i 38 E2E.

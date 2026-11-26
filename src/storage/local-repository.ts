@@ -2,6 +2,8 @@ import { openDB, type DBSchema, type IDBPDatabase, type StoreNames } from "idb";
 import { applyContent } from "./apply-content";
 import type { ResetProjection } from "./snapshot-rebase";
 import {
+  repairResponseSchema,
+  type RepairResponse,
   uuidSchema,
   reviewEventSchema,
   progressSchema,
@@ -169,6 +171,12 @@ export function createLocalRepository(
     listBlocked(): Promise<OutboxItem[]>;
     getDeviceId(generate: () => string): Promise<string>;
     reserveReviewSequence(): Promise<string>;
+    readRepairCandidates(): Promise<RepairResponse | null>;
+    beginRepairRead(requestId: string): Promise<void>;
+    saveRepairCandidates(
+      requestId: string,
+      response: RepairResponse,
+    ): Promise<boolean>;
     readWorkspace(): Promise<SnapshotData>;
     readOfflineDecks(): Promise<readonly string[]>;
     markOfflineDeck(deckId: string): Promise<void>;
@@ -959,6 +967,27 @@ export function createLocalRepository(
       await tx.store.put(sequence, "reviewSequence");
       await tx.done;
       return sequence;
+    },
+    async readRepairCandidates() {
+      const db = await connect();
+      const cached = repairResponseSchema.safeParse(
+        await db.get("meta", "repairCandidates:v1"),
+      );
+      return cached.success ? cached.data : null;
+    },
+    async beginRepairRead(requestId) {
+      const db = await connect();
+      await db.put("meta", requestId, "repairCandidates:request");
+    },
+    async saveRepairCandidates(requestId, response) {
+      const validated = repairResponseSchema.parse(response);
+      const db = await connect();
+      const tx = db.transaction("meta", "readwrite");
+      const accepted =
+        (await tx.store.get("repairCandidates:request")) === requestId;
+      if (accepted) await tx.store.put(validated, "repairCandidates:v1");
+      await tx.done;
+      return accepted;
     },
     async readWorkspace() {
       const db = await connect();

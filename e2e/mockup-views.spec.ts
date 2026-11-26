@@ -1,3 +1,4 @@
+import { holdStore } from "./hold-store";
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { expectAccessible } from "./accessibility";
@@ -142,7 +143,46 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
     await page.getByLabel("Strona A").fill("un conto");
     await page.getByLabel("Strona B").fill("rachunek");
     await frame("W05");
-    await page.getByRole("button", { name: "Zapisz fiszkę" }).click();
+    await page.getByText("Przykłady (opcjonalne)").click();
+    await page.getByLabel("Przykład A").fill("Un conto, per favore.");
+    await page.getByRole("button", { name: "Wróć do zestawu" }).click();
+    await page.getByRole("button", { name: "Dodaj pierwszą fiszkę" }).click();
+    await expect(page.getByLabel("Strona A")).toHaveValue("un conto");
+    await expect(page.getByLabel("Strona B")).toHaveValue("rachunek");
+    await expect(page.getByLabel("Przykład A")).toHaveValue(
+      "Un conto, per favore.",
+    );
+    await page.getByRole("button", { name: "Anuluj", exact: true }).click();
+    await page.getByRole("button", { name: "Wróć do edycji" }).click();
+    // Fail a local write once and check that retry keeps all fields.
+    await page.evaluate(() => {
+      const put = IDBObjectStore.prototype.put;
+      IDBObjectStore.prototype.put = function (...args) {
+        if (this.name === "cards") {
+          IDBObjectStore.prototype.put = put;
+          throw new DOMException("Full", "QuotaExceededError");
+        }
+        return put.apply(this, args);
+      };
+    });
+    const saveCard = page.getByRole("button", {
+      name: "Zapisz i dodaj następną",
+    });
+    if (mobile) await page.setViewportSize({ width: 320, height: 720 });
+    const releaseCards = await holdStore(page, id, "cards");
+    try {
+      await saveCard.click();
+      for (const name of ["Strona A", "Strona B", "Przykład A", "Przykład B"])
+        await expect(page.getByLabel(name)).not.toBeEditable();
+    } finally {
+      await releaseCards();
+    }
+    if (mobile) await page.setViewportSize({ width, height: 844 });
+    await expect(
+      page.getByText("Nie udało się zapisać zmiany.", { exact: false }),
+    ).toBeVisible();
+    await expect(page.getByLabel("Strona B")).toHaveValue("rachunek");
+    await saveCard.click();
     await expect(
       page.getByRole("link", { name: "Ucz się z tego zestawu" }),
     ).toBeVisible();

@@ -22,6 +22,7 @@ import {
 } from "@/storage/local-repository";
 import { createSyncController, type SyncStatus } from "@/sync/controller";
 import styles from "./deck-manager.module.css";
+import { discardDraft, draftKey, readDraft, rememberDraft } from "./card-draft";
 
 type DeckAction =
   | "saveDeck"
@@ -146,6 +147,14 @@ export function DeckManager({
 
   const decks = data?.decks.filter((deck) => !deck.deletedAt) ?? [];
   const deck = decks.find((item) => item.id === selected);
+  const editorKey =
+    deck && cardForm !== undefined
+      ? draftKey(userId, deck.id, cardForm?.id)
+      : undefined;
+  const restoredDraft = useMemo(
+    () => (editorKey ? readDraft(editorKey) : undefined),
+    [editorKey, savedCards],
+  );
   const found = decks.filter((item) =>
     item.name
       .toLocaleLowerCase("pl")
@@ -210,9 +219,10 @@ export function DeckManager({
   }
   function saveCard(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!deck || cardForm === undefined) return;
+    if (!deck || cardForm === undefined || !editorKey) return;
     const fields = new FormData(event.currentTarget);
-    const expected = cardForm && currentCardVersion(cardForm);
+    const base = restoredDraft?.base ?? cardForm;
+    const expected = base && currentCardVersion(base);
     const text = (name: string) => String(fields.get(name) ?? "");
     void perform("saveCard", async () => {
       await commit(
@@ -231,6 +241,7 @@ export function DeckManager({
         },
         expected,
       );
+      discardDraft(editorKey);
       setNotice({ deckId: deck.id, text: "Zapisano fiszkę." });
       setSavedCards((n) => n + 1);
       setCardForm(expected ? undefined : null);
@@ -250,8 +261,10 @@ export function DeckManager({
         },
         item,
       );
-      if (isCard) setCardForm(undefined);
-      else {
+      if (isCard) {
+        discardDraft(draftKey(userId, item.deckId, item.id));
+        setCardForm(undefined);
+      } else {
         setDeckForm(undefined);
         setCardForm(undefined);
       }
@@ -632,6 +645,14 @@ export function DeckManager({
                 className="auth-form"
                 key={cardForm?.id ?? "new-card-" + savedCards}
                 onSubmit={saveCard}
+                onChange={(event) => {
+                  if (editorKey)
+                    rememberDraft(
+                      editorKey,
+                      restoredDraft?.base ?? cardForm,
+                      new FormData(event.currentTarget),
+                    );
+                }}
               >
                 <header className={styles.formIntro}>
                   <h1>
@@ -652,7 +673,8 @@ export function DeckManager({
                       <textarea
                         autoFocus
                         name="sideA"
-                        defaultValue={cardForm?.sideA}
+                        readOnly={busy}
+                        defaultValue={restoredDraft?.sideA ?? cardForm?.sideA}
                         maxLength={4000}
                         required
                       />
@@ -663,20 +685,32 @@ export function DeckManager({
                     >
                       <textarea
                         name="sideB"
-                        defaultValue={cardForm?.sideB}
+                        readOnly={busy}
+                        defaultValue={restoredDraft?.sideB ?? cardForm?.sideB}
                         maxLength={4000}
                         required
                       />
                     </ValidatedField>
                   </div>
-                  <details open={cardForm ? true : undefined}>
+                  <details
+                    open={
+                      cardForm ||
+                      restoredDraft?.exampleA ||
+                      restoredDraft?.exampleB
+                        ? true
+                        : undefined
+                    }
+                  >
                     <summary>Przykłady (opcjonalne)</summary>
                     <div className={styles.pair}>
                       <label>
                         Przykład A
                         <input
                           name="exampleA"
-                          defaultValue={cardForm?.exampleA ?? ""}
+                          readOnly={busy}
+                          defaultValue={
+                            restoredDraft?.exampleA ?? cardForm?.exampleA ?? ""
+                          }
                           maxLength={8000}
                         />
                       </label>
@@ -684,7 +718,10 @@ export function DeckManager({
                         Przykład B
                         <input
                           name="exampleB"
-                          defaultValue={cardForm?.exampleB ?? ""}
+                          readOnly={busy}
+                          defaultValue={
+                            restoredDraft?.exampleB ?? cardForm?.exampleB ?? ""
+                          }
                           maxLength={8000}
                         />
                       </label>
@@ -720,22 +757,32 @@ export function DeckManager({
                       </div>
                     </details>
                   )}
-                  <LoadingButton
-                    className="primary"
-                    disabled={busy}
-                    loading={operation === "saveCard"}
-                    loadingLabel="Zapisywanie fiszki…"
-                  >
-                    Zapisz fiszkę
-                  </LoadingButton>
-                  <button
-                    className="auth-secondary"
-                    type="button"
-                    disabled={busy}
-                    onClick={() => setCardForm(undefined)}
-                  >
-                    Anuluj
-                  </button>
+                  <div className={styles.actions}>
+                    <LoadingButton
+                      className="primary"
+                      disabled={busy}
+                      loading={operation === "saveCard"}
+                      loadingLabel="Zapisywanie fiszki…"
+                    >
+                      {cardForm ? "Zapisz zmiany" : "Zapisz i dodaj następną"}
+                    </LoadingButton>
+                    <ConfirmAction
+                      label="Anuluj"
+                      title="Odrzucić szkic fiszki?"
+                      description="Niezapisane zmiany w tej fiszce zostaną usunięte."
+                      confirm="Odrzuć szkic"
+                      cancelLabel="Wróć do edycji"
+                      triggerClassName="text-action"
+                      needsConfirmation={() =>
+                        !!editorKey && !!readDraft(editorKey)
+                      }
+                      disabled={busy}
+                      onConfirm={() => {
+                        if (editorKey) discardDraft(editorKey);
+                        setCardForm(undefined);
+                      }}
+                    />
+                  </div>
                 </NotebookSheet>
               </form>
             )}

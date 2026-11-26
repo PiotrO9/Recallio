@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { LoadingButton } from "@/components/loading-button";
+import { clearAccountDrafts } from "@/features/decks/card-draft";
 import { createLocalRepository } from "@/storage/local-repository";
 import { createSyncController } from "@/sync/controller";
 
@@ -82,6 +83,7 @@ export function AccountPanel({ accountId }: { accountId: string }) {
       const body = new URLSearchParams({ intent: "logout", accountId });
       const response = await fetch("/auth/actions", { method: "POST", body });
       if (!response.ok) throw new Error("Wylogowanie nie powiodło się");
+      clearAccountDrafts(accountId);
       window.location.assign(response.url);
       navigating = true;
     } catch {

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { holdStore } from "./hold-store";
 import { readFile } from "node:fs/promises";
 import { expect, test, type BrowserContext } from "@playwright/test";
 import { expectAccessible } from "./accessibility";
@@ -177,35 +178,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
       };
     });
     // Hold a competing write transaction until the pending grade is visible.
-    await page.evaluate(
-      (userId) =>
-        new Promise<void>((resolve, reject) => {
-          const open = indexedDB.open("recallio-user-" + userId);
-          open.onerror = () => reject(open.error);
-          open.onsuccess = () => {
-            const db = open.result;
-            const transaction = db.transaction("progress", "readwrite");
-            const store = transaction.objectStore("progress");
-            let hold = true;
-            window.addEventListener(
-              "release-progress-store",
-              () => {
-                hold = false;
-              },
-              { once: true },
-            );
-            function keepOpen() {
-              store.count().onsuccess = () => {
-                resolve();
-                if (hold) keepOpen();
-              };
-            }
-            transaction.oncomplete = () => db.close();
-            keepOpen();
-          };
-        }),
-      owner.id,
-    );
+    const releaseProgress = await holdStore(page, owner.id, "progress");
     try {
       await page.keyboard.press("3");
       const grades = page.getByRole("group", { name: "Ocena odpowiedzi" });
@@ -215,9 +188,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
       await expect(grades.locator('button[aria-busy="true"]')).toHaveCount(1);
       await expect(grades.locator("button:disabled")).toHaveCount(4);
     } finally {
-      await page.evaluate(() =>
-        window.dispatchEvent(new Event("release-progress-store")),
-      );
+      await releaseProgress();
     }
     await expect(
       page.getByText("Nie udało się zapisać oceny.", { exact: true }),
@@ -347,7 +318,9 @@ test("a review survives an offline reload and synchronizes once to a second devi
     await otherPage.getByRole("button", { name: "Zapisz zestaw" }).click();
     await otherPage.getByLabel("Strona A").fill("un conto");
     await otherPage.getByLabel("Strona B").fill("rachunek");
-    await otherPage.getByRole("button", { name: "Zapisz fiszkę" }).click();
+    await otherPage
+      .getByRole("button", { name: "Zapisz i dodaj następną" })
+      .click();
     await expect(
       otherPage.getByRole("link", { name: "Ucz się z tego zestawu" }),
     ).toBeVisible();
@@ -390,7 +363,7 @@ test("a review survives an offline reload and synchronizes once to a second devi
     ).toBeVisible();
     await page.getByRole("button", { name: "Edytuj fiszkę" }).click();
     await page.getByLabel("Strona B").fill("dog (noun)");
-    await page.getByRole("button", { name: "Zapisz fiszkę" }).click();
+    await page.getByRole("button", { name: "Zapisz zmiany" }).click();
     await expect(page.getByText("dog (noun)", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Edytuj fiszkę" }).click();
     await page.getByText("Postęp i usuwanie", { exact: true }).click();

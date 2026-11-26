@@ -6,6 +6,9 @@ export function ConfirmAction({
   title,
   description,
   confirm = label,
+  cancelLabel = "Anuluj",
+  triggerClassName = "auth-secondary",
+  needsConfirmation,
   disabled = false,
   loading = false,
   loadingLabel,
@@ -15,6 +18,9 @@ export function ConfirmAction({
   title: string;
   description: string;
   confirm?: string;
+  cancelLabel?: string;
+  triggerClassName?: string;
+  needsConfirmation?: () => boolean;
   disabled?: boolean;
   loading?: boolean;
   loadingLabel?: string;
@@ -26,11 +32,15 @@ export function ConfirmAction({
     <>
       <LoadingButton
         type="button"
-        className="auth-secondary"
+        className={triggerClassName}
         disabled={disabled}
         loading={loading}
         loadingLabel={loadingLabel}
-        onClick={() => ref.current?.showModal()}
+        onClick={() =>
+          needsConfirmation && !needsConfirmation()
+            ? onConfirm()
+            : ref.current?.showModal()
+        }
       >
         {label}
       </LoadingButton>
@@ -44,7 +54,7 @@ export function ConfirmAction({
             className="auth-secondary"
             onClick={() => ref.current?.close()}
           >
-            Anuluj
+            {cancelLabel}
           </button>
           <button
             type="button"

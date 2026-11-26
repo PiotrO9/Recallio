@@ -9,9 +9,18 @@ test("login shows pending feedback, blocks duplicate submits and recovers after 
   const submit = page.getByRole("button", { name: "Zaloguj się" });
   await submit.click();
   await expect(submit).toBeEnabled();
+  const email = page.getByRole("textbox", {
+    name: "Adres e-mail",
+    exact: true,
+  });
+  await expect(email).toBeFocused();
+  await expect(email).toHaveAccessibleDescription("Podaj pełny adres e-mail.");
+  await expect(email).toHaveAttribute("aria-invalid", "true");
   await expectAccessible(page, "blad-pola");
   await page.getByLabel("Adres e-mail").fill("loading@example.test");
   await page.getByLabel("Hasło").fill("password-for-test");
+  await expect(email).not.toHaveAttribute("aria-invalid", "true");
+  await expect(email).toHaveAccessibleDescription("");
   let release!: () => void;
   const hold = new Promise<void>((resolve) => {
     release = resolve;
@@ -71,7 +80,15 @@ test("account links and old bookmarks open the correct form", async ({
 }) => {
   await page.goto("/auth/login");
   await page.getByRole("link", { name: "Utwórz konto" }).click();
-  await expect(page).toHaveURL(/\/auth\/signup$/);
+  await expect(page).toHaveTitle("Utwórz konto · Recallio");
+  const password = page.getByLabel("Hasło", { exact: true });
+  await expect(password).toHaveAccessibleDescription("Od 8 do 128 znaków.");
+  await page.getByRole("button", { name: "Utwórz konto" }).click();
+  await expect(password).toHaveAccessibleDescription(
+    /Od 8 do 128 znaków.*Wpisz hasło/,
+  );
+  await password.fill("password-123");
+  await expect(password).toHaveAccessibleDescription("Od 8 do 128 znaków.");
   await page.getByRole("link", { name: "Nie pamiętam hasła" }).click();
   await expect(page).toHaveURL(/\/auth\/forgot-password$/);
   await expect(page.getByRole("button", { name: "Wyślij link" })).toBeVisible();
@@ -79,6 +96,7 @@ test("account links and old bookmarks open the correct form", async ({
   await expect(page).toHaveURL(/\/auth\/login$/);
   await page.goto("/auth?mode=reset&status=sent");
   await expect(page).toHaveURL(/\/auth\/forgot-password\?status=sent$/);
+  await expect(page).toHaveTitle("Sprawdź pocztę · Recallio");
   await expect(page.getByRole("status")).toContainText("skrzynce");
   await page.goto("/auth?mode=signup");
   await expect(page).toHaveURL(/\/auth\/signup$/);

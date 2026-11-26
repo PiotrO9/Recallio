@@ -1,6 +1,8 @@
 import { ActionLink } from "@/components/action-link";
 import { AuthFrame } from "@/features/auth/auth-frame";
 
+export const metadata = { title: "Nie znaleziono strony" };
+
 export default function NotFound() {
   return (
     <AuthFrame title="Nie znaleziono strony" variant="auth">

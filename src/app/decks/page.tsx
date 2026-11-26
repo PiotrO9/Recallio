@@ -3,6 +3,8 @@ import { AuthFrame } from "@/features/auth/auth-frame";
 import { DeckManager } from "@/features/decks/deck-manager";
 import { serverAuth, verifiedIdentity } from "@/server/auth/client";
 
+export const metadata = { title: "Moje zestawy" };
+
 export default async function DecksPage({
   searchParams,
 }: {

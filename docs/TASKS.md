@@ -59,7 +59,7 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | ID      | Stan | Zakres                                 |
 | ------- | ---- | -------------------------------------- |
 | A11Y-01 | DONE | Pomiar axe i stany bazowe.             |
-| A11Y-02 | TODO | Nawigacja, tytuły i walidacja.         |
+| A11Y-02 | DONE | Nawigacja, tytuły i walidacja.         |
 | A11Y-03 | TODO | Trening, zapis i ponowienie odczytu.   |
 | A11Y-04 | TODO | Wyszukiwanie, import i sugestie.       |
 | A11Y-05 | TODO | Potwierdzenia, preferencje i układ.    |
@@ -131,3 +131,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - Odbiór pięciu funkcji po integracji — Wstecz przywraca listę „Do poprawy”, edycja ostatniego trafienia przenosi fokus do wyszukiwarki, a panel po utracie sieci korzysta z przygotowanych zestawów. Sprawdzono 85 testów, 44 scenariusze E2E w Next.js, 16 przebiegów nowych funkcji w lokalnym Wranglerze, rzeczywisty IndexedDB, 21 asercji pgTAP oraz izolację kont przez REST. Oba buildy lokalne przeszły.
 
 - `A11Y-01` — 26 raportów axe, 44/44 E2E na lokalnych kontach.
+
+- `A11Y-02` — Tytuły tras i edytorów, zachowanie opisu pól i historia przeglądarki sprawdzone w 44/44 E2E.

@@ -4,6 +4,8 @@ import { AuthFrame } from "@/features/auth/auth-frame";
 import { AccountPanel } from "@/features/auth/account-panel";
 import { serverAuth, verifiedIdentity } from "@/server/auth/client";
 
+export const metadata = { title: "Moje konto" };
+
 export default async function AccountPage({
   searchParams,
 }: {

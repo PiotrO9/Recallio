@@ -3,6 +3,8 @@ import { AuthFrame } from "@/features/auth/auth-frame";
 import { CsvImport } from "@/features/import/csv-import";
 import { serverAuth, verifiedIdentity } from "@/server/auth/client";
 
+export const metadata = { title: "Import fiszek" };
+
 export default async function ImportPage({
   searchParams,
 }: {

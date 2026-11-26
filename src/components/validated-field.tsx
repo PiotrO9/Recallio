@@ -1,49 +1,68 @@
 "use client";
-import { useId, useState, type ReactNode } from "react";
+import {
+  cloneElement,
+  useId,
+  useState,
+  type AriaAttributes,
+  type ReactElement,
+} from "react";
+
+type FieldProps = Pick<AriaAttributes, "aria-describedby" | "aria-invalid"> & {
+  id?: string;
+};
+
 export function ValidatedField({
   label,
   hint,
+  description,
   children,
 }: {
   label: string;
   hint: string;
-  children: ReactNode;
+  description?: string;
+  children: ReactElement<FieldProps>;
 }) {
-  const id = useId(),
-    [invalid, setInvalid] = useState(false);
+  const id = useId();
+  const [invalid, setInvalid] = useState(false);
+  const fieldId = children.props.id ?? id;
+  const describedBy =
+    [
+      ...new Set(
+        [
+          ...(children.props["aria-describedby"] ?? "").split(/\s+/),
+          description && id + "-hint",
+          invalid && id + "-error",
+        ].filter(Boolean),
+      ),
+    ].join(" ") || undefined;
   return (
-    <label
-      onInvalid={(event) => {
-        const input = event.target;
-        if (
-          input instanceof HTMLInputElement ||
-          input instanceof HTMLTextAreaElement
-        ) {
-          input.setAttribute("aria-invalid", "true");
-          input.setAttribute("aria-describedby", id);
-          setInvalid(true);
-        }
-      }}
+    <div
+      className="validated-field"
+      onInvalid={() => setInvalid(true)}
       onInput={(event) => {
-        const input = event.target;
+        const field = event.target;
         if (
-          (input instanceof HTMLInputElement ||
-            input instanceof HTMLTextAreaElement) &&
-          input.validity.valid
-        ) {
-          input.removeAttribute("aria-invalid");
-          input.removeAttribute("aria-describedby");
+          (field instanceof HTMLInputElement ||
+            field instanceof HTMLTextAreaElement) &&
+          field.validity.valid
+        )
           setInvalid(false);
-        }
       }}
     >
-      {label}
-      {children}
+      <label htmlFor={fieldId}>
+        {label}
+        {cloneElement(children, {
+          id: fieldId,
+          "aria-invalid": invalid || children.props["aria-invalid"],
+          "aria-describedby": describedBy,
+        })}
+      </label>
+      {description && <small id={id + "-hint"}>{description}</small>}
       {invalid && (
-        <small id={id} className="field-error">
+        <small id={id + "-error"} className="field-error">
           {hint}
         </small>
       )}
-    </label>
+    </div>
   );
 }

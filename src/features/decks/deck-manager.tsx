@@ -227,6 +227,22 @@ export function DeckManager(entry: LibraryEntry) {
   const cards =
     data?.cards.filter((card) => card.deckId === deck?.id && !card.deletedAt) ??
     [];
+  const editorTitle = cardForm
+    ? "Edytuj fiszkę"
+    : cards.length
+      ? "Nowa fiszka"
+      : "Pierwsza fiszka";
+  const viewTitle =
+    deckForm !== undefined
+      ? deckForm
+        ? "Edytuj zestaw"
+        : "Nowy zestaw"
+      : deck && cardForm !== undefined
+        ? editorTitle + " · " + deck.name
+        : (deck?.name ?? "Moje zestawy");
+  useEffect(() => {
+    document.title = viewTitle + " · Recallio";
+  }, [viewTitle]);
   const message = {
     idle: "",
     quota: offlineErrors.quota,
@@ -829,13 +845,7 @@ export function DeckManager(entry: LibraryEntry) {
                   }}
                 >
                   <header className={styles.formIntro}>
-                    <h1>
-                      {cardForm
-                        ? "Edytuj fiszkę"
-                        : cards.length
-                          ? "Nowa fiszka"
-                          : "Pierwsza fiszka"}
-                    </h1>
+                    <h1>{editorTitle}</h1>
                     <p>{deck.name}</p>
                   </header>
                   <NotebookSheet deckId={deck?.id} className={styles.fields}>

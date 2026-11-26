@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "@fontsource-variable/manrope";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "Recallio — odrobinę każdego dnia",
+  title: { default: "Recallio", template: "%s · Recallio" },
   description:
     "Spokojna nauka fiszek we własnym tempie. Twórz własne zestawy i wracaj do zaplanowanych powtórek.",
 };

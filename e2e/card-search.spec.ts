@@ -126,6 +126,11 @@ test("wyszukuje tłumaczenie w 10 tys. fiszek i wraca z edytora do wyniku", asyn
   await input.fill("cześć");
   await rows.first().click();
   await expect(page).toHaveURL(new RegExp("card=" + cardId));
+  await expect(page).toHaveTitle("Edytuj fiszkę · Rozmówki · Recallio");
+  await page.goBack();
+  await expect(page).toHaveTitle("Moje zestawy · Recallio");
+  await page.goForward();
+  await expect(page).toHaveTitle("Edytuj fiszkę · Rozmówki · Recallio");
   await page.reload();
   await expect(page.getByLabel("Strona A")).toHaveValue("ciao");
   await page.getByLabel("Strona A").fill("salve");

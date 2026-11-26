@@ -4,6 +4,8 @@ import { AuthFrame } from "@/features/auth/auth-frame";
 import { AuthActionForm } from "@/features/auth/auth-action-form";
 import { serverAuth, verifiedIdentity } from "@/server/auth/client";
 
+export const metadata = { title: "Ustaw nowe hasło" };
+
 export default async function NewPasswordPage({
   searchParams,
 }: {
@@ -26,7 +28,11 @@ export default async function NewPasswordPage({
       )}
       <AuthActionForm label="Zapisz hasło" loadingLabel="Zapisywanie hasła…">
         <input type="hidden" name="intent" value="update-password" />
-        <ValidatedField label="Nowe hasło" hint="Użyj co najmniej 8 znaków.">
+        <ValidatedField
+          label="Nowe hasło"
+          description="Od 8 do 128 znaków."
+          hint="Użyj co najmniej 8 znaków."
+        >
           <input
             name="password"
             type="password"

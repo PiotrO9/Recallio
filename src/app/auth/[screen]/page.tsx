@@ -14,27 +14,32 @@ const statusMessages: Record<string, string> = {
   unavailable: "Logowanie jest obecnie niedostępne.",
 };
 
-export default async function AuthPage({
-  params,
-  searchParams,
-}: {
+type AuthProps = {
   params: Promise<{ screen: string }>;
   searchParams: Promise<{ status?: string }>;
-}) {
+};
+async function authView({ params, searchParams }: AuthProps) {
   const { screen } = await params;
+  const { status } = await searchParams;
   if (screen !== "login" && screen !== "signup" && screen !== "forgot-password")
     notFound();
   const intent = screen === "forgot-password" ? "reset" : screen;
-  const { status } = await searchParams;
-  const title = {
-    login: "Zaloguj się",
-    signup: "Utwórz konto",
-    reset: "Odzyskaj hasło",
-  }[intent];
-
-  if (status === "sent" && intent !== "login")
+  const sent = status === "sent" && intent !== "login";
+  const title = sent
+    ? "Sprawdź pocztę"
+    : { login: "Zaloguj się", signup: "Utwórz konto", reset: "Odzyskaj hasło" }[
+        intent
+      ];
+  return { intent, status, sent, title } as const;
+}
+export async function generateMetadata(props: AuthProps) {
+  return { title: (await authView(props)).title };
+}
+export default async function AuthPage(props: AuthProps) {
+  const { intent, status, sent, title } = await authView(props);
+  if (sent)
     return (
-      <AuthFrame title="Sprawdź pocztę" variant="auth">
+      <AuthFrame title={title} variant="auth">
         <p role="status">{statusMessages.sent}</p>
         <Link href="/auth/login">Wróć do logowania</Link>
       </AuthFrame>
@@ -71,6 +76,9 @@ export default async function AuthPage({
         {intent !== "reset" && (
           <ValidatedField
             label="Hasło"
+            description={
+              intent === "signup" ? "Od 8 do 128 znaków." : undefined
+            }
             hint="Wpisz hasło o długości co najmniej 8 znaków."
           >
             <input

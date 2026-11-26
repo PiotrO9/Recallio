@@ -5,6 +5,7 @@ import { ConfirmAction } from "@/components/confirm-action";
 import { LoadingButton } from "@/components/loading-button";
 import { ActionLink } from "@/components/action-link";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { reviewImport, matching, type Decision } from "@/domain/import/review";
 import {
@@ -12,6 +13,7 @@ import {
   CsvError,
   MAX_CSV_BYTES,
   parseCsv,
+  parsePastedRows,
   type Content,
 } from "@/domain/import/csv";
 import {
@@ -74,14 +76,21 @@ function ContentColumn({
 export function CsvImport({
   userId,
   initialDeck,
+  paste = false,
 }: {
   userId: string;
   initialDeck?: string;
+  paste?: boolean;
 }) {
+  const router = useRouter();
+  const [text, setText] = useState("");
+  const [hasHeader, setHasHeader] = useState(false);
+  const [readError, setReadError] = useState(false);
   const [workspace, setWorkspace] = useState<SnapshotData>();
   const [active, setActive] = useState<StoredImport | null>(null);
   const [deckId, setDeckId] = useState(initialDeck ?? "");
-  const [file, setFile] = useState<ReturnType<typeof parseCsv>>();
+  const [file, setFile] =
+    useState<ReturnType<typeof parseCsv | typeof parsePastedRows>>();
   const [decisions, setDecisions] = useState<Record<number, Decision>>({});
   const [skipDuplicates, setSkipDuplicates] = useState(false);
   const [page, setPage] = useState(0);
@@ -207,7 +216,33 @@ export function CsvImport({
     }
   }
 
-  async function run(plan: StoredImport) {
+  function invalidatePaste() {
+    fileVersion.current++;
+    setFile(undefined);
+    setDecisions({});
+    setPage(0);
+    setError("");
+  }
+  async function refreshLibrary() {
+    try {
+      setWorkspace(await repository.readWorkspace());
+      setReadError(false);
+    } catch {
+      setReadError(true);
+    }
+  }
+  async function finish(planId: string, study = false) {
+    const receipt = await repository.finishImport(planId);
+    setDone(receipt);
+    setActive(null);
+    setFile(undefined);
+    setText("");
+    void sync.run();
+    if (study && receipt.next === receipt.total)
+      router.push("/study?deck=" + receipt.deckId);
+    else await refreshLibrary();
+  }
+  async function run(plan: StoredImport, study = false) {
     pauseRequested.current = false;
     let current: StoredImport | null = plan;
     while (current && current.id === plan.id && current.next < current.total) {
@@ -221,11 +256,7 @@ export function CsvImport({
       setActive(current);
     }
     if (current?.id !== plan.id) return;
-    setDone(await repository.finishImport(plan.id));
-    setActive(null);
-    setFile(undefined);
-    setWorkspace(await repository.readWorkspace());
-    void sync.run();
+    await finish(plan.id, study);
   }
 
   async function guarded(
@@ -255,7 +286,11 @@ export function CsvImport({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!preview || unresolved.length > 0 || !accepted) return;
+    if (!preview || unresolved.length > 0 || !accepted || (deckId && !target))
+      return;
+    const study =
+      ((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null)
+        ?.value === "study";
     const form = new FormData(event.currentTarget);
     void guarded("start", async () => {
       const id = target?.id ?? crypto.randomUUID();
@@ -315,7 +350,7 @@ export function CsvImport({
       const stored = await repository.readImport();
       if (stored) {
         setActive(stored);
-        await run(stored);
+        await run(stored, study);
       }
     });
   }
@@ -327,16 +362,20 @@ export function CsvImport({
     >
       <Link href="/decks">Wróć do zestawów</Link>
       <ol className={styles.steps} aria-label="Etapy importu">
-        {["Wybór pliku", "Podgląd", "Wynik"].map((step, i) => (
-          <li
-            key={step}
-            aria-current={
-              i === (active || done ? 2 : preview ? 1 : 0) ? "step" : undefined
-            }
-          >
-            {step}
-          </li>
-        ))}
+        {[paste ? "Wklejanie" : "Wybór pliku", "Podgląd", "Wynik"].map(
+          (step, i) => (
+            <li
+              key={step}
+              aria-current={
+                i === (active || done ? 2 : preview ? 1 : 0)
+                  ? "step"
+                  : undefined
+              }
+            >
+              {step}
+            </li>
+          ),
+        )}
       </ol>
       <div className={styles.intro}>
         <h1>
@@ -354,12 +393,24 @@ export function CsvImport({
                 : "Import wstrzymany"
               : preview
                 ? "Podgląd importu"
-                : "Importuj CSV"}
+                : paste
+                  ? "Wklej fiszki"
+                  : "Importuj CSV"}
         </h1>
         {!preview && !active && !done && (
           <p>
-            Dodaj fiszki z pliku. Przed zapisem sprawdzisz treść i
-            rozstrzygniesz różnice.
+            {paste
+              ? "Skopiuj z arkusza dwie kolumny z pytaniami i odpowiedziami."
+              : "Dodaj fiszki z pliku."}{" "}
+            Przed zapisem sprawdzisz treść i rozstrzygniesz różnice.
+          </p>
+        )}
+        {readError && (
+          <p role="alert">
+            Nie udało się odświeżyć biblioteki.{" "}
+            <button type="button" onClick={() => void refreshLibrary()}>
+              Ponów odczyt
+            </button>
           </p>
         )}
         {error && <p role="alert">{error}</p>}
@@ -383,6 +434,11 @@ export function CsvImport({
               : "Import częściowy zapisany na tym urządzeniu."}
           </p>
           <div className="action-row">
+            {done.added + done.updated > 0 && done.next === done.total && (
+              <ActionLink href={"/study?deck=" + done.deckId}>
+                Zacznij naukę
+              </ActionLink>
+            )}
             <ActionLink
               href={
                 workspace?.decks.some(
@@ -407,7 +463,7 @@ export function CsvImport({
                 setPreview(false);
               }}
             >
-              Importuj kolejny plik
+              {paste ? "Wklej kolejne fiszki" : "Importuj kolejny plik"}
             </button>
           </div>
         </section>
@@ -454,11 +510,7 @@ export function CsvImport({
             disabled={busy}
             onConfirm={() => {
               void guarded("finish", async () => {
-                setDone(await repository.finishImport(active.id));
-                setActive(null);
-                setFile(undefined);
-                setWorkspace(await repository.readWorkspace());
-                void sync.run();
+                await finish(active.id);
               });
             }}
           />
@@ -491,7 +543,7 @@ export function CsvImport({
                   <input
                     type="radio"
                     name="destination"
-                    checked={!target}
+                    checked={deckId === ""}
                     onChange={() => changeTarget("")}
                   />
                   Nowy zestaw
@@ -514,7 +566,10 @@ export function CsvImport({
                   </select>
                 </label>
               )}
-              {!target && (
+              {workspace && deckId && !target && (
+                <p role="alert">Wybierz dostępny zestaw albo utwórz nowy.</p>
+              )}
+              {deckId === "" && (
                 <label>
                   Nazwa zestawu
                   <input
@@ -526,21 +581,56 @@ export function CsvImport({
                   />
                 </label>
               )}
-              <label>
-                Plik CSV
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={({ target }) => void readFile(target.files?.[0])}
-                />
-              </label>
-              <p>
-                CSV UTF-8 do 1 MiB. Wymagane są obie strony fiszki. Przykłady są
-                opcjonalne.{" "}
-                <a href="/examples/fiszki.csv" download>
-                  Pobierz wzór CSV
-                </a>
-              </p>
+              {paste ? (
+                <>
+                  <label>
+                    Kolumny z arkusza
+                    <textarea
+                      rows={7}
+                      value={text}
+                      onChange={(e) => {
+                        invalidatePaste();
+                        setText(e.target.value);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={hasHeader}
+                      onChange={(e) => {
+                        invalidatePaste();
+                        setHasHeader(e.target.checked);
+                      }}
+                    />{" "}
+                    Pierwszy wiersz to nagłówki
+                  </label>
+                  <p>
+                    Trzecia i czwarta kolumna mogą zawierać przykłady. Limit
+                    wklejanego tekstu wynosi 1 MiB.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <label>
+                    Plik CSV
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={({ target }) =>
+                        void readFile(target.files?.[0])
+                      }
+                    />
+                  </label>
+                  <p>
+                    CSV UTF-8 do 1 MiB. Wymagane są obie strony fiszki.
+                    Przykłady są opcjonalne.{" "}
+                    <a href="/examples/fiszki.csv" download>
+                      Pobierz wzór CSV
+                    </a>
+                  </p>
+                </>
+              )}
             </fieldset>
             {!preview && (
               <LoadingButton
@@ -548,10 +638,33 @@ export function CsvImport({
                 type="button"
                 loading={readingFile}
                 loadingLabel="Odczytywanie pliku…"
-                disabled={!file || !workspace}
+                disabled={
+                  (!paste && !file) ||
+                  (paste && !text.trim()) ||
+                  !workspace ||
+                  !!(deckId && !target)
+                }
                 onClick={(event) => {
-                  if (event.currentTarget.form?.reportValidity())
-                    setPreview(true);
+                  if (!event.currentTarget.form?.reportValidity()) return;
+                  if (paste) {
+                    try {
+                      const parsed = parsePastedRows(text, { hasHeader });
+                      if (!parsed.rows.length) {
+                        setError("Wklej co najmniej jedną fiszkę.");
+                        return;
+                      }
+                      setFile(parsed);
+                    } catch (problem) {
+                      setError(
+                        problem instanceof CsvError
+                          ? "Wiersz " + problem.row + ". " + problem.message
+                          : "Nie udało się odczytać treści.",
+                      );
+                      return;
+                    }
+                  }
+                  setError("");
+                  setPreview(true);
                 }}
               >
                 Pokaż podgląd
@@ -569,11 +682,16 @@ export function CsvImport({
                   Pomiń duplikaty
                 </label>
                 <p className={styles.totals}>
-                  Separator: {file.delimiter === "," ? "przecinek" : "średnik"}.
-                  Do zapisu: {accepted} z {rows.length}.
+                  Separator:{" "}
+                  {file.delimiter === ","
+                    ? "przecinek"
+                    : file.delimiter === "\t"
+                      ? "tabulator"
+                      : "średnik"}
+                  . Do zapisu: {accepted} z {rows.length}.
                 </p>
                 <p className={styles.filename}>
-                  {filename} · {target?.name ?? newName}
+                  {paste ? "Arkusz" : filename} · {target?.name ?? newName}
                 </p>
                 <button
                   className="text-action"
@@ -581,7 +699,7 @@ export function CsvImport({
                   disabled={busy}
                   onClick={() => setPreview(false)}
                 >
-                  Zmień plik lub zestaw
+                  {paste ? "Edytuj wklejoną treść" : "Zmień plik lub zestaw"}
                 </button>
                 <ol className={styles.rows} aria-label="Wiersze importu">
                   {reviewed
@@ -781,6 +899,18 @@ export function CsvImport({
                   >
                     Zatwierdź import
                   </LoadingButton>
+                  {paste && (
+                    <LoadingButton
+                      value="study"
+                      loading={operation === "start"}
+                      loadingLabel="Zapisywanie…"
+                      disabled={
+                        !workspace || unresolved.length > 0 || !accepted
+                      }
+                    >
+                      Dodaj i zacznij naukę
+                    </LoadingButton>
+                  )}
                 </div>
               </>
             )}

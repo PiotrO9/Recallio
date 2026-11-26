@@ -361,6 +361,9 @@ export function DeckManager(entry: LibraryEntry) {
               >
                 Dodaj zestaw
               </button>
+              <Link className={styles.link} href="/import?source=paste">
+                Wklej fiszki
+              </Link>
               <Link className={styles.link} href="/import">
                 Importuj CSV
               </Link>
@@ -602,6 +605,9 @@ export function DeckManager(entry: LibraryEntry) {
                     <p role="alert">{offlineErrors[offlineIssue.reason]}</p>
                   )}
                   <div className={styles.actions}>
+                    <Link href={`/import?source=paste&deck=${deck.id}`}>
+                      Wklej fiszki
+                    </Link>
                     <Link href={`/import?deck=${deck.id}`}>
                       Importuj CSV do zestawu
                     </Link>

@@ -26,7 +26,7 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | ENTRY-01 | DONE | AUTH-01, DECK-01 | Wejście do aplikacji prowadzi do logowania lub własnych zestawów. Usunięto publiczny trening przykładowy. |
 | RELEASE-01 | TODO | RELEASE-LOCAL, FLOW-02, SETTINGS-LIMIT, SETTINGS-01 | Uzupełnij dowody dla środowiska docelowego, w tym próbę kopii i odtworzenia oraz test działania aplikacji. Publikacja produkcyjna wymaga osobnego zlecenia. |
 | REFACTOR-1 | DONE | — | Zgodność decyzji CSV w podglądzie i przy zapisie. |
-| REFACTOR-2 | TODO | — | Odróżnienie zapisu od odświeżenia po zapisie. |
+| REFACTOR-2 | DONE | — | Odróżnienie zapisu od odświeżenia po zapisie. |
 | REFACTOR-3 | TODO | — | Wspólne przygotowanie zestawu offline. |
 | REFACTOR-4 | TODO | — | Przygotowanie i ponowne przeliczenie tej samej oceny poza widokiem. |
 | REFACTOR-5 | TODO | — | Wspólna zmiana treści dla zapisu lokalnego i odtwarzania snapshotu. |
@@ -62,3 +62,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `ENTRY-01` — sprawdzono wejście gościa, bibliotekę po zalogowaniu i potwierdzenie konta. Przeszły typecheck, 73 testy, build i 10 E2E.
 
 - `REFACTOR-1` — Podgląd i zapis używają wspólnej decyzji. E2E obejmuje dwa wiersze przypisane do tej samej fiszki i korektę wyboru.
+
+- `REFACTOR-2` — Błąd odczytu po udanym zapisie ma własne ponowienie. E2E wymusza awarię odświeżenia biblioteki i ustawień.

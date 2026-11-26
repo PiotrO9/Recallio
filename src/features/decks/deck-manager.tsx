@@ -114,6 +114,21 @@ export function DeckManager({
     [repository, userId],
   );
 
+  const [readError, setReadError] = useState(false);
+  const [reading, setReading] = useState(false);
+  async function readAfterSave() {
+    setReading(true);
+    try {
+      setData(await repository.readWorkspace());
+      setReadError(false);
+      return true;
+    } catch {
+      setReadError(true);
+      return false;
+    } finally {
+      setReading(false);
+    }
+  }
   async function sync(afterWrite = false) {
     try {
       setStatus(await (afterWrite ? controller.flush() : controller.run()));
@@ -158,8 +173,7 @@ export function DeckManager({
     setError(false);
     try {
       await action();
-      setData(await repository.readWorkspace());
-      void sync(true);
+      if (await readAfterSave()) void sync(true);
     } catch {
       setError(true);
     } finally {
@@ -424,6 +438,23 @@ export function DeckManager({
 
   return (
     <div className={styles.body}>
+      {readError && (
+        <div>
+          <p role="alert">Nie udało się odświeżyć biblioteki po zapisie.</p>
+          <LoadingButton
+            type="button"
+            loading={reading}
+            loadingLabel="Wczytywanie…"
+            onClick={() =>
+              void readAfterSave().then((ok) => {
+                if (ok) void sync(true);
+              })
+            }
+          >
+            Ponów odczyt
+          </LoadingButton>
+        </div>
+      )}
       {error && (
         <p role="alert">
           Nie udało się zapisać zmiany. Sprawdź dane lub odśwież listę.

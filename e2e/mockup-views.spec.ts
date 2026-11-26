@@ -1,3 +1,4 @@
+import { failNextWorkspaceRead } from "./fail-workspace-read";
 import { holdStore } from "./hold-store";
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
@@ -182,7 +183,15 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
       page.getByText("Nie udało się zapisać zmiany.", { exact: false }),
     ).toBeVisible();
     await expect(page.getByLabel("Strona B")).toHaveValue("rachunek");
+    await failNextWorkspaceRead(page);
     await saveCard.click();
+    await expect(
+      page.getByText("Nie udało się odświeżyć biblioteki po zapisie."),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Ponów odczyt" }).click();
+    await expect(
+      page.getByText("Nie udało się odświeżyć biblioteki po zapisie."),
+    ).toHaveCount(0);
     await expect(
       page.getByRole("link", { name: "Ucz się z tego zestawu" }),
     ).toBeVisible();

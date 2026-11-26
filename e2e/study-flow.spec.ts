@@ -1,3 +1,4 @@
+import { failNextWorkspaceRead } from "./fail-workspace-read";
 import { randomUUID } from "node:crypto";
 import { holdStore } from "./hold-store";
 import { readFile } from "node:fs/promises";
@@ -343,7 +344,15 @@ test("a review survives an offline reload and synchronizes once to a second devi
     ).toBeVisible();
     await expect(unsaved).toBeVisible();
     await expect(defaultLimit).toHaveValue("0");
+    await failNextWorkspaceRead(otherPage);
     await saveSettings.click();
+    await expect(
+      otherPage.getByText(
+        "Nie udało się odświeżyć treningu po zapisie ustawień.",
+      ),
+    ).toBeVisible();
+    await expect(defaultLimit).toHaveValue("0");
+    await otherPage.getByRole("button", { name: "Ponów odczyt" }).click();
     await expect(unsaved).toHaveCount(0);
     await expect(otherPage.getByText("Ustawienia zapisane.")).toBeVisible();
     await expect.poll(syncedLimit).toBe(0);

@@ -425,6 +425,22 @@ function StudyBoard({
     }
   }
 
+  const [settingsReadError, setSettingsReadError] = useState(false);
+  const [readingSettings, setReadingSettings] = useState(false);
+  async function readAfterSettingsSave() {
+    setReadingSettings(true);
+    try {
+      await refresh(false);
+      setSettingsReadError(false);
+      return true;
+    } catch {
+      setSettingsReadError(true);
+      return false;
+    } finally {
+      setReadingSettings(false);
+    }
+  }
+
   async function saveSettings(next: Settings) {
     const { revision, ...payload } = next;
     await repository.commitContent(
@@ -437,8 +453,8 @@ function StudyBoard({
       },
       workspace?.settings ?? null,
     );
-    await refresh(false);
-    void synchronize(true);
+    setWorkspace((current) => current && { ...current, settings: next });
+    if (await readAfterSettingsSave()) void synchronize(true);
   }
 
   async function loadNext(mode: "extra" | "restart") {
@@ -806,6 +822,25 @@ function StudyBoard({
         <details className={styles.settings}>
           <summary>Ustawienia nauki</summary>
           <StudySettings settings={workspace.settings} save={saveSettings} />
+          {settingsReadError && (
+            <div>
+              <p role="alert">
+                Nie udało się odświeżyć treningu po zapisie ustawień.
+              </p>
+              <LoadingButton
+                type="button"
+                loading={readingSettings}
+                loadingLabel="Wczytywanie…"
+                onClick={() =>
+                  void readAfterSettingsSave().then((ok) => {
+                    if (ok) void synchronize(true);
+                  })
+                }
+              >
+                Ponów odczyt
+              </LoadingButton>
+            </div>
+          )}
           {currentDeck &&
             (offlineDecks.includes(currentDeck.id) ? (
               <p role="status">Zestaw jest dostępny offline.</p>

@@ -3,6 +3,8 @@ import type { Card, Deck } from "@/contracts";
 type LibraryPosition = {
   userId: string;
   search: string;
+  scope?: "cards" | "decks";
+  visible?: number;
   rowId: string;
   scrollY: number | null;
 };
@@ -12,8 +14,12 @@ function libraryPosition(userId: string): LibraryPosition | undefined {
   return position?.userId === userId ? position : undefined;
 }
 
-export function deckHref(id: string) {
-  return "/decks?deck=" + encodeURIComponent(id);
+export function deckHref(id: string, card?: string) {
+  return (
+    "/decks?deck=" +
+    encodeURIComponent(id) +
+    (card ? "&card=" + encodeURIComponent(card) : "")
+  );
 }
 
 export type LibraryEntry = {
@@ -21,13 +27,17 @@ export type LibraryEntry = {
   initialDeck?: string;
   createDeck?: boolean;
   createCard?: boolean;
+  initialCard?: string;
 };
 export function useLibraryNavigation(
-  { userId, initialDeck, createDeck, createCard }: LibraryEntry,
+  { userId, initialDeck, createDeck, createCard, initialCard }: LibraryEntry,
   busy: boolean,
 ) {
   const [selected, setSelected] = useState<string | undefined>(initialDeck);
   const returnPosition = useRef<LibraryPosition | undefined>(undefined);
+  const [target, setTarget] = useState(initialCard);
+  const [scope, setScope] = useState<"cards" | "decks">("decks");
+  const [visible, setVisible] = useState(50);
   const [search, setSearch] = useState("");
   const [deckForm, setDeckForm] = useState<Deck | null | undefined>(
     createDeck ? null : undefined,
@@ -45,6 +55,13 @@ export function useLibraryNavigation(
       returnPosition.current = id ? undefined : position;
       focusSelection.current = !!id;
       setSearch(position?.search ?? "");
+      setScope(position?.scope ?? "decks");
+      setVisible(position?.visible ?? 50);
+      setTarget(
+        params.get("card") === "new"
+          ? undefined
+          : (params.get("card") ?? undefined),
+      );
       setSelected(id);
       setDeckForm(params.get("new") === "1" ? null : undefined);
       setCardForm(params.get("card") === "new" ? null : undefined);
@@ -54,7 +71,11 @@ export function useLibraryNavigation(
     return () => window.removeEventListener("popstate", restoreLocation);
   }, [userId]);
 
-  function openDeck(event: MouseEvent<HTMLAnchorElement>, id: string) {
+  function openDeck(
+    event: MouseEvent<HTMLAnchorElement>,
+    id: string,
+    card?: string,
+  ) {
     if (
       event.metaKey ||
       event.ctrlKey ||
@@ -64,14 +85,21 @@ export function useLibraryNavigation(
     )
       return;
     event.preventDefault();
-    if (busy || id === selected) return;
-    const position = { userId, rowId: id, search, scrollY: window.scrollY };
-    if (!selected) {
+    if (busy || (id === selected && !card)) return;
+    const position = {
+      userId,
+      rowId: card ?? id,
+      search,
+      scope,
+      visible,
+      scrollY: window.scrollY,
+    };
+    if (!selected || card) {
       window.history.replaceState({ libraryPosition: position }, "", "/decks");
       window.history.pushState(
         { libraryPosition: position, fromLibrary: true },
         "",
-        deckHref(id),
+        deckHref(id, card),
       );
     } else {
       window.history.replaceState(
@@ -83,12 +111,38 @@ export function useLibraryNavigation(
         deckHref(id),
       );
     }
-    focusSelection.current = true;
+    setTarget(card);
+    focusSelection.current = !card;
     setSelected(id);
     setCardForm(undefined);
   }
 
   function closeCardForm() {
+    if (
+      target &&
+      window.history.state?.fromLibrary &&
+      libraryPosition(userId)?.scope === "cards"
+    ) {
+      window.history.back();
+      return;
+    }
+    if (
+      target &&
+      new URLSearchParams(window.location.search).get("from") === "repair"
+    ) {
+      const params = new URLSearchParams(window.location.search);
+      const session = params.get("session");
+      window.location.assign(
+        "/study?repair=1" +
+          (session === "today"
+            ? "&scope=today"
+            : session
+              ? "&deck=" + encodeURIComponent(session)
+              : ""),
+      );
+      return;
+    }
+    setTarget(undefined);
     if (selected && new URLSearchParams(window.location.search).has("card")) {
       window.history.replaceState(
         {
@@ -107,7 +161,14 @@ export function useLibraryNavigation(
       window.history.back();
       return;
     }
-    const position = { userId, rowId: id, search, scrollY: null };
+    const position = {
+      userId,
+      rowId: id,
+      search,
+      scope,
+      visible,
+      scrollY: null,
+    };
     window.history.replaceState({ libraryPosition: position }, "", "/decks");
     returnPosition.current = position;
     setSelected(undefined);
@@ -136,6 +197,11 @@ export function useLibraryNavigation(
   }
   return {
     selected,
+    target,
+    scope,
+    setScope,
+    visible,
+    setVisible,
     search,
     setSearch,
     deckForm,

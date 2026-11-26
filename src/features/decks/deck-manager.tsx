@@ -20,6 +20,7 @@ import {
   type Deck,
 } from "@/contracts";
 import { resetFsrsProgress } from "@/domain/learning/scheduler";
+import { indexCards, searchCards } from "@/domain/card-search";
 import { exportCsv } from "@/domain/import/csv";
 import { type SnapshotData } from "@/storage/local-repository";
 import type { SyncStatus } from "@/sync/controller";
@@ -49,6 +50,11 @@ export function DeckManager(entry: LibraryEntry) {
   const busy = operation !== null;
   const {
     selected,
+    target,
+    scope,
+    setScope,
+    visible,
+    setVisible,
     search,
     setSearch,
     deckForm,
@@ -78,6 +84,9 @@ export function DeckManager(entry: LibraryEntry) {
     [userId],
   );
 
+  const [confirmed, setConfirmed] = useState(false);
+  const [missing, setMissing] = useState(false);
+  const searchField = useRef<HTMLInputElement>(null);
   const [readError, setReadError] = useState(false);
   const [reading, setReading] = useState(false);
   async function readAfterSave() {
@@ -95,8 +104,12 @@ export function DeckManager(entry: LibraryEntry) {
   }
   async function sync(afterWrite = false) {
     try {
-      setStatus(await (afterWrite ? controller.flush() : controller.run()));
+      const outcome = await (afterWrite
+        ? controller.flush()
+        : controller.run());
+      setStatus(outcome);
       setData(await repository.readWorkspace());
+      if (outcome === "idle") setConfirmed(true);
     } catch {
       setStatus("failed");
     }
@@ -148,6 +161,44 @@ export function DeckManager(entry: LibraryEntry) {
 
   const decks = data?.decks.filter((deck) => !deck.deletedAt) ?? [];
   const deck = decks.find((item) => item.id === selected);
+  const index = useMemo(
+    () => indexCards(data?.decks ?? [], data?.cards ?? []),
+    [data],
+  );
+  const searching = scope === "cards" && !!search.trim();
+  const hits = useMemo(
+    () => (searching ? searchCards(index, search) : []),
+    [index, search, searching],
+  );
+  const linked =
+    target && deck
+      ? data?.cards.find(
+          (c) => c.id === target && c.deckId === deck.id && !c.deletedAt,
+        )
+      : undefined;
+  useEffect(() => {
+    if (!target) return;
+    if (linked) {
+      if (cardForm?.id !== linked.id) openCardForm(linked);
+      return;
+    }
+    if (confirmed) {
+      setMissing(true);
+      closeCardForm();
+    }
+  }, [target, linked, cardForm, confirmed, closeCardForm, openCardForm]);
+  useEffect(() => {
+    const position = returnPosition.current;
+    if (
+      !selected &&
+      data &&
+      position?.scope === "cards" &&
+      !hits.some((h) => h.card.id === position.rowId)
+    ) {
+      searchField.current?.focus();
+      returnPosition.current = undefined;
+    }
+  }, [selected, data, hits, returnPosition]);
   const editorKey =
     deck && cardForm !== undefined
       ? draftKey(userId, deck.id, cardForm?.id)
@@ -310,11 +361,22 @@ export function DeckManager(entry: LibraryEntry) {
   }
 
   const browsing = deckForm === undefined && (!deck || cardForm === undefined);
-  const preview = !deck && found[0];
+  const preview = !deck && !searching && found[0];
   const previewCard =
     preview && data?.cards.find((c) => !c.deletedAt && c.deckId === preview.id);
   return (
     <div className={styles.body}>
+      {missing && <p role="status">Ta fiszka nie jest już dostępna.</p>}
+      {target && !linked && !confirmed && (
+        <p role="status">
+          {status === "idle"
+            ? "Wczytywanie fiszki…"
+            : "Nie udało się pobrać fiszki."}{" "}
+          {status !== "idle" && (
+            <button onClick={() => void sync()}>Ponów pobieranie</button>
+          )}
+        </p>
+      )}
       {readError && (
         <div>
           <p role="alert">Nie udało się odświeżyć biblioteki po zapisie.</p>
@@ -342,16 +404,36 @@ export function DeckManager(entry: LibraryEntry) {
         data-split={browsing && !!(deck || preview)}
         data-selected={!!deck}
       >
-        {browsing && (
+        {browsing && !target && (
           <section className={styles.index} aria-label="Biblioteka">
             {deck ? <h2>Moje zestawy</h2> : <h1>Moje zestawy</h1>}
             <div className={styles.toolbar}>
               <label>
-                Wyszukaj zestaw
+                Szukaj w
+                <select
+                  value={scope}
+                  onChange={(event) => {
+                    setScope(
+                      event.target.value === "cards" ? "cards" : "decks",
+                    );
+                    setVisible(50);
+                  }}
+                >
+                  <option value="decks">Zestawy</option>
+                  <option value="cards">Fiszki</option>
+                </select>
+              </label>
+              <label>
+                {scope === "cards" ? "Wyszukaj fiszkę" : "Wyszukaj zestaw"}
                 <input
+                  ref={searchField}
                   type="search"
                   value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setVisible(50);
+                    setMissing(false);
+                  }}
                 />
               </label>
               <button
@@ -369,50 +451,98 @@ export function DeckManager(entry: LibraryEntry) {
               </Link>
             </div>
 
-            <ul className={styles.list} aria-label="Zestawy">
-              {found.map((item) => (
-                <li key={item.id}>
-                  <a
-                    className={styles.deckRow}
-                    href={deckHref(item.id)}
-                    aria-disabled={busy || undefined}
-                    style={deckColor(item.id)}
-                    aria-current={deck?.id === item.id ? "true" : undefined}
-                    ref={(el) => {
-                      const position = returnPosition.current;
-                      if (el && !selected && position?.rowId === item.id) {
-                        returnPosition.current = undefined;
-                        el.focus({ preventScroll: true });
-                        if (position.scrollY === null)
-                          el.scrollIntoView({ block: "nearest" });
-                        else window.scrollTo(0, position.scrollY);
-                      }
-                    }}
-                    onClick={(event) => openDeck(event, item.id)}
-                  >
-                    <span>
-                      {item.name}
-                      <span className={styles.count}>
-                        Fiszki: {counts.get(item.id) ?? 0}
-                      </span>
-                    </span>
-                    <small>Otwórz</small>
-                  </a>
-                </li>
-              ))}
-            </ul>
-            {decks.length > 0 && !found.length && (
-              <div>
-                <p>Brak wyników dla „{search}”.</p>
-                <button
-                  type="button"
-                  className="text-action"
-                  onClick={() => setSearch("")}
+            {searching ? (
+              <>
+                <ul
+                  className={styles.list}
+                  aria-label="Wyniki wyszukiwania fiszek"
                 >
-                  Wyczyść wyszukiwanie
-                </button>
-              </div>
+                  {hits.slice(0, visible).map(({ card, deckName }) => (
+                    <li key={card.id}>
+                      <a
+                        className={styles.deckRow}
+                        style={deckColor(card.deckId)}
+                        href={deckHref(card.deckId, card.id)}
+                        onClick={(event) => {
+                          setMissing(false);
+                          openDeck(event, card.deckId, card.id);
+                        }}
+                        ref={(el) => {
+                          const p = returnPosition.current;
+                          if (el && !selected && p?.rowId === card.id) {
+                            returnPosition.current = undefined;
+                            el.focus({ preventScroll: true });
+                            if (p.scrollY != null)
+                              window.scrollTo(0, p.scrollY);
+                          }
+                        }}
+                      >
+                        <span>
+                          <strong>{card.sideA}</strong> · {card.sideB}
+                          <span className={styles.count}>{deckName}</span>
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+                {hits.length > visible && (
+                  <button
+                    className="auth-secondary"
+                    onClick={() => setVisible((n) => n + 50)}
+                  >
+                    Pokaż więcej
+                  </button>
+                )}
+              </>
+            ) : (
+              <ul className={styles.list} aria-label="Zestawy">
+                {found.map((item) => (
+                  <li key={item.id}>
+                    <a
+                      className={styles.deckRow}
+                      href={deckHref(item.id)}
+                      aria-disabled={busy || undefined}
+                      style={deckColor(item.id)}
+                      aria-current={deck?.id === item.id ? "true" : undefined}
+                      ref={(el) => {
+                        const position = returnPosition.current;
+                        if (el && !selected && position?.rowId === item.id) {
+                          returnPosition.current = undefined;
+                          el.focus({ preventScroll: true });
+                          if (position.scrollY === null)
+                            el.scrollIntoView({ block: "nearest" });
+                          else window.scrollTo(0, position.scrollY);
+                        }
+                      }}
+                      onClick={(event) => openDeck(event, item.id)}
+                    >
+                      <span>
+                        {item.name}
+                        <span className={styles.count}>
+                          Fiszki: {counts.get(item.id) ?? 0}
+                        </span>
+                      </span>
+                      <small>Otwórz</small>
+                    </a>
+                  </li>
+                ))}
+              </ul>
             )}
+            {data &&
+              (searching
+                ? !hits.length
+                : decks.length > 0 && !found.length) && (
+                <div>
+                  <p>Brak wyników dla „{search}”.</p>
+                  <button
+                    type="button"
+                    className="text-action"
+                    onClick={() => setSearch("")}
+                  >
+                    Wyczyść wyszukiwanie
+                  </button>
+                </div>
+              )}
 
             {!decks.length && (
               <p>
@@ -505,311 +635,330 @@ export function DeckManager(entry: LibraryEntry) {
           </form>
         )}
 
-        {deck && deckForm === undefined && (
-          <section className={styles.detail} aria-label={deck.name}>
-            <button
-              className="text-action"
-              disabled={busy}
-              onClick={() => {
-                if (cardForm === undefined) returnToList(deck.id);
-                else closeCardForm();
-              }}
-            >
-              {cardForm === undefined ? "Wróć do zestawów" : "Wróć do zestawu"}
-            </button>
-            {cardForm === undefined && (
-              <NotebookSheet deckId={deck.id} className={styles.cover}>
-                <h1
-                  tabIndex={-1}
-                  ref={(el) => {
-                    if (el && focusSelection.current) {
-                      focusSelection.current = false;
-                      el.focus();
-                    }
-                  }}
-                >
-                  {deck.name}
-                </h1>
-                <p>
-                  Fiszki: {cards.length} ·{" "}
-                  {deck.directionMode === "mixed"
-                    ? "Kierunek mieszany"
-                    : deck.directionMode === "a-b"
-                      ? "Ze strony A na B"
-                      : "Ze strony B na A"}
-                </p>
-                <div className={styles.actions}>
-                  {!!cards.length && (
-                    <a className="primary" href={`/study?deck=${deck.id}`}>
-                      Ucz się z tego zestawu
-                    </a>
-                  )}
-                  <button
-                    className={cards.length ? "auth-secondary" : "primary"}
-                    disabled={busy}
-                    onClick={() => openCardForm(null)}
-                  >
-                    {cards.length ? "Dodaj fiszkę" : "Dodaj pierwszą fiszkę"}
-                  </button>
-                </div>
-              </NotebookSheet>
-            )}
-            {notice?.deckId === deck.id && (
-              <p role="status">
-                {notice.text}
-                {cardForm === null && (
-                  <>
-                    {" "}
-                    <a href={`/study?deck=${deck.id}`}>
-                      Ucz się z tego zestawu
-                    </a>
-                  </>
-                )}
-              </p>
-            )}
-            {cardForm === undefined && (
-              <>
-                <details>
-                  <summary>Zarządzaj zestawem</summary>
-                  {offlineReady.includes(deck.id) ? (
-                    <p role="status">
-                      Zestaw jest gotowy do nauki offline na tym urządzeniu.
-                    </p>
-                  ) : (
-                    <LoadingButton
-                      className="auth-secondary"
-                      disabled={busy || !cards.length}
-                      loading={operation === "offline"}
-                      loadingLabel="Przygotowywanie zestawu…"
-                      onClick={() =>
-                        void perform("offline", async () => {
-                          setOfflineIssue(undefined);
-                          const { status, result } = await prepareDeckOffline(
-                            deck.id,
-                            controller,
-                            repository,
-                          );
-                          setStatus(status);
-                          if (result === "ready")
-                            setOfflineReady((ids) => [
-                              ...new Set([...ids, deck.id]),
-                            ]);
-                          else setOfflineIssue({ id: deck.id, reason: result });
-                        })
-                      }
-                    >
-                      Przygotuj zestaw offline
-                    </LoadingButton>
-                  )}
-                  {offlineIssue?.id === deck.id && (
-                    <p role="alert">{offlineErrors[offlineIssue.reason]}</p>
-                  )}
-                  <div className={styles.actions}>
-                    <Link href={`/import?source=paste&deck=${deck.id}`}>
-                      Wklej fiszki
-                    </Link>
-                    <Link href={`/import?deck=${deck.id}`}>
-                      Importuj CSV do zestawu
-                    </Link>
-                    <button
-                      className="auth-secondary"
-                      disabled={busy}
-                      onClick={() => openDeckForm(deck)}
-                    >
-                      Edytuj zestaw
-                    </button>
-                    <ConfirmAction
-                      label="Usuń zestaw"
-                      loading={operation === "deleteDeck"}
-                      loadingLabel="Usuwanie zestawu…"
-                      title="Usunąć zestaw?"
-                      description={`Usuniesz zestaw „${deck.name}” i wszystkie jego fiszki.`}
-                      disabled={busy}
-                      onConfirm={() => remove(deck)}
-                    />
-
-                    <button
-                      className="auth-secondary"
-                      disabled={busy || !cards.length}
-                      onClick={download}
-                    >
-                      Eksportuj CSV
-                    </button>
-                  </div>
-                </details>
-              </>
-            )}
-            {cardForm !== undefined && (
-              <form
-                className="auth-form"
-                key={cardForm?.id ?? "new-card-" + savedCards}
-                onSubmit={saveCard}
-                onChange={(event) => {
-                  if (editorKey)
-                    rememberDraft(
-                      editorKey,
-                      restoredDraft?.base ?? cardForm,
-                      new FormData(event.currentTarget),
-                    );
+        {deck &&
+          deckForm === undefined &&
+          (!target || (linked && cardForm)) && (
+            <section className={styles.detail} aria-label={deck.name}>
+              <button
+                className="text-action"
+                disabled={busy}
+                onClick={() => {
+                  if (cardForm === undefined) returnToList(deck.id);
+                  else closeCardForm();
                 }}
               >
-                <header className={styles.formIntro}>
-                  <h1>
-                    {cardForm
-                      ? "Edytuj fiszkę"
-                      : cards.length
-                        ? "Nowa fiszka"
-                        : "Pierwsza fiszka"}
-                  </h1>
-                  <p>{deck.name}</p>
-                </header>
-                <NotebookSheet deckId={deck?.id} className={styles.fields}>
-                  <div className={styles.pair}>
-                    <ValidatedField
-                      label="Strona A"
-                      hint="Wpisz treść strony A."
-                    >
-                      <textarea
-                        autoFocus
-                        name="sideA"
-                        readOnly={busy}
-                        defaultValue={restoredDraft?.sideA ?? cardForm?.sideA}
-                        maxLength={MAX_CARD_SIDE_LENGTH}
-                        required
-                      />
-                    </ValidatedField>
-                    <ValidatedField
-                      label="Strona B"
-                      hint="Wpisz odpowiedź ze strony B."
-                    >
-                      <textarea
-                        name="sideB"
-                        readOnly={busy}
-                        defaultValue={restoredDraft?.sideB ?? cardForm?.sideB}
-                        maxLength={MAX_CARD_SIDE_LENGTH}
-                        required
-                      />
-                    </ValidatedField>
-                  </div>
-                  <details
-                    open={
-                      cardForm ||
-                      restoredDraft?.exampleA ||
-                      restoredDraft?.exampleB
-                        ? true
-                        : undefined
-                    }
-                  >
-                    <summary>Przykłady (opcjonalne)</summary>
-                    <div className={styles.pair}>
-                      <label>
-                        Przykład A
-                        <input
-                          name="exampleA"
-                          readOnly={busy}
-                          defaultValue={
-                            restoredDraft?.exampleA ?? cardForm?.exampleA ?? ""
-                          }
-                          maxLength={MAX_CARD_EXAMPLE_LENGTH}
-                        />
-                      </label>
-                      <label>
-                        Przykład B
-                        <input
-                          name="exampleB"
-                          readOnly={busy}
-                          defaultValue={
-                            restoredDraft?.exampleB ?? cardForm?.exampleB ?? ""
-                          }
-                          maxLength={MAX_CARD_EXAMPLE_LENGTH}
-                        />
-                      </label>
-                    </div>
-                  </details>
-                  {cardForm && (
-                    <details>
-                      <summary>Postęp i usuwanie</summary>
-                      <div className="action-row">
-                        {data?.progress
-                          .filter((p) => p.cardId === cardForm.id)
-                          .map((p) => (
-                            <ConfirmAction
-                              key={p.direction}
-                              loading={operation === `reset-${p.direction}`}
-                              loadingLabel="Resetowanie…"
-                              label={`Zresetuj ${p.direction === "a-b" ? "A → B" : "B → A"}`}
-                              title="Zresetować postęp kierunku?"
-                              description="Historia ocen pozostanie zapisana. Wybrany kierunek rozpocznie naukę od początku."
-                              disabled={busy}
-                              onConfirm={() => reset(cardForm, p.direction)}
-                            />
-                          ))}
-                        <ConfirmAction
-                          label="Usuń fiszkę"
-                          loading={operation === "deleteCard"}
-                          loadingLabel="Usuwanie fiszki…"
-                          title="Usunąć fiszkę?"
-                          description="Obie strony fiszki zostaną usunięte z zestawu."
-                          disabled={busy}
-                          onConfirm={() => remove(currentCardVersion(cardForm))}
-                        />
-                      </div>
-                    </details>
-                  )}
-                  <div className={styles.actions}>
-                    <LoadingButton
-                      className="primary"
-                      disabled={busy}
-                      loading={operation === "saveCard"}
-                      loadingLabel="Zapisywanie fiszki…"
-                    >
-                      {cardForm ? "Zapisz zmiany" : "Zapisz i dodaj następną"}
-                    </LoadingButton>
-                    <ConfirmAction
-                      label="Anuluj"
-                      title="Odrzucić szkic fiszki?"
-                      description="Niezapisane zmiany w tej fiszce zostaną usunięte."
-                      confirm="Odrzuć szkic"
-                      cancelLabel="Wróć do edycji"
-                      triggerClassName="text-action"
-                      needsConfirmation={() =>
-                        !!editorKey && !!readDraft(editorKey)
+                {cardForm === undefined
+                  ? "Wróć do zestawów"
+                  : target && scope === "cards"
+                    ? "Wróć do wyników"
+                    : target &&
+                        typeof window !== "undefined" &&
+                        new URLSearchParams(window.location.search).get(
+                          "from",
+                        ) === "repair"
+                      ? "Wróć do listy Do poprawy"
+                      : "Wróć do zestawu"}
+              </button>
+              {cardForm === undefined && (
+                <NotebookSheet deckId={deck.id} className={styles.cover}>
+                  <h1
+                    tabIndex={-1}
+                    ref={(el) => {
+                      if (el && focusSelection.current) {
+                        focusSelection.current = false;
+                        el.focus();
                       }
+                    }}
+                  >
+                    {deck.name}
+                  </h1>
+                  <p>
+                    Fiszki: {cards.length} ·{" "}
+                    {deck.directionMode === "mixed"
+                      ? "Kierunek mieszany"
+                      : deck.directionMode === "a-b"
+                        ? "Ze strony A na B"
+                        : "Ze strony B na A"}
+                  </p>
+                  <div className={styles.actions}>
+                    {!!cards.length && (
+                      <a className="primary" href={`/study?deck=${deck.id}`}>
+                        Ucz się z tego zestawu
+                      </a>
+                    )}
+                    <button
+                      className={cards.length ? "auth-secondary" : "primary"}
                       disabled={busy}
-                      onConfirm={() => {
-                        if (editorKey) discardDraft(editorKey);
-                        closeCardForm();
-                      }}
-                    />
+                      onClick={() => openCardForm(null)}
+                    >
+                      {cards.length ? "Dodaj fiszkę" : "Dodaj pierwszą fiszkę"}
+                    </button>
                   </div>
                 </NotebookSheet>
-              </form>
-            )}
-            {cardForm === undefined && <h2>Fiszki</h2>}
-            {cardForm === undefined && (
-              <ul className={styles.list} aria-label="Fiszki">
-                {cards.map((card) => (
-                  <li className={styles.card} key={card.id}>
-                    <strong>{card.sideA}</strong>
-                    <span>{card.sideB}</span>
+              )}
+              {notice?.deckId === deck.id && (
+                <p role="status">
+                  {notice.text}
+                  {cardForm === null && (
+                    <>
+                      {" "}
+                      <a href={`/study?deck=${deck.id}`}>
+                        Ucz się z tego zestawu
+                      </a>
+                    </>
+                  )}
+                </p>
+              )}
+              {cardForm === undefined && (
+                <>
+                  <details>
+                    <summary>Zarządzaj zestawem</summary>
+                    {offlineReady.includes(deck.id) ? (
+                      <p role="status">
+                        Zestaw jest gotowy do nauki offline na tym urządzeniu.
+                      </p>
+                    ) : (
+                      <LoadingButton
+                        className="auth-secondary"
+                        disabled={busy || !cards.length}
+                        loading={operation === "offline"}
+                        loadingLabel="Przygotowywanie zestawu…"
+                        onClick={() =>
+                          void perform("offline", async () => {
+                            setOfflineIssue(undefined);
+                            const { status, result } = await prepareDeckOffline(
+                              deck.id,
+                              controller,
+                              repository,
+                            );
+                            setStatus(status);
+                            if (result === "ready")
+                              setOfflineReady((ids) => [
+                                ...new Set([...ids, deck.id]),
+                              ]);
+                            else
+                              setOfflineIssue({ id: deck.id, reason: result });
+                          })
+                        }
+                      >
+                        Przygotuj zestaw offline
+                      </LoadingButton>
+                    )}
+                    {offlineIssue?.id === deck.id && (
+                      <p role="alert">{offlineErrors[offlineIssue.reason]}</p>
+                    )}
                     <div className={styles.actions}>
+                      <Link href={`/import?source=paste&deck=${deck.id}`}>
+                        Wklej fiszki
+                      </Link>
+                      <Link href={`/import?deck=${deck.id}`}>
+                        Importuj CSV do zestawu
+                      </Link>
                       <button
                         className="auth-secondary"
                         disabled={busy}
-                        onClick={() => openCardForm(card)}
+                        onClick={() => openDeckForm(deck)}
                       >
-                        Edytuj fiszkę
+                        Edytuj zestaw
+                      </button>
+                      <ConfirmAction
+                        label="Usuń zestaw"
+                        loading={operation === "deleteDeck"}
+                        loadingLabel="Usuwanie zestawu…"
+                        title="Usunąć zestaw?"
+                        description={`Usuniesz zestaw „${deck.name}” i wszystkie jego fiszki.`}
+                        disabled={busy}
+                        onConfirm={() => remove(deck)}
+                      />
+
+                      <button
+                        className="auth-secondary"
+                        disabled={busy || !cards.length}
+                        onClick={download}
+                      >
+                        Eksportuj CSV
                       </button>
                     </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {cardForm === undefined && !cards.length && (
-              <p>W zestawie nie ma fiszek.</p>
-            )}
-          </section>
-        )}
+                  </details>
+                </>
+              )}
+              {cardForm !== undefined && (
+                <form
+                  className="auth-form"
+                  key={cardForm?.id ?? "new-card-" + savedCards}
+                  onSubmit={saveCard}
+                  onChange={(event) => {
+                    if (editorKey)
+                      rememberDraft(
+                        editorKey,
+                        restoredDraft?.base ?? cardForm,
+                        new FormData(event.currentTarget),
+                      );
+                  }}
+                >
+                  <header className={styles.formIntro}>
+                    <h1>
+                      {cardForm
+                        ? "Edytuj fiszkę"
+                        : cards.length
+                          ? "Nowa fiszka"
+                          : "Pierwsza fiszka"}
+                    </h1>
+                    <p>{deck.name}</p>
+                  </header>
+                  <NotebookSheet deckId={deck?.id} className={styles.fields}>
+                    <div className={styles.pair}>
+                      <ValidatedField
+                        label="Strona A"
+                        hint="Wpisz treść strony A."
+                      >
+                        <textarea
+                          autoFocus
+                          name="sideA"
+                          readOnly={busy}
+                          defaultValue={restoredDraft?.sideA ?? cardForm?.sideA}
+                          maxLength={MAX_CARD_SIDE_LENGTH}
+                          required
+                        />
+                      </ValidatedField>
+                      <ValidatedField
+                        label="Strona B"
+                        hint="Wpisz odpowiedź ze strony B."
+                      >
+                        <textarea
+                          name="sideB"
+                          readOnly={busy}
+                          defaultValue={restoredDraft?.sideB ?? cardForm?.sideB}
+                          maxLength={MAX_CARD_SIDE_LENGTH}
+                          required
+                        />
+                      </ValidatedField>
+                    </div>
+                    <details
+                      open={
+                        cardForm ||
+                        restoredDraft?.exampleA ||
+                        restoredDraft?.exampleB
+                          ? true
+                          : undefined
+                      }
+                    >
+                      <summary>Przykłady (opcjonalne)</summary>
+                      <div className={styles.pair}>
+                        <label>
+                          Przykład A
+                          <input
+                            name="exampleA"
+                            readOnly={busy}
+                            defaultValue={
+                              restoredDraft?.exampleA ??
+                              cardForm?.exampleA ??
+                              ""
+                            }
+                            maxLength={MAX_CARD_EXAMPLE_LENGTH}
+                          />
+                        </label>
+                        <label>
+                          Przykład B
+                          <input
+                            name="exampleB"
+                            readOnly={busy}
+                            defaultValue={
+                              restoredDraft?.exampleB ??
+                              cardForm?.exampleB ??
+                              ""
+                            }
+                            maxLength={MAX_CARD_EXAMPLE_LENGTH}
+                          />
+                        </label>
+                      </div>
+                    </details>
+                    {cardForm && (
+                      <details>
+                        <summary>Postęp i usuwanie</summary>
+                        <div className="action-row">
+                          {data?.progress
+                            .filter((p) => p.cardId === cardForm.id)
+                            .map((p) => (
+                              <ConfirmAction
+                                key={p.direction}
+                                loading={operation === `reset-${p.direction}`}
+                                loadingLabel="Resetowanie…"
+                                label={`Zresetuj ${p.direction === "a-b" ? "A → B" : "B → A"}`}
+                                title="Zresetować postęp kierunku?"
+                                description="Historia ocen pozostanie zapisana. Wybrany kierunek rozpocznie naukę od początku."
+                                disabled={busy}
+                                onConfirm={() => reset(cardForm, p.direction)}
+                              />
+                            ))}
+                          <ConfirmAction
+                            label="Usuń fiszkę"
+                            loading={operation === "deleteCard"}
+                            loadingLabel="Usuwanie fiszki…"
+                            title="Usunąć fiszkę?"
+                            description="Obie strony fiszki zostaną usunięte z zestawu."
+                            disabled={busy}
+                            onConfirm={() =>
+                              remove(currentCardVersion(cardForm))
+                            }
+                          />
+                        </div>
+                      </details>
+                    )}
+                    <div className={styles.actions}>
+                      <LoadingButton
+                        className="primary"
+                        disabled={busy}
+                        loading={operation === "saveCard"}
+                        loadingLabel="Zapisywanie fiszki…"
+                      >
+                        {cardForm ? "Zapisz zmiany" : "Zapisz i dodaj następną"}
+                      </LoadingButton>
+                      <ConfirmAction
+                        label="Anuluj"
+                        title="Odrzucić szkic fiszki?"
+                        description="Niezapisane zmiany w tej fiszce zostaną usunięte."
+                        confirm="Odrzuć szkic"
+                        cancelLabel="Wróć do edycji"
+                        triggerClassName="text-action"
+                        needsConfirmation={() =>
+                          !!editorKey && !!readDraft(editorKey)
+                        }
+                        disabled={busy}
+                        onConfirm={() => {
+                          if (editorKey) discardDraft(editorKey);
+                          closeCardForm();
+                        }}
+                      />
+                    </div>
+                  </NotebookSheet>
+                </form>
+              )}
+              {cardForm === undefined && <h2>Fiszki</h2>}
+              {cardForm === undefined && (
+                <ul className={styles.list} aria-label="Fiszki">
+                  {cards.map((card) => (
+                    <li className={styles.card} key={card.id}>
+                      <strong>{card.sideA}</strong>
+                      <span>{card.sideB}</span>
+                      <div className={styles.actions}>
+                        <button
+                          className="auth-secondary"
+                          disabled={busy}
+                          onClick={() => openCardForm(card)}
+                        >
+                          Edytuj fiszkę
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {cardForm === undefined && !cards.length && (
+                <p>W zestawie nie ma fiszek.</p>
+              )}
+            </section>
+          )}
       </div>
       {message && <p role="status">{message}</p>}
     </div>

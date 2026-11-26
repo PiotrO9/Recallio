@@ -1,3 +1,5 @@
+import { normalizeText as normalizeCsvText } from "../normalize-text";
+export { normalizeCsvText };
 import {
   MAX_CARD_SIDE_LENGTH,
   MAX_CARD_EXAMPLE_LENGTH,
@@ -243,13 +245,6 @@ function parseRow(r: RecordRow, keys: readonly (keyof Content)[]) {
   return { row: r.line, content, errors };
 }
 
-// Comparison only; never replace the original content with these keys.
-export const normalizeCsvText = (s: string | null) =>
-  (s ?? "")
-    .normalize("NFC")
-    .trim()
-    .replace(/\s+/gu, " ")
-    .toLocaleLowerCase("pl-PL");
 /** Reclassify after changing decisions. skippedRows must include every prior row
  * that will not create the given content, including updates. For bulk skipping,
  * use automaticallySkipped from this same run; do not skip solely by classification.

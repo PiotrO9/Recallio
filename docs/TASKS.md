@@ -47,7 +47,7 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | TODAY-01    | DONE | QUEUE-01, TRAIN-01   | Dobieraj należne kierunki z wielu zestawów. Sprawdź termin graniczny, powroty po błędzie i zakończenie sesji.          |
 | TODAY-02    | DONE | TODAY-01, PWA-01     | Połącz panel i sesję dzienną online oraz offline. Sprawdź odświeżenie i synchronizację oceny.                          |
 | STUDY-CHECK | DONE | PASTE-02, TODAY-02   | Odbierz przejście od arkusza do nauki oraz dzienną powtórkę dwóch zestawów na desktopie i telefonie.                   |
-| SEARCH-01   | TODO | DECK-01              | Wyszukaj fiszkę po dowolnej stronie i przywróć wyniki po edycji. Sprawdź dużą bibliotekę i izolację kont.              |
+| SEARCH-01   | DONE | DECK-01              | Wyszukaj fiszkę po dowolnej stronie i przywróć wyniki po edycji. Sprawdź dużą bibliotekę i izolację kont.              |
 | REPAIR-01   | TODO | SYNC-01, SCHED-01    | Wylicz trudne fiszki z kanonicznej historii. Sprawdź świeże urządzenie, zmianę epoki i wynik offline.                  |
 | REPAIR-02   | TODO | SEARCH-01, REPAIR-01 | Pokaż listę „Do poprawy” z powodem i przejściem do edycji. Sprawdź zachowanie postępu po poprawieniu treści.           |
 | TYPE-01     | TODO | TRAIN-01             | Dodaj opcjonalną odpowiedź pisemną przed odsłonięciem. Sprawdź samoocenę, retry i czyszczenie tekstu.                  |
@@ -106,3 +106,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `TODAY-02` — Panel i sesja dzienna korzystają ze wspólnej puli, również w powłoce offline. Typy, build, 83 testy i 32 E2E przeszły lokalnie.
 
 - `STUDY-CHECK` — Na desktopie i telefonie sprawdzono wklejanie, dwa zestawy, przeładowanie offline, unikalne oceny na drugim urządzeniu i izolację konta. 34 E2E przeszły lokalnie.
+
+- `SEARCH-01` — Wyszukiwanie A/B, edytor z bezpośrednim adresem i powrót do wyniku. Chromium, 10 tys. kart, po 50 wyników: mediana/p95 desktop 20,3/23,5 ms, emulacja telefonu 19,5/25,4 ms (12 próbek od input do kolejnej klatki). 84 testy i 36 E2E.

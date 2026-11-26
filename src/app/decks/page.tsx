@@ -18,6 +18,7 @@ export default async function DecksPage({
         userId={account.id}
         initialDeck={params.deck}
         createDeck={params.new === "1"}
+        initialCard={params.card === "new" ? undefined : params.card}
         createCard={params.card === "new"}
       />
     </AuthFrame>

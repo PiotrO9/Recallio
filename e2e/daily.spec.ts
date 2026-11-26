@@ -116,6 +116,9 @@ test("dwa zestawy przechodzą przez jedną sesję offline i zapisują po jednej 
     await expect(
       page.getByRole("heading", { name: "pytanie B" }),
     ).toBeVisible();
+    const nextQuestion = page.getByRole("button", { name: "Pokaż odpowiedź" });
+    await expect(nextQuestion).toBeFocused();
+    await expect(nextQuestion).toHaveAccessibleDescription("pytanie B");
     await page.reload();
     await expect(
       page.getByRole("heading", { name: "pytanie B" }),

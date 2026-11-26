@@ -132,6 +132,10 @@ function StudyBoard({
   );
   const loadingCard = useRef(false);
   const [cardReadError, setCardReadError] = useState(false);
+  const [needsNextCard, setNeedsNextCard] = useState(false);
+  const awaitingNextCard = useRef(false);
+  const readRetry = useRef<HTMLButtonElement>(null);
+  const [readingNext, setReadingNext] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [syncState, setSyncState] = useState<SyncStatus>("idle");
   const [offlineDecks, setOfflineDecks] = useState<readonly string[]>([]);
@@ -245,7 +249,10 @@ function StudyBoard({
     availableOffline.current = decks;
     setOfflineDecks(decks);
     setWorkspace(data);
-    if (advance || (!active.current && !saving.current)) {
+    if (
+      advance ||
+      (!active.current && !saving.current && !awaitingNextCard.current)
+    ) {
       const next = choose(data, synchronized);
       active.current = next;
       setCandidate(next);
@@ -398,13 +405,14 @@ function StudyBoard({
       moveToCard.current = true;
       active.current = null;
       setCandidate(null);
+      setRevealed(false);
       setSessionCount((value) => value + 1);
       await refresh(true);
       void synchronize(true);
     } catch (error) {
       if (saved) {
-        setSyncState("failed");
-        setCardReadError(true);
+        awaitingNextCard.current = true;
+        setNeedsNextCard(true);
       } else {
         const command = prepared.current;
         if (error instanceof ReviewProjectionConflict && command) {
@@ -490,6 +498,23 @@ function StudyBoard({
     }
   }
 
+  async function retryNextCard() {
+    if (loadingCard.current || !awaitingNextCard.current) return;
+    loadingCard.current = true;
+    setReadingNext(true);
+    try {
+      await refresh(true);
+      awaitingNextCard.current = false;
+      setNeedsNextCard(false);
+      void synchronize(true);
+    } catch {
+      // The review is already committed. Keep the read-only retry available.
+    } finally {
+      loadingCard.current = false;
+      setReadingNext(false);
+    }
+  }
+
   function endSession() {
     if (saving.current) return;
     setCardReadError(false);
@@ -510,13 +535,23 @@ function StudyBoard({
   useEffect(() => {
     if (busy) return;
     if (ended) returnLink.current?.focus();
+    else if (needsNextCard && !readingNext) readRetry.current?.focus();
     else if (saveError) retryButton.current?.focus();
     else if (revealed) gradeGroup.current?.focus({ preventScroll: true });
     else if (candidate && moveToCard.current) {
       moveToCard.current = false;
       (typed ? answerInput.current : revealButton.current)?.focus();
     }
-  }, [busy, candidate, ended, revealed, saveError, typed]);
+  }, [
+    busy,
+    candidate,
+    ended,
+    revealed,
+    saveError,
+    typed,
+    needsNextCard,
+    readingNext,
+  ]);
 
   const status = {
     idle: "",
@@ -582,6 +617,26 @@ function StudyBoard({
   const deckLink = currentDeck && (
     <a href={`/decks?deck=${currentDeck.id}`}>{currentDeck.name}</a>
   );
+  if (needsNextCard)
+    return (
+      <section className={styles.board}>
+        <h1>Ocena zapisana</h1>
+        <p role="alert" id="next-card-error">
+          Nie udało się wczytać następnej fiszki. Twoja ocena została zapisana
+          na urządzeniu.
+        </p>
+        <LoadingButton
+          ref={readRetry}
+          className="primary"
+          aria-describedby="next-card-error"
+          loading={readingNext}
+          loadingLabel="Wczytywanie fiszki…"
+          onClick={() => void retryNextCard()}
+        >
+          Ponów odczyt
+        </LoadingButton>
+      </section>
+    );
   if (ended)
     return (
       <section className={styles.finished}>
@@ -590,7 +645,7 @@ function StudyBoard({
           tab={deckLink}
           className={styles.closed}
         >
-          <h1>
+          <h1 id="session-summary">
             {daily && dailyCount === 0
               ? "Wszystkie dostępne powtórki zrobione."
               : "Sesja zakończona."}
@@ -599,6 +654,7 @@ function StudyBoard({
           <div className="action-row">
             <a
               ref={returnLink}
+              aria-describedby="session-summary"
               className="primary"
               href={currentDeck ? `/decks?deck=${currentDeck.id}` : "/decks"}
             >
@@ -669,7 +725,7 @@ function StudyBoard({
                   : "Pytanie"}{" "}
                 · {candidate.direction === "a-b" ? "Strona A" : "Strona B"}
               </small>
-              <h1>
+              <h1 id="study-question">
                 {candidate.direction === "a-b"
                   ? candidate.card.sideA
                   : candidate.card.sideB}
@@ -694,6 +750,7 @@ function StudyBoard({
                     Twoja odpowiedź
                     <textarea
                       ref={answerInput}
+                      aria-describedby="study-question"
                       value={draftAnswer}
                       onChange={(event) => setDraftAnswer(event.target.value)}
                       rows={2}
@@ -703,7 +760,7 @@ function StudyBoard({
                 )}
               </div>
             )}
-            <div className={styles.answer} aria-live="polite">
+            <div className={styles.answer}>
               {revealed && (
                 <>
                   {typed && (
@@ -718,7 +775,7 @@ function StudyBoard({
                     Odpowiedź ·{" "}
                     {candidate.direction === "a-b" ? "Strona B" : "Strona A"}
                   </small>
-                  <p className={styles.translation}>
+                  <p id="study-answer" className={styles.translation}>
                     {candidate.direction === "a-b"
                       ? candidate.card.sideB
                       : candidate.card.sideA}
@@ -762,11 +819,12 @@ function StudyBoard({
                   className={styles.grades}
                   role="group"
                   aria-label="Ocena odpowiedzi"
-                  aria-describedby="grade-question"
+                  aria-describedby="study-answer grade-question"
                   ref={gradeGroup}
                   tabIndex={-1}
                   onKeyDown={(event) => {
                     if (
+                      event.nativeEvent.isComposing ||
                       event.repeat ||
                       event.ctrlKey ||
                       event.metaKey ||
@@ -800,6 +858,7 @@ function StudyBoard({
           ) : (
             <button
               ref={revealButton}
+              aria-describedby="study-question"
               className="primary"
               disabled={updating}
               onClick={() => setRevealed(true)}

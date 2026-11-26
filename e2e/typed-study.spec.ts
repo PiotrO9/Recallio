@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { expectAccessible } from "./accessibility";
 import { expect } from "@playwright/test";
 import { test, signIn } from "./local-accounts";
+import { failNextWorkspaceRead } from "./fail-workspace-read";
 import { operationSchema } from "../src/contracts";
 test.skip(
   process.env.RECALLIO_RUN_SYNC_TESTS !== "1",
@@ -54,12 +55,26 @@ for (const direction of ["a-b", "b-a"] as const) {
       await page.getByRole("checkbox", { name: "Wpisuj odpowiedź" }).check();
       const input = page.getByRole("textbox", { name: "Twoja odpowiedź" });
       await expect(input).toBeFocused();
+      await expect(input).toHaveAccessibleDescription(
+        direction === "a-b" ? "cześć" : "hi",
+      );
       const answer = "Hej, miło Cię widzieć!";
       await input.fill(answer);
       await input.press("3");
       await expect(input).toHaveValue(answer + "3");
       await page.getByRole("button", { name: "Pokaż odpowiedź" }).click();
       await expect(page.getByText(answer + "3", { exact: true })).toBeVisible();
+      const grades = page.getByRole("group", { name: "Ocena odpowiedzi" });
+      await expect(grades).toBeFocused();
+      await expect(grades).toHaveAccessibleDescription(
+        (direction === "a-b" ? "hi" : "cześć") +
+          " Jak dobrze pamiętasz odpowiedź?",
+      );
+      await grades.dispatchEvent("keydown", { key: "3", isComposing: true });
+      await page.keyboard.press("Tab");
+      await expect(
+        page.getByRole("button", { name: "Nie pamiętam" }),
+      ).toBeFocused();
       await expectAccessible(page, "odpowiedz");
       await expect(
         page.getByText(direction === "a-b" ? "hi" : "cześć", { exact: true }),
@@ -85,7 +100,39 @@ for (const direction of ["a-b", "b-a"] as const) {
         (req) =>
           req.method() === "POST" && req.url().endsWith("/api/v1/sync/push"),
       );
-      await page.getByRole("button", { name: "Ponów zapis" }).click();
+      const retry = page.getByRole("button", { name: "Ponów zapis" });
+      await expect(retry).toBeFocused();
+      await failNextWorkspaceRead(page);
+      await retry.click();
+      const readRetry = page.getByRole("button", {
+        name: "Ponów odczyt",
+        exact: true,
+      });
+      await expect(readRetry).toBeFocused();
+      await expect(readRetry).toHaveAccessibleDescription(
+        /ocena została zapisana/,
+      );
+      const stored = await page.evaluate(async (user) => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const req = indexedDB.open("recallio-user-" + user);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+        try {
+          const keys = (store: string) =>
+            new Promise<IDBValidKey[]>((resolve, reject) => {
+              const req = db.transaction(store).objectStore(store).getAllKeys();
+              req.onsuccess = () => resolve(req.result);
+              req.onerror = () => reject(req.error);
+            });
+          return await Promise.all([keys("reviews"), keys("outbox")]);
+        } finally {
+          db.close();
+        }
+      }, owner.id);
+      const id = await page.evaluate(() => Reflect.get(window, "typedAttempt"));
+      expect(stored).toEqual([[id], [id]]);
+      await readRetry.click();
       const payload = (await outgoing).postDataJSON();
       expect(payload.operations).toHaveLength(1);
       const review = operationSchema.parse(payload.operations[0]);

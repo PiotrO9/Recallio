@@ -27,7 +27,7 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | RELEASE-01 | TODO | RELEASE-LOCAL, FLOW-02, SETTINGS-LIMIT, SETTINGS-01 | Uzupełnij dowody dla środowiska docelowego, w tym próbę kopii i odtworzenia oraz test działania aplikacji. Publikacja produkcyjna wymaga osobnego zlecenia. |
 | REFACTOR-1 | DONE | — | Zgodność decyzji CSV w podglądzie i przy zapisie. |
 | REFACTOR-2 | DONE | — | Odróżnienie zapisu od odświeżenia po zapisie. |
-| REFACTOR-3 | TODO | — | Wspólne przygotowanie zestawu offline. |
+| REFACTOR-3 | DONE | — | Wspólne przygotowanie zestawu offline. |
 | REFACTOR-4 | TODO | — | Przygotowanie i ponowne przeliczenie tej samej oceny poza widokiem. |
 | REFACTOR-5 | TODO | — | Wspólna zmiana treści dla zapisu lokalnego i odtwarzania snapshotu. |
 | REFACTOR-6 | TODO | — | Nawigacja biblioteki wraz z pozycją powrotu. |
@@ -64,3 +64,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `REFACTOR-1` — Podgląd i zapis używają wspólnej decyzji. E2E obejmuje dwa wiersze przypisane do tej samej fiszki i korektę wyboru.
 
 - `REFACTOR-2` — Błąd odczytu po udanym zapisie ma własne ponowienie. E2E wymusza awarię odświeżenia biblioteki i ustawień.
+
+- `REFACTOR-3` — Wspólne przygotowanie zestawu rozpoznaje brak miejsca. Oba ekrany przeszły próbę nieudanego przygotowania i ponowienia.

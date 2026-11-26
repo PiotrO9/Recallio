@@ -2,7 +2,7 @@
 
 import { NotebookSheet, deckColor } from "@/components/notebook";
 import { ValidatedField } from "@/components/validated-field";
-import { prepareStudyShell } from "@/features/study/offline";
+import { prepareDeckOffline, offlineErrors } from "@/features/study/offline";
 import { ConfirmAction } from "@/components/confirm-action";
 import { LoadingButton } from "@/components/loading-button";
 import Link from "next/link";
@@ -84,7 +84,7 @@ export function DeckManager({
   const [offlineReady, setOfflineReady] = useState<readonly string[]>([]);
   const [offlineIssue, setOfflineIssue] = useState<{
     id: string;
-    quota: boolean;
+    reason: keyof typeof offlineErrors;
   }>();
   const [savedCards, setSavedCards] = useState(0);
   const [notice, setNotice] = useState<{ deckId: string; text: string }>();
@@ -205,6 +205,7 @@ export function DeckManager({
     [];
   const message = {
     idle: "",
+    quota: offlineErrors.quota,
     offline: "Offline. Zmiany zapisują się na urządzeniu.",
     requires_auth: "Zaloguj się ponownie, aby zsynchronizować zmiany.",
     retry: "Zmiany czekają na synchronizację.",
@@ -708,31 +709,17 @@ export function DeckManager({
                       onClick={() =>
                         void perform("offline", async () => {
                           setOfflineIssue(undefined);
-                          try {
-                            const result = await controller.run(true);
-                            setStatus(result);
-                            const shell =
-                              result === "idle"
-                                ? await prepareStudyShell()
-                                : "unavailable";
-                            if (shell === "quota")
-                              throw new DOMException(
-                                "Brak miejsca",
-                                "QuotaExceededError",
-                              );
-                            if (shell !== "ready") throw new Error();
-                            await repository.markOfflineDeck(deck.id);
-                            setOfflineReady(
-                              await repository.readOfflineDecks(),
-                            );
-                          } catch (err) {
-                            setOfflineIssue({
-                              id: deck.id,
-                              quota:
-                                err instanceof DOMException &&
-                                err.name === "QuotaExceededError",
-                            });
-                          }
+                          const { status, result } = await prepareDeckOffline(
+                            deck.id,
+                            controller,
+                            repository,
+                          );
+                          setStatus(status);
+                          if (result === "ready")
+                            setOfflineReady((ids) => [
+                              ...new Set([...ids, deck.id]),
+                            ]);
+                          else setOfflineIssue({ id: deck.id, reason: result });
                         })
                       }
                     >
@@ -740,11 +727,7 @@ export function DeckManager({
                     </LoadingButton>
                   )}
                   {offlineIssue?.id === deck.id && (
-                    <p role="alert">
-                      {offlineIssue.quota
-                        ? "Brakuje miejsca na urządzeniu. Zwolnij miejsce i spróbuj ponownie."
-                        : "Nie udało się przygotować zestawu offline. Sprawdź połączenie i ponów próbę."}
-                    </p>
+                    <p role="alert">{offlineErrors[offlineIssue.reason]}</p>
                   )}
                   <div className={styles.actions}>
                     <Link href={`/import?deck=${deck.id}`}>

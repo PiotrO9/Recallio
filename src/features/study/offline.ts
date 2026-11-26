@@ -1,3 +1,4 @@
+import type { SyncStatus } from "@/sync/controller";
 export const offlineAccountCookie = "recallio-offline-account";
 
 export function savedOfflineAccount(): string | undefined {
@@ -50,6 +51,36 @@ export async function prepareStudyShell(): Promise<
     });
   } catch {
     return "unavailable";
+  }
+}
+
+type OfflineResult = "ready" | "quota" | "unavailable";
+export const offlineErrors = {
+  quota: "Brakuje miejsca na urządzeniu. Zwolnij miejsce i spróbuj ponownie.",
+  unavailable:
+    "Nie udało się przygotować zestawu offline. Sprawdź połączenie i ponów próbę.",
+};
+export async function prepareDeckOffline(
+  deckId: string,
+  sync: { run(force: boolean): Promise<SyncStatus> },
+  repository: { markOfflineDeck(id: string): Promise<void> },
+): Promise<{ status: SyncStatus; result: OfflineResult }> {
+  let status: SyncStatus = "failed";
+  try {
+    status = await sync.run(true);
+    if (status !== "idle")
+      return { status, result: status === "quota" ? "quota" : "unavailable" };
+    const result = await prepareStudyShell();
+    if (result === "ready") await repository.markOfflineDeck(deckId);
+    return { status, result };
+  } catch (error) {
+    return {
+      status,
+      result:
+        error instanceof DOMException && error.name === "QuotaExceededError"
+          ? "quota"
+          : "unavailable",
+    };
   }
 }
 

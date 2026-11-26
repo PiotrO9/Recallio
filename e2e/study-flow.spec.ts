@@ -128,19 +128,48 @@ test("a review survives an offline reload and synchronizes once to a second devi
     await prepare.click();
     await expect(
       page.getByRole("alert").filter({
-        hasText: "Nie udało się przygotować zestawu offline.",
+        hasText: "Brakuje miejsca na urządzeniu.",
       }),
     ).toBeVisible();
     await expect(ready).toHaveCount(0);
     await devtools.send("Storage.overrideQuotaForOrigin", { origin: baseURL! });
     await devtools.detach();
+    const libraryDevice = await device(owner);
+    const libraryPage = await libraryDevice.newPage();
+    await libraryPage.goto("/decks?deck=" + deckId);
+    await libraryPage.getByText("Zarządzaj zestawem", { exact: true }).click();
+    const libraryTools = await libraryDevice.newCDPSession(libraryPage);
+    await libraryTools.send("Storage.overrideQuotaForOrigin", {
+      origin: baseURL!,
+      quotaSize: 1,
+    });
+    const libraryPrepare = libraryPage.getByRole("button", {
+      name: "Przygotuj zestaw offline",
+    });
+    await libraryPrepare.click();
+    await expect(
+      libraryPage
+        .getByRole("alert")
+        .filter({ hasText: "Brakuje miejsca na urządzeniu." }),
+    ).toBeVisible();
+    await libraryTools.send("Storage.overrideQuotaForOrigin", {
+      origin: baseURL!,
+    });
+    await libraryTools.detach();
+    await libraryPrepare.click();
+    await expect(
+      libraryPage.getByText(
+        "Zestaw jest gotowy do nauki offline na tym urządzeniu.",
+      ),
+    ).toBeVisible();
+    await libraryPage.close();
     await prepare.click();
     await expect(ready).toBeVisible();
     await expect
       .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller))
       .toBe(true);
     const cachedPaths = await page.evaluate(async () => {
-      const cache = await caches.open("recallio-study-shell-v8");
+      const cache = await caches.open("recallio-study-shell-v9");
       return (await cache.keys()).map((entry) => new URL(entry.url).pathname);
     });
     expect(cachedPaths).toContain("/study/offline");

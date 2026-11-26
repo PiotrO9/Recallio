@@ -29,7 +29,8 @@ import {
 import { createSyncController, type SyncStatus } from "@/sync/controller";
 import {
   activateStudyUpdate,
-  prepareStudyShell,
+  prepareDeckOffline,
+  offlineErrors,
   registerStudyWorker,
   savedOfflineAccount,
 } from "./offline";
@@ -108,7 +109,8 @@ function StudyBoard({
   const [syncState, setSyncState] = useState<SyncStatus>("idle");
   const [offlineDecks, setOfflineDecks] = useState<readonly string[]>([]);
   const [preparingOffline, setPreparingOffline] = useState(false);
-  const [offlineError, setOfflineError] = useState(false);
+  const [offlineError, setOfflineError] =
+    useState<keyof typeof offlineErrors>();
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(
     null,
   );
@@ -282,16 +284,16 @@ function StudyBoard({
     if (offlinePending.current) return;
     offlinePending.current = true;
     setPreparingOffline(true);
-    setOfflineError(false);
+    setOfflineError(undefined);
     try {
-      const status = await sync.run(true);
+      const { status, result } = await prepareDeckOffline(id, sync, repository);
       setSyncState(status);
-      if (status !== "idle" || (await prepareStudyShell()) !== "ready")
-        throw new Error("Offline preparation failed");
-      await repository.markOfflineDeck(id);
-      await refresh(false);
-    } catch {
-      setOfflineError(true);
+      if (result === "ready") {
+        availableOffline.current = [
+          ...new Set([...availableOffline.current, id]),
+        ];
+        setOfflineDecks(availableOffline.current);
+      } else setOfflineError(result);
     } finally {
       offlinePending.current = false;
       setPreparingOffline(false);
@@ -518,6 +520,7 @@ function StudyBoard({
 
   const status = {
     idle: "",
+    quota: offlineErrors.quota,
     offline: "Offline",
     requires_auth: "Zaloguj się ponownie, aby zsynchronizować zapis.",
     retry: "Synchronizacja zaczeka na połączenie.",
@@ -866,12 +869,7 @@ function StudyBoard({
               <p>Zapisany postęp: {workspace.progress.length}</p>
             </details>
           )}
-          {offlineError && (
-            <p role="alert">
-              Nie udało się przygotować zestawu offline. Sprawdź połączenie i
-              wolne miejsce, a następnie ponów próbę.
-            </p>
-          )}
+          {offlineError && <p role="alert">{offlineErrors[offlineError]}</p>}
         </details>
       )}
       {waitingWorker && !revealed && !busy && !saveError && (

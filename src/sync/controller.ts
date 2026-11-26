@@ -10,7 +10,13 @@ import { createSnapshotRebaser } from "../storage/snapshot-rebase";
 
 type Repository = ReturnType<typeof createLocalRepository>;
 export type SyncStatus =
-  "idle" | "offline" | "requires_auth" | "retry" | "conflict" | "failed";
+  | "idle"
+  | "offline"
+  | "quota"
+  | "requires_auth"
+  | "retry"
+  | "conflict"
+  | "failed";
 
 class TransportError extends Error {
   constructor(
@@ -172,6 +178,8 @@ export function createSyncController(options: SyncOptions) {
       nextAttempt = 0;
       return "idle";
     } catch (error) {
+      if (error instanceof DOMException && error.name === "QuotaExceededError")
+        return "quota";
       if (!(error instanceof TransportError)) return "failed";
       if (error.status === 401) return "requires_auth";
       if (error.status === 429 || error.status >= 500) {

@@ -44,7 +44,7 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | ----------- | ---- | -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | PASTE-01    | DONE | IMPORT-01            | Odczytaj wklejone kolumny z arkusza. Sprawdź limity, numerację wierszy oraz zgodność z klasyfikacją importu CSV.       |
 | PASTE-02    | DONE | PASTE-01             | Podłącz wklejanie do istniejącego podglądu i trwałego zapisu. Sprawdź wznowienie oraz rozpoczęcie treningu po zapisie. |
-| TODAY-01    | TODO | QUEUE-01, TRAIN-01   | Dobieraj należne kierunki z wielu zestawów. Sprawdź termin graniczny, powroty po błędzie i zakończenie sesji.          |
+| TODAY-01    | DONE | QUEUE-01, TRAIN-01   | Dobieraj należne kierunki z wielu zestawów. Sprawdź termin graniczny, powroty po błędzie i zakończenie sesji.          |
 | TODAY-02    | TODO | TODAY-01, PWA-01     | Połącz panel i sesję dzienną online oraz offline. Sprawdź odświeżenie i synchronizację oceny.                          |
 | STUDY-CHECK | TODO | PASTE-02, TODAY-02   | Odbierz przejście od arkusza do nauki oraz dzienną powtórkę dwóch zestawów na desktopie i telefonie.                   |
 | SEARCH-01   | TODO | DECK-01              | Wyszukaj fiszkę po dowolnej stronie i przywróć wyniki po edycji. Sprawdź dużą bibliotekę i izolację kont.              |
@@ -100,3 +100,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `PASTE-01` — Parser wklejek i CSV współdzielą walidację. Przeszły 82 testy, build i typecheck.
 
 - `PASTE-02` — Wklejanie uruchamia wspólny podgląd i zapis. Przeszło 30 E2E, w tym trening po wklejeniu 20 par na obu profilach, oraz build, typy i 82 testy.
+
+- `TODAY-01` — Deterministyczna kolejka rozpoznaje termin, kierunek, epokę i dozwolone zestawy. Przeszły 83 testy, build i typy.

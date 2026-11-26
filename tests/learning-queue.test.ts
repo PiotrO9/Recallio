@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { collectDue, dailyChoices } from "../src/domain/learning/daily";
 import type { Card, QueuePolicy, ReviewEvent } from "../src/contracts";
 import {
   recordSessionAnswer,
@@ -185,5 +186,40 @@ test("the autumn Warsaw study day lasts 25 hours", () => {
   assert.deepEqual(getStudyPeriod("2026-10-25T10:00:00.000Z"), {
     start: Date.parse("2026-10-24T22:00:00.000Z"),
     end: Date.parse("2026-10-25T23:00:00.000Z"),
+  });
+});
+
+test("dzienna pula zamraża należne kierunki, uwzględnia przygotowane zestawy i pomija nową epokę", () => {
+  const other = { ...secondCard, deckId: "other" };
+  const deck = {
+    id: "deck",
+    name: "A",
+    directionMode: "a-b" as const,
+    revision: "1",
+    deletedAt: null,
+  };
+  const a = firstReview(firstCard, 1).progress;
+  const b = { ...a, cardId: other.id, direction: "b-a" as const };
+  const data = {
+    cards: [firstCard, other],
+    decks: [deck, { ...deck, id: "other", directionMode: "b-a" as const }],
+    progress: [b, a, { ...a, direction: "b-a" as const }],
+  };
+  assert.deepEqual(collectDue(data, mostRecent), []);
+  const pending = collectDue(data, a.dueAt);
+  assert.deepEqual(
+    pending.map((v) => v.cardId),
+    ["a", "b"],
+  );
+  assert.equal(collectDue(data, now, new Set(["other"])).length, 1);
+  assert.equal(collectDue(data, now, new Set()).length, 0);
+  assert.equal(
+    dailyChoices(data, [pending[1]], [pending[0]], now, "a").candidate?.card.id,
+    "b",
+  );
+  const reset = { ...data, progress: [resetFsrsProgress(a, "1")] };
+  assert.deepEqual(dailyChoices(reset, pending, [pending[0]], now, null), {
+    candidate: null,
+    remaining: 0,
   });
 });

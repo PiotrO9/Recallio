@@ -50,24 +50,32 @@ const grades: readonly [Rating, string][] = [
   [4, "Łatwo"],
 ];
 
+import { RepairList } from "./repair-list";
+
 export function StudySession({
   accountId,
   deckId,
   daily = false,
+  showRepair = false,
 }: {
   accountId?: string;
+  showRepair?: boolean;
   daily?: boolean;
   deckId?: string;
 }) {
   const [offlineId, setOfflineId] = useState<string | null | undefined>(
     undefined,
   );
+  const [offlineRepair, setOfflineRepair] = useState(false);
   const [offlineDaily, setOfflineDaily] = useState(false);
   const [offlineDeck, setOfflineDeck] = useState<string | undefined>();
   useEffect(() => {
     if (accountId) return;
     const stored = uuidSchema.safeParse(savedOfflineAccount());
     setOfflineId(stored.success ? stored.data : null);
+    setOfflineRepair(
+      new URLSearchParams(window.location.search).get("repair") === "1",
+    );
     setOfflineDaily(
       new URLSearchParams(window.location.search).get("scope") === "today",
     );
@@ -88,7 +96,8 @@ export function StudySession({
   const today = !selected && (accountId ? daily : offlineDaily);
   return (
     <StudyBoard
-      key={`${id}:${selected ?? ""}:${today}`}
+      key={`${id}:${selected ?? ""}:${today}:${showRepair || offlineRepair}`}
+      showRepair={showRepair || offlineRepair}
       daily={today}
       userId={id}
       deckId={selected}
@@ -102,9 +111,11 @@ function StudyBoard({
   deckId,
   offlineShell,
   daily,
+  showRepair,
 }: {
   userId: string;
   deckId?: string;
+  showRepair: boolean;
   offlineShell: boolean;
   daily: boolean;
 }) {
@@ -129,9 +140,10 @@ function StudyBoard({
   );
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState(false);
-  const [ended, setEnded] = useState(false);
+  const [ended, setEnded] = useState(showRepair);
+  const [syncGeneration, setSyncGeneration] = useState(0);
   const [sessionCount, setSessionCount] = useState(0);
-  const endedRef = useRef(false);
+  const endedRef = useRef(showRepair);
   const extra = useRef<{ dayStart: number; count: number } | null>(null);
   const revealButton = useRef<HTMLButtonElement>(null);
   const gradeGroup = useRef<HTMLDivElement>(null);
@@ -244,6 +256,8 @@ function StudyBoard({
       const status = await (afterWrite ? sync.flush() : sync.run());
       setSyncState(status);
       await refresh(false, status === "idle");
+      if (status === "idle" && endedRef.current)
+        setSyncGeneration((n) => n + 1);
     } catch {
       setSyncState("failed");
     }
@@ -456,6 +470,9 @@ function StudyBoard({
       moveToCard.current = true;
       await refresh(mode === "restart");
       if (mode === "restart") {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("repair");
+        window.history.replaceState(window.history.state, "", url);
         setSessionCount(0);
         setEnded(false);
       }
@@ -602,6 +619,19 @@ function StudyBoard({
             <p role="alert">Nie udało się wczytać fiszek. Spróbuj ponownie.</p>
           )}
         </NotebookSheet>
+        {workspace && (
+          <RepairList
+            userId={userId}
+            sync={sync}
+            repository={repository}
+            workspace={workspace}
+            generation={syncGeneration}
+            initialOpen={showRepair}
+            session={daily ? "today" : currentDeck?.id}
+            offlineShell={offlineShell}
+            offlineDecks={offlineDecks}
+          />
+        )}
       </section>
     );
   return (

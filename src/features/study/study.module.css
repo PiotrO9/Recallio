@@ -187,3 +187,23 @@
 .saveStatus:empty {
   position: absolute;
 }
+
+.repairs {
+  margin-top: 1rem;
+  overflow-wrap: anywhere;
+}
+.repairs ul {
+  list-style: none;
+  padding: 0;
+}
+.repairs li {
+  border-top: 1px solid #ded4df;
+  padding: 0.9rem 0;
+  display: grid;
+  justify-items: start;
+  gap: 0.35rem;
+}
+.repairs li span,
+.repairs small {
+  color: #655970;
+}

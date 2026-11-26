@@ -184,6 +184,31 @@ Pierwszy przyrost ma skrócić drogę od własnych materiałów do pierwszej ses
 - „Dodaj i zacznij naukę” otwiera trening docelowego zestawu dopiero po pełnym zapisie lokalnym. Zwykły zapis pozwala zostać w bibliotece. Przy zapisie częściowym ekran pokazuje postęp i akcję wznowienia. Jeżeli wszystkie wiersze pominięto, użytkownik może wrócić do podglądu.
 - W teście odbiorczym wkleić 20 par do nowego zestawu i rozpocząć trening na telefonie oraz komputerze. Osobny scenariusz obejmuje import do istniejącego zestawu z duplikatem, zmianę rewizji po podglądzie i przerwanie zapisu. Po wznowieniu każda zaakceptowana fiszka występuje dokładnie raz.
 
+##### Kontrakt parsera i granica zapisu
+
+Proponowany interfejs w `src/domain/import/csv.ts` korzysta z obecnego typu `Content`. `classifyRows` dostaje tablicę wierszy z obu źródeł. Typ separatora pliku pozostaje częścią publicznej sygnatury `parseCsv`.
+
+```ts
+type ParsedRow = { row: number; content: Content; errors: string[] };
+
+declare function parseCsv(text: string): {
+  delimiter: "," | ";";
+  rows: ParsedRow[];
+};
+declare function parsePastedRows(
+  text: string,
+  options: { hasHeader: boolean },
+): { delimiter: "\t"; rows: ParsedRow[] };
+```
+
+1. Wspólna funkcja mapuje `RecordRow` i listę kolumn na `ParsedRow`. Dla pliku listę wyznacza istniejące `headers()`, a dla wklejki kolejność to `sideA, sideB, exampleA, exampleB`. Użyć `records(text, "\t")` dla całego tekstu i dopiero potem pominąć puste rekordy oraz opcjonalny pierwszy niepusty rekord. Dzięki temu wielowierszowy nagłówek zachowuje numerację kolejnych linii. Sprawdzić obie długości z `src/domain/content-limits.ts` oraz limit bajtów przed tokenizacją. Błąd cytowania kończy odczyt. Błędy liczby kolumn i treści są przypisane do pojedynczego wiersza.
+2. `src/app/import/page.tsx` przekazuje do `CsvImport` źródło określone przez `/import?source=paste` oraz opcjonalne `deck=<uuid>`. Obecne wejście `/import` otwiera plik. Zmiana tekstu, nagłówka lub źródła unieważnia numer odczytu w `fileVersion`, wynik parsowania, decyzje i numer strony podglądu. Zmiana docelowego zestawu zachowuje sparsowane wiersze, ale przelicza dopasowania. Brak lub usunięcie wcześniej wybranego celu wymaga jawnego wyboru przed zapisem.
+3. Obie ścieżki wywołują kolejno `classifyRows → reviewImport → startImport → commitContent → finishImport`. Każdy krok używa zapisanego `ImportStep` z oczekiwaną wersją, ID operacji i encji. `startImport` sprawdza stan zestawu i zajmuje jeden aktywny plan konta. `commitContent` atomowo przesuwa `next` wraz z zapisem treści i outbox. Druga karta przeglądarki może odczytać istniejący plan. Po odświeżeniu `readImport()` przywraca go również wtedy, gdy powstał ze starszego pliku CSV.
+4. Rozpoznać akcję końcową po przycisku wysyłającym formularz. Dla „Dodaj i zacznij naukę” nawigować do `/study?deck=<receipt.deckId>` raz, po `finishImport` z `next === total`. Po wznowieniu w nowej karcie pokazać jawny link do nauki na ekranie wyniku. Wspólnym identyfikatorem zapisu jest `StoredImport.id`. Nazwa źródła i tekst schowka nie są potrzebne w kolejce synchronizacji.
+5. Traktować zwrócony `ImportReceipt` jako potwierdzenie zapisu także wtedy, gdy kolejny `readWorkspace()` się nie powiedzie. Przy tej awarii zachować podsumowanie i ponowić odczyt biblioteki. Zapobiega to ponownemu utworzeniu planu i nowych ID po ukończonym imporcie.
+
+Przykład testowy parsera to `A\tB\r\n"kot\npies"\tcat\r\n\tbrak`. Przy `hasHeader: true` powstają rekordy z fizycznych linii 2 i 4. Pierwszy zachowuje znak nowej linii w pytaniu, drugi zwraca błąd pustej strony A. W teście wznowienia po pierwszym zapisanym wierszu porównać ID operacji przed i po ponowieniu oraz liczbę fiszek po synchronizacji.
+
 #### 2. Powtórz na dziś
 
 **TODAY-01 — dobór z wielu zestawów.** Obecnie `selectDeck` w `study-session.tsx` wybiera jeden zestaw, a `studyQueue.next` przyjmuje jeden tryb kierunku. W domenie nauki dodać jawny zakres sesji dziennej. Panel i trening mają korzystać z tej samej funkcji wyznaczającej kierunki gotowe do powtórki.
@@ -200,6 +225,42 @@ Pierwszy przyrost ma skrócić drogę od własnych materiałów do pierwszej ses
 
 **STUDY-CHECK — odbiór przyrostu.** Na desktopie i mobilnym Chromium przejść ścieżkę „wklej → sprawdź → ucz się”. W drugim scenariuszu przygotować konto z powtórkami należnymi z dwóch zestawów i przejść „otwórz panel → powtórz oba zestawy → zakończ”. Użyć kontrolowanego czasu lub przygotowanych danych. Sprawdzić również szerokość 320 px, fokus po błędzie i pełną obsługę klawiaturą. Przed szerszym wydaniem warto dać te dwa zadania osobie, która pierwszy raz widzi aplikację, i zapisać, gdzie potrzebowała podpowiedzi.
 
+##### Tożsamość sesji i aktualizacja kolejki
+
+Proponowane typy należą do domeny nauki. Zależności wejściowe są zwykłymi kolekcjami kontraktów. Widok przekazuje im wynik `readWorkspace()`, a w trybie offline także identyfikatory z `readOfflineDecks()`.
+
+```ts
+type StudyScope = { kind: "deck"; deckId?: string } | { kind: "today" };
+
+type DueEntry = SessionReturn & {
+  dueAt: string;
+  progressRevision: string;
+};
+type DailyPool = {
+  startedAt: string;
+  pending: readonly DueEntry[];
+  returns: readonly SessionReturn[];
+};
+declare function collectDue(
+  data: {
+    decks: readonly Deck[];
+    cards: readonly Card[];
+    progress: readonly Progress[];
+  },
+  startedAt: string,
+  allowedDeckIds?: ReadonlySet<string>,
+): DueEntry[];
+```
+
+- W `src/domain/learning/queue.ts` lub sąsiednim module zbudować mapy aktywnych zestawów i fiszek po ID. Przejść po postępach, stosując kierunek zestawu oraz `fsrsScheduler.classify(progress, startedAt) === "due"`. Brak `allowedDeckIds` dopuszcza wszystkie aktywne zestawy. Pusty zbiór oznacza brak przygotowanych zestawów. Posortować wynik według znacznika czasu `dueAt`, następnie `cardId` i `direction`. Praca obejmuje jeden przebieg po zestawach, fiszkach i postępach oraz sortowanie wyłącznie należnych kierunków.
+- Zapamiętać `startedAt` raz dla sesji. Na nowym urządzeniu pierwszy pusty odczyt IndexedDB może poprzedzać pobranie danych. Zbudować początkową pulę po potwierdzonym odczycie danych konta, w razie potrzeby po pierwszej synchronizacji. Podczas błędu pierwszego pobrania pokazać ponowienie. Panel może obliczać aktualną liczbę niezależnie, przekazując bieżący czas do tej samej funkcji.
+- Przed pokazaniem kolejnego pytania sprawdzić jego `cardId + direction + epoch` względem aktualnego stanu. Przy zmianie rewizji ponownie ocenić kwalifikację dla czasu startu i pominąć rozliczony termin. Ewentualny kolejny termin tego kierunku stanowi osobną powtórkę. Zmiana samej treści odświeża przyszłego kandydata. Z aktywnym pytaniem pracuje dotychczasowe `active.current`. Wyboru dokonać z prawidłowych powrotów i początkowej puli, stosując pierwszeństwo powrotu po innej fiszce. Licznik jest liczbą unikalnych jeszcze oczekujących trójek, więc przy jednej pozostałej fiszce ponowny błąd nadal oznacza jedną do przećwiczenia.
+- W `rate()` po uzyskaniu potwierdzenia `commitReview` usunąć zaliczony wpis z `pending` oraz wykonać istniejące `recordSessionAnswer` dla powrotów. Przy konflikcie lokalnej wersji `reprojectReview` przelicza projekcję tego samego zdarzenia. Błąd odczytu kolejnej karty po już zatwierdzonym zapisie ponawia wyłącznie odczyt. Pusta pula wraz z pustą listą powrotów przechodzi do podsumowania. Dalsze ćwiczenie otwiera zwykłą ścieżkę zestawu.
+- `src/app/study/page.tsx` i powłoka offline interpretują parametry tak samo. Jawny poprawny `deck` ma pierwszeństwo w niejednoznacznym adresie, a `scope=today` bez zestawu uruchamia sesję dzienną. Wejście `/study` zachowuje dotychczasowy wybór zestawu. Dodać zakres do klucza `StudyBoard`, by zmiana trybu rozpoczęła nową sesję. Service worker już przechwytuje nawigacje do ścieżki `/study`; zakres odczytać z adresu w przeglądarce po załadowaniu wspólnej powłoki.
+- `src/app/dashboard.tsx` korzysta z `collectDue` w rekomendacji dla należnych powtórek. W `study-session.tsx` istniejący `countDueToday` liczy także terminy późniejsze tego samego dnia. Licznik dziennej sesji należy wyprowadzić z jej puli. Zachować zachowanie obu dotychczasowych preferencji wyświetlania liczników.
+
+**Próba odbiorcza STUDY-CHECK.** W lokalnym środowisku użyć dwóch niezależnych kontekstów Playwright tego samego konta oraz osobnego konta do kontroli izolacji. Przygotować terminy przed startem, dokładnie na granicy i po starcie przez dane testowe z ustalonym zegarem. Przy wyłączonej sieci ocenić fiszkę i odświeżyć stronę. Po synchronizacji sprawdzić ID zdarzenia, postęp właściwego kierunku i brak dodatkowej operacji na drugim urządzeniu. Nie uzależniać asercji od aktualnej godziny uruchomienia testu.
+
 ### Przyrost 2. Odnalezienie i poprawienie fiszki
 
 #### 3. Szukanie po obu stronach fiszki
@@ -209,6 +270,13 @@ Pierwszy przyrost ma skrócić drogę od własnych materiałów do pierwszej ses
 - Na początek filtrować lokalne dane z `readWorkspace()`. Zapytanie pozostaje na urządzeniu. Ograniczyć liczbę jednocześnie renderowanych wyników i zapewnić „Pokaż więcej”. Pusty tekst pokazuje zwykłą bibliotekę. Dla braku trafień pokazać wpisaną frazę i możliwość jej wyczyszczenia.
 - Otwierać istniejący edytor po ID zestawu i fiszki. Powrót przywraca frazę, zakres i fokus na wynik. Jeśli fiszka zniknęła w trakcie synchronizacji, wrócić do wyników z komunikatem. Ten sam sposób otwierania edytora posłuży liście „Do poprawy”.
 - W testach sprawdzić trafienie po tłumaczeniu w innym zestawie, identyczną treść w dwóch zestawach, usunięty rekord, powrót po edycji i izolację po zmianie konta. Zmierzyć opóźnienie między wpisaniem znaku a wyświetleniem wyników i liczbę renderowanych pozycji na próbce 10 tys. fiszek przed decyzją o dodatkowym indeksie.
+
+##### Wyszukiwanie i nawigacja do istniejącej fiszki
+
+- Wydzielić czysty selektor wyszukiwania. Na zmianę danych biblioteki przygotować rekordy `{ cardId, deckId, sideAKey, sideBKey }` tylko dla aktywnych kart i ich aktywnych zestawów. Wyodrębnić istniejącą normalizację NFC, białych znaków i wielkości liter z `normalizeCsvText` do wspólnej funkcji, zachowując jej dotychczasowe wyniki dla importu. Wyświetlane strony odczytywać z oryginalnej karty. Tekst zapytania jest normalizowany raz na zmianę.
+- Dla każdej strony sprawdzić kolejno pełną zgodność, początek i fragment. Jedna fiszka trafia do najwyższej pasującej kategorii nawet przy trafieniu po obu stronach. Przygotować stabilną kolejność bazową według nazwy zestawu i ID karty. Dzięki temu każde wyszukanie wymaga jednego przejścia po wpisach bez sortowania całej listy po każdym znaku. Proponowana pierwsza porcja to 50 wyników. W teście 10 tys. kart raportować medianę i p95 czasu od wpisania do wyrenderowania po rozgrzaniu, na tej samej konfiguracji i dla tego samego zestawu zapytań.
+- Rozszerzyć `LibraryEntry` i `useLibraryNavigation` o ID edytowanej fiszki. Obsłużyć `/decks?deck=<uuid>&card=<uuid>` obok istniejącego `card=new`. Przy bezpośrednim wejściu i po `popstate` rozwiązać ID dopiero po wczytaniu biblioteki. Przed otwarciem formularza sprawdzić zgodność `card.deckId`, oba pola `deletedAt` i aktualne konto. Brak wpisu w trakcie pobierania i potwierdzony brak fiszki to dwa osobne stany.
+- Rozszerzyć `history.state.libraryPosition` o zakres, liczbę odsłoniętych wyników i ID elementu do odzyskania fokusu. Starszy wpis bez zakresu oznacza listę zestawów. Na powrocie najpierw odtworzyć wyniki, potem przewinięcie i fokus. Gdy edycja usunęła dopasowanie, ustawić fokus na polu wyszukiwania. Przy przejściu z listy trudnych fiszek zapamiętać ten ekran jako źródło powrotu. Na głębokim linku bez historii przycisk powrotu otwiera zestaw. Fraza pozostaje w stanie historii danego konta i nie trafia do URL.
 
 #### 4. Do poprawy
 
@@ -220,6 +288,66 @@ Pierwszy przyrost ma skrócić drogę od własnych materiałów do pierwszej ses
 
 **REPAIR-02 — przejście od sugestii do edycji.** Po zakończeniu sesji pokazać dyskretny odnośnik „Do poprawy”, gdy są sugestie. Lista podaje konkretny powód, np. „Trudność w 3 różnych dniach”, oraz otwiera istniejący edytor. Użytkownik może poprawić pytanie lub dopisać przykład. Po zwykłej edycji zachowujemy postęp i wskazujemy, że wskazanie opiera się na wcześniejszych ocenach. Sugestia wygasa po wyjściu zdarzeń z okna czasu albo po ręcznym resecie danego kierunku.
 
+##### Kontrakt odczytu i agregacja historii
+
+Proponowany `GET /api/v1/study/repair-candidates` zwraca agregat dla zalogowanego konta. Klient przekazuje `X-Recallio-Account` jak w obecnym transporcie. Handler używa `serveSync`, a usługa wykonuje jedno parametryzowane zapytanie przez `withDatabase` i `accountTransaction`. Serwer ustala `asOf` raz, przekazuje je jako `$1::timestamptz` i wykorzystuje tę samą wartość w odpowiedzi. Uwzględnić dzień bieżący i 29 poprzednich dat w Warszawie.
+
+```ts
+type RepairDirection = {
+  direction: Direction;
+  epoch: string;
+  failedDays: number;
+  lastFailedDay: string;
+};
+type RepairResponse = {
+  asOf: string;
+  items: Array<{
+    cardId: string;
+    deckId: string;
+    directions: RepairDirection[];
+  }>;
+};
+```
+
+Dodać schemat Zod dla odpowiedzi w `src/contracts`. Sprawdzić UUID, ISO instant, datę kalendarzową, rewizję jako ciąg dziesiętny i liczbę różnych dni od 3 do 30. Grupować rekordy SQL po `cardId` i zachować dane dla każdego kierunku osobno. Brak sugestii zwraca `200` z `items: []`. Błąd sesji zwraca `401`, błąd czasowej dostępności `503`. Odpowiedzi korzystają z istniejącego nagłówka `Cache-Control: private, no-store`.
+
+```sql
+WITH failures AS (
+  SELECT e.card_id, c.deck_id, e.direction, e.epoch,
+         (e.effective_at AT TIME ZONE 'Europe/Warsaw')::date AS failed_day
+  FROM public.review_events AS e
+  JOIN public.progress AS p
+    ON (p.user_id, p.card_id, p.direction, p.epoch) =
+       (e.user_id, e.card_id, e.direction, e.epoch)
+  JOIN public.cards AS c ON (c.user_id, c.id) = (e.user_id, e.card_id)
+  JOIN public.decks AS d ON (d.user_id, d.id) = (c.user_id, c.deck_id)
+  WHERE e.user_id = recallio_private.account_id()
+    AND c.deleted_at IS NULL AND d.deleted_at IS NULL
+    AND e.disposition = 'applied' AND e.canonical_mode = 'due' AND e.rating = 1
+    AND e.effective_at >= (
+      ((($1::timestamptz AT TIME ZONE 'Europe/Warsaw')::date - 29)::timestamp)
+      AT TIME ZONE 'Europe/Warsaw'
+    )
+    AND e.effective_at <= $1::timestamptz
+)
+SELECT card_id, deck_id, direction, epoch::text,
+       count(DISTINCT failed_day)::int AS failed_days,
+       max(failed_day)::text AS last_failed_day
+FROM failures
+GROUP BY card_id, deck_id, direction, epoch
+HAVING count(DISTINCT failed_day) >= 3
+ORDER BY card_id, direction;
+```
+
+Przypadek referencyjny dla PostgreSQL 17 przy `asOf = 2026-11-23T12:00:00Z`: początek okna to `2026-10-24T22:00:00Z`. Termin o sekundę wcześniejszy wypada z okna. Oceny z 25 października o `00:30Z` i `01:30Z` przypadają na tę samą lokalną datę mimo cofnięcia zegara. Po dodaniu ocen z 26 października i 23 listopada oczekiwany wynik to `failedDays = 3` oraz `lastFailedDay = "2026-11-23"`. Drugie konto z identycznymi ID fiszki i zestawu oraz oceną tylko z jednego dnia otrzymuje pustą listę.
+
+- Czas w filtrze zakresu porównuje surowe `effective_at` z granicami. Obliczenie lokalnej daty służy do policzenia odrębnych dni. Istniejący indeks to `review_events_card_direction_idx (user_id, card_id, direction, effective_at, id)`. W zadaniu zmierzyć `EXPLAIN (ANALYZE, BUFFERS)` na reprezentatywnej historii konta. Jeśli dominuje skan niekwalifikujących się ocen, porównać indeks częściowy na `(user_id, effective_at)` z predykatem dla trzech warunków oceny. Decyzję o migracji oprzeć na odczytanych blokach i czasie zapytania.
+- Pierwsza wersja zwraca pełną listę zagregowanych kierunków. W teście dużego konta zmierzyć także rozmiar odpowiedzi. UI sortuje fiszki według najnowszego dnia trudności, potem ID. Powód przy fiszce ma wskazywać konkretny kierunek i jego liczbę dni. Sumowanie liczników z obu stron mogłoby policzyć ten sam dzień podwójnie.
+- Walidowany wynik zapisać pod wersjonowanym kluczem `repairCandidates:v1` w istniejącym magazynie IndexedDB `meta` dla konta. Jeden `put` zastępuje całą odpowiedź. Pusty wynik zastępuje wcześniejszą listę. Błąd HTTP lub niedokończony zapis pozostawia ostatni poprawny wynik. Brak klucza oznacza „jeszcze nie pobrano”. Istniejący `clearForLogout` czyści także `meta`.
+- Po zakończeniu sesji i po wejściu do listy pokazać dostępny wynik lokalny, a po udanym `sync.flush()` lub `sync.run()` odświeżyć go. Przy rozpoczęciu odczytu zapisać jego ID pod kluczem `repairCandidates:request` w `meta`. Przed zapisem odpowiedzi odczytać ten klucz w tej samej transakcji zapisu i zaakceptować tylko aktualne ID. Nowe żądanie zastępuje ID, a wylogowanie je usuwa. W efekcie nawet spóźniona odpowiedź w innej karcie nie odtworzy wyczyszczonych danych. Anulować żądanie przy zmianie konta. Po `401` stosować istniejący stan ponownego logowania, a po błędzie transportu podać czas ostatnich danych.
+- W `REPAIR-02` listę otwierać wewnątrz podsumowania `StudyBoard`, tak aby działała także z przygotowanej powłoki offline. Łączyć identyfikatory z bieżącym `readWorkspace()` oraz pomijać lokalnie usunięte cele i nieaktualne epoki. W powłoce offline udostępnić listę dla przygotowanych zestawów. Przejście do edycji po odzyskaniu połączenia korzysta z adresu fiszki z `SEARCH-01`. Obecny service worker obsługuje nawigację offline do `/study`.
+- Wprowadzić endpoint przed klientem. Jeżeli starszy serwer zwraca `404`, klient pomija sugestię w podsumowaniu i pozostawia dostęp do treningu. `push`, `pull`, `snapshot` i schemat operacji ocen zachowują zgodność ze starszymi urządzeniami. Wdrożenie planu będzie momentem wpisania zatwierdzonego kontraktu do [kontraktów v1](CONTRACTS.md).
+
 ### Przyrost 3. Wpisywanie odpowiedzi
 
 **TYPE-01.** Dodać opcję „Wpisuj odpowiedź” przy rozpoczęciu treningu zestawu. Na pierwszy przyrost proponujemy wybór na czas danej sesji. Otwiera to możliwość przetestowania trybu bez migracji preferencji konta. Wpisany tekst należy do aktualnego pytania i pozostaje w pamięci widoku.
@@ -227,6 +355,33 @@ Pierwszy przyrost ma skrócić drogę od własnych materiałów do pierwszej ses
 - Przed odsłonięciem użytkownik może wpisać odpowiedź lub zostawić pole puste. Następnie widzi swoją odpowiedź i treść wzorcową dla aktualnego kierunku. Ocenę wybiera sam, także przy synonimach, literówkach i parafrazach. Używamy obecnych czterech ocen i tej samej ścieżki zapisu.
 - Po błędzie zapisu zachować tekst i odsłonięty wzorzec. Wyczyścić tekst po przejściu do następnej fiszki, zakończeniu sesji lub zmianie konta. Podczas pisania skróty ocen są nieaktywne. Przycisk odsłonięcia musi działać również przy otwartej klawiaturze telefonu.
 - Przetestować oba kierunki, pusty wpis, znaki diakrytyczne, samoocenę odmiennego poprawnego sformułowania, ponowienie zapisu i kolejne pytanie z pustym polem. Sprawdzić, że wpisana odpowiedź nie pojawia się w operacji synchronizacji.
+
+##### Stan formularza odpowiedzi
+
+W `src/features/study/study-session.tsx` dodać przełącznik dla sesji zestawu oraz kontrolowane pole `draftAnswer: string`. Zmiana trybu przed rozpoczęciem odpowiadania nie tworzy operacji domenowej. `revealed`, `savingRating`, `saveError` i `prepared.current` nadal sterują odsłanianiem oraz oceną. Odpowiedź wzorcowa pochodzi z zamrożonego `Candidate.card` i aktualnego `direction`.
+
+| Przejście                           | Stan tekstu i działanie                                                                                                                                                                                        |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pokazanie kolejnego pytania         | Wyczyścić pole przy przejściu po zapisie, również wtedy, gdy w jednoelementowym zestawie wraca to samo `cardId` i ten sam kierunek.                                                                            |
+| Pisanie i odsłonięcie               | W trybie pisemnym po przejściu do pytania fokus trafia do pola. Wpisywanie cyfr i zatwierdzanie znaków przez IME należy do edytora. Po odsłonięciu zamrozić tekst i przekazać fokus do istniejącej grupy ocen. |
+| Błąd zapisu i ponowienie            | Zachować pytanie, wpis i ocenę. Wywołać obecną ścieżkę `rate` z przygotowanym zdarzeniem. Zmiana statusu synchronizacji lub `refresh(false)` nie powinna wyczyścić tekstu.                                     |
+| Zapis, zakończenie lub zmiana konta | Po potwierdzeniu lokalnego zapisu wyczyścić tekst wraz z przejściem do kolejnej karty. Wyczyścić go także w `endSession` i przy zmianie konta. Odświeżenie strony rozpoczyna nową sesję z domyślnym trybem.    |
+
+W scenariuszu E2E wpisać unikatowy tekst inny niż obie strony fiszki, wywołać kontrolowany błąd zapisu i ponowić ocenę. Przechwycić rzeczywisty `review.record` wysłany po synchronizacji. Sprawdzić pojedyncze ID zdarzenia i zgodność zestawu kluczy z kontraktem oraz brak wpisanej wartości w żądaniu. Powtórzyć przejście dla obu kierunków, w tym z klawiatury telefonu.
+
+### Mapa testów dla dziewięciu zadań
+
+| Zadanie     | Miejsce w projekcie                                              | Rozstrzygająca asercja                                                                                                                        |
+| ----------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| PASTE-01    | `tests/import/csv.test.ts`, `tests/import/review.test.ts`        | Wklejka i równoważny CSV zwracają równą treść i decyzje. Numer błędnej linii pochodzi ze źródła.                                              |
+| PASTE-02    | `tests/storage/content-repository.test.ts`, E2E importu          | Po awarii i wznowieniu zbiór ID operacji dla wierszy jest identyczny. Nawigacja do nauki następuje po ostatnim zapisie.                       |
+| TODAY-01    | `tests/learning-queue.test.ts`                                   | Dla ustalonego czasu, danych i zdarzeń kolejność trójek oraz licznik są powtarzalne. Przyszły termin i nieaktywna epoka wypadają z puli.      |
+| TODAY-02    | `tests/prepare-review.test.ts`, E2E treningu                     | Powrót po błędzie działa między zestawami, a odświeżenie offline odtwarza zakres i pomija zestawy nieprzygotowane na urządzeniu.              |
+| STUDY-CHECK | Osobne scenariusze w `e2e/` z fixture `local-accounts.ts`        | Desktop i mobile przechodzą oba przepływy. Drugie urządzenie widzi jeden efekt każdej zsynchronizowanej oceny.                                |
+| SEARCH-01   | Test selektora w `tests/`, `e2e/library-sync.spec.ts`            | Trafienie po obu stronach daje jeden wynik. Powrót z edytora zachowuje zapytanie, odsłoniętą porcję i właściwy fokus.                         |
+| REPAIR-01   | Test odczytu z lokalnego PostgreSQL i scenariusz API dwóch kont  | Trzy dni to sugestia, dwie daty z wieloma ocenami to brak sugestii. Sprawdzić granicę 30 dni wokół zmiany czasu, reset oraz konto bez danych. |
+| REPAIR-02   | Test repozytorium IndexedDB i E2E edytora                        | Poprawny pusty raport czyści stary wynik, przerwany odczyt go zachowuje. Wylogowanie przed końcem żądania nie przywraca cache konta.          |
+| TYPE-01     | E2E treningu, `tests/prepare-review.test.ts` dla kontraktu oceny | Próba ponowienia zachowuje wpis do momentu zatwierdzenia. W następnej prezentacji tej samej fiszki pole jest puste.                           |
 
 ### Kolejność pracy i wydania
 

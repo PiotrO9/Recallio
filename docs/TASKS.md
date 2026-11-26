@@ -36,6 +36,22 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | REFACTOR-9     | DONE    | —                                                   | Osobne scenariusze E2E i współdzielone przygotowanie kont.                                                                                                                                                                                 |
 | REFACTOR-10    | DONE    | —                                                   | Pomiar i weryfikacja kosztu opróżniania lokalnej kolejki.                                                                                                                                                                                  |
 
+### Rozwój po MVP
+
+[Plan wdrożenia pięciu funkcji](TECHNICAL-PLAN.md#14-plan-rozwoju-po-mvp) opisuje zachowanie, granice zakresu i testy. Pierwszy przyrost kończy się zadaniem `STUDY-CHECK`.
+
+| ID          | Stan | Zależy od            | Zakres i odbiór                                                                                                        |
+| ----------- | ---- | -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| PASTE-01    | TODO | IMPORT-01            | Odczytaj wklejone kolumny z arkusza. Sprawdź limity, numerację wierszy oraz zgodność z klasyfikacją importu CSV.       |
+| PASTE-02    | TODO | PASTE-01             | Podłącz wklejanie do istniejącego podglądu i trwałego zapisu. Sprawdź wznowienie oraz rozpoczęcie treningu po zapisie. |
+| TODAY-01    | TODO | QUEUE-01, TRAIN-01   | Dobieraj należne kierunki z wielu zestawów. Sprawdź termin graniczny, powroty po błędzie i zakończenie sesji.          |
+| TODAY-02    | TODO | TODAY-01, PWA-01     | Połącz panel i sesję dzienną online oraz offline. Sprawdź odświeżenie i synchronizację oceny.                          |
+| STUDY-CHECK | TODO | PASTE-02, TODAY-02   | Odbierz przejście od arkusza do nauki oraz dzienną powtórkę dwóch zestawów na desktopie i telefonie.                   |
+| SEARCH-01   | TODO | DECK-01              | Wyszukaj fiszkę po dowolnej stronie i przywróć wyniki po edycji. Sprawdź dużą bibliotekę i izolację kont.              |
+| REPAIR-01   | TODO | SYNC-01, SCHED-01    | Wylicz trudne fiszki z kanonicznej historii. Sprawdź świeże urządzenie, zmianę epoki i wynik offline.                  |
+| REPAIR-02   | TODO | SEARCH-01, REPAIR-01 | Pokaż listę „Do poprawy” z powodem i przejściem do edycji. Sprawdź zachowanie postępu po poprawieniu treści.           |
+| TYPE-01     | TODO | TRAIN-01             | Dodaj opcjonalną odpowiedź pisemną przed odsłonięciem. Sprawdź samoocenę, retry i czyszczenie tekstu.                  |
+
 ## Wyniki i blokady
 
 Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono i weryfikację. Dla `BLOCKED` podaj ID, co udało się zrobić, przyczynę z dowodem oraz sprawdzalny warunek wznowienia. Jeśli część prac zachowano wyłącznie lokalnie, odnotuj jej lokalizację lub hash.

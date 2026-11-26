@@ -164,3 +164,72 @@ Wzorce zastosowane w Recallio obejmują App Router, małe komponenty klienckie, 
 - [OpenNext](https://developers.cloudflare.com/workers/framework-guides/web-apps/opennext/)
 - [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security)
 - [Supabase changelog](https://supabase.com/changelog.md)
+
+## 14. Plan rozwoju po MVP
+
+Pierwszy przyrost ma skrócić drogę od własnych materiałów do pierwszej sesji oraz od ponownego otwarcia aplikacji do dzisiejszych powtórek. Obejmuje „Wklej fiszki” i „Powtórz na dziś”. Kolejne przyrosty to wyszukiwanie po treści, pomoc w poprawianiu trudnych fiszek oraz wpisywanie odpowiedzi. Identyfikatory poniżej odpowiadają zadaniom w [kolejce](TASKS.md). Każdy wiersz kolejki jest osobnym, testowalnym commitem.
+
+### Przyrost 1. Od arkusza do codziennej powtórki
+
+#### 1. Wklej fiszki
+
+**PASTE-01 — odczyt danych z arkusza.** Na wejściu zwykły tekst z kolumnami rozdzielonymi tabulatorem. Pierwsza wersja przyjmuje dwie wymagane kolumny A i B oraz opcjonalne przykłady A i B w tej kolejności. Pierwszy wiersz domyślnie zawiera dane. Opcja „Pierwszy wiersz to nagłówki” pomija go wyłącznie na życzenie użytkownika. Puste wiersze pomijamy, a przy błędzie wskazujemy fizyczny numer wiersza we wklejonym tekście.
+
+- W `src/domain/import/csv.ts` wykorzystać istniejący odczyt cytowanych rekordów z parametrem separatora i wspólną walidację treści. Dodać wejście dla tekstu z arkusza zwracające ten sam kształt wierszy co parser plików. Zachować kontrakt CSV, surową treść pól i limit 1 MiB liczony w UTF-8.
+- Odbiór w testach domeny obejmuje polskie znaki, CRLF, przecinek w treści, cytowaną komórkę z tabulatorem lub nową linią, pustą stronę, nadmiarową kolumnę, przekroczenie limitu i oba ustawienia nagłówka. Ten sam materiał z pliku i arkusza ma dać takie same decyzje o duplikatach.
+
+**PASTE-02 — podgląd, zapis i przejście do nauki.** W bibliotece i w otwartym zestawie udostępnić akcję „Wklej fiszki”. Otwiera istniejący widok importu z polem tekstowym i prawidłowo wybranym celem. Zostawić zwykłe wklejanie systemowe, także z menu dotykowego. Użytkownik może wrócić z podglądu, poprawić treść i przeliczyć wynik.
+
+- W `src/features/import/csv-import.tsx` oba źródła korzystają z tej samej klasyfikacji, wyboru docelowej karty, sprawdzenia rewizji i trwałego planu zapisu. Zmiana treści zeruje decyzje dotyczące poprzednich wierszy. Spóźniony odczyt wcześniej wybranego pliku nie może zastąpić tekstu.
+- „Dodaj i zacznij naukę” otwiera trening docelowego zestawu dopiero po pełnym zapisie lokalnym. Zwykły zapis pozwala zostać w bibliotece. Przy zapisie częściowym ekran pokazuje postęp i akcję wznowienia. Jeżeli wszystkie wiersze pominięto, użytkownik może wrócić do podglądu.
+- W teście odbiorczym wkleić 20 par do nowego zestawu i rozpocząć trening na telefonie oraz komputerze. Osobny scenariusz obejmuje import do istniejącego zestawu z duplikatem, zmianę rewizji po podglądzie i przerwanie zapisu. Po wznowieniu każda zaakceptowana fiszka występuje dokładnie raz.
+
+#### 2. Powtórz na dziś
+
+**TODAY-01 — dobór z wielu zestawów.** Obecnie `selectDeck` w `study-session.tsx` wybiera jeden zestaw, a `studyQueue.next` przyjmuje jeden tryb kierunku. W domenie nauki dodać jawny zakres sesji dziennej. Panel i trening mają korzystać z tej samej funkcji wyznaczającej kierunki gotowe do powtórki.
+
+- Do sesji kwalifikuje się istniejący postęp z terminem do chwili startu włącznie. Uwzględnić zaległości, aktualny kierunek każdego zestawu oraz oba kierunki trybu mieszanego. Pominąć usunięte fiszki, usunięte zestawy i kierunki po resecie oczekujące na wprowadzenie. Fiszki z terminem wieczorem stają się dostępne po nadejściu terminu. Granice dnia i komunikaty o jutrze wyznacza `Europe/Warsaw`.
+- Zacząć od najstarszego terminu, przy remisie zastosować stabilną kolejność. Nie pokazywać od razu odwrotnej strony tej samej karty, jeśli dostępna jest inna. Po „Nie pamiętam” stosować istniejące powroty sesyjne. Zweryfikować, że powrót nadal dotyczy aktualnej epoki. Przejście dalej następuje po lokalnym zapisie oceny.
+- Sesja obejmuje początkową pulę i powroty wynikające z udzielonych ocen. Nowe fiszki wymagają osobnej akcji, więc ta sesja nie zużywa dziennego limitu nowych. Pula pomija pozycje już rozliczone lub usunięte na innym urządzeniu, a odsłonięta fiszka zachowuje treść do końca odpowiedzi. Po przeładowaniu wyznaczyć nową pulę z zapisanego postępu.
+- Ustawić zegar testowy i przygotować trzy zestawy z różnymi kierunkami. Sprawdzić zaległość, termin dokładnie teraz, termin przyszły, reset, błąd i powrót. Przy braku należnych kierunków funkcja kończy sesję także wtedy, gdy biblioteka ma nowe fiszki.
+
+**TODAY-02 — panel, sesja i tryb offline.** Przycisk „Powtórz na dziś” prowadzi do proponowanego adresu `/study?scope=today`. Trening pojedynczego zestawu nadal ma adres `/study?deck=…`. Na fiszce widać nazwę bieżącego zestawu. Jeśli użytkownik włączył licznik, pokazujemy liczbę pozostałych kierunków w całej sesji. Po ostatniej powtórce można zakończyć lub świadomie przejść do dalszego ćwiczenia.
+
+- Obsłużyć zakres zarówno w `src/app/study/page.tsx`, jak i w wejściu offline używanym przez service worker. Bez sieci liczyć wyłącznie zestawy przygotowane na tym urządzeniu. Przy pustej puli odróżnić „Wszystkie dostępne powtórki zrobione” od „Przygotuj zestaw do nauki offline”.
+- W E2E sprawdzić dwa zestawy w jednej sesji, wejście do pojedynczego zestawu, odświeżenie po ocenie offline i pojedynczą synchronizację po odzyskaniu sieci. Błąd lokalnego zapisu pozostawia bieżącą fiszkę i daje możliwość ponowienia.
+
+**STUDY-CHECK — odbiór przyrostu.** Na desktopie i mobilnym Chromium przejść ścieżkę „wklej → sprawdź → ucz się”. W drugim scenariuszu przygotować konto z powtórkami należnymi z dwóch zestawów i przejść „otwórz panel → powtórz oba zestawy → zakończ”. Użyć kontrolowanego czasu lub przygotowanych danych. Sprawdzić również szerokość 320 px, fokus po błędzie i pełną obsługę klawiaturą. Przed szerszym wydaniem warto dać te dwa zadania osobie, która pierwszy raz widzi aplikację, i zapisać, gdzie potrzebowała podpowiedzi.
+
+### Przyrost 2. Odnalezienie i poprawienie fiszki
+
+#### 3. Szukanie po obu stronach fiszki
+
+**SEARCH-01.** W bibliotece dodać zakres wyszukiwania „Fiszki” obok obecnego wyszukiwania zestawów. Jedno pole przeszukuje strony A i B we wszystkich aktywnych zestawach zalogowanej osoby. Wynik zawiera obie strony i nazwę zestawu. Pełne dopasowanie ma pierwszeństwo przed początkiem tekstu i dopasowaniem wewnątrz. Do porównania ujednolicić wielkość liter, zapis Unicode i odstępy. Wynik pokazuje oryginalną treść.
+
+- Na początek filtrować lokalne dane z `readWorkspace()`. Zapytanie pozostaje na urządzeniu. Ograniczyć liczbę jednocześnie renderowanych wyników i zapewnić „Pokaż więcej”. Pusty tekst pokazuje zwykłą bibliotekę. Dla braku trafień pokazać wpisaną frazę i możliwość jej wyczyszczenia.
+- Otwierać istniejący edytor po ID zestawu i fiszki. Powrót przywraca frazę, zakres i fokus na wynik. Jeśli fiszka zniknęła w trakcie synchronizacji, wrócić do wyników z komunikatem. Ten sam sposób otwierania edytora posłuży liście „Do poprawy”.
+- W testach sprawdzić trafienie po tłumaczeniu w innym zestawie, identyczną treść w dwóch zestawach, usunięty rekord, powrót po edycji i izolację po zmianie konta. Zmierzyć opóźnienie między wpisaniem znaku a wyświetleniem wyników i liczbę renderowanych pozycji na próbce 10 tys. fiszek przed decyzją o dodatkowym indeksie.
+
+#### 4. Do poprawy
+
+**REPAIR-01 — wiarygodne dane na dwóch urządzeniach.** Proponowany próg początkowy to ocena „Nie pamiętam” na zaplanowanej powtórce tego samego kierunku w co najmniej trzech różnych dniach nauki spośród ostatnich 30. Wiele prób tego samego dnia liczy się raz. Liczyć tylko zastosowane zdarzenia bieżącej epoki, według kanonicznego trybu i czasu skutecznego. Oba problematyczne kierunki pokazać w jednym wpisie fiszki.
+
+- Obecny snapshot zawiera postęp i wprowadzenia. Pełna historia sprzed jego pobrania nie trafia na nowe urządzenie. Proponowany pierwszy wariant to uwierzytelniony odczyt zbiorczy z historii konta na serwerze. Zwraca ID fiszki, kierunek, liczbę dni i datę ostatniej trudności. Ustalić kontrakt w `CONTRACTS.md` i sprawdzić koszt zapytania na przykładowej historii przed dodaniem indeksu.
+- Odświeżyć listę po udanej synchronizacji. Offline pokazać ostatni wynik z czasem aktualizacji, zapisany osobno dla konta i czyszczony przy wylogowaniu. Nowe oceny offline wpłyną na listę po potwierdzeniu synchronizacji. Przy pierwszym użyciu bez zapisanej listy pokazać stan oczekiwania na połączenie.
+- Sprawdzić wynik po dwóch i trzech dniach, zmianę daty o północy w Warszawie, oceny z dwóch urządzeń tego samego dnia, ponowione zdarzenie, starą epokę, usuniętą fiszkę i izolację kont. Świeżo zalogowane urządzenie ma otrzymać ten sam wynik co urządzenie z dłuższą historią.
+
+**REPAIR-02 — przejście od sugestii do edycji.** Po zakończeniu sesji pokazać dyskretny odnośnik „Do poprawy”, gdy są sugestie. Lista podaje konkretny powód, np. „Trudność w 3 różnych dniach”, oraz otwiera istniejący edytor. Użytkownik może poprawić pytanie lub dopisać przykład. Po zwykłej edycji zachowujemy postęp i wskazujemy, że wskazanie opiera się na wcześniejszych ocenach. Sugestia wygasa po wyjściu zdarzeń z okna czasu albo po ręcznym resecie danego kierunku.
+
+### Przyrost 3. Wpisywanie odpowiedzi
+
+**TYPE-01.** Dodać opcję „Wpisuj odpowiedź” przy rozpoczęciu treningu zestawu. Na pierwszy przyrost proponujemy wybór na czas danej sesji. Otwiera to możliwość przetestowania trybu bez migracji preferencji konta. Wpisany tekst należy do aktualnego pytania i pozostaje w pamięci widoku.
+
+- Przed odsłonięciem użytkownik może wpisać odpowiedź lub zostawić pole puste. Następnie widzi swoją odpowiedź i treść wzorcową dla aktualnego kierunku. Ocenę wybiera sam, także przy synonimach, literówkach i parafrazach. Używamy obecnych czterech ocen i tej samej ścieżki zapisu.
+- Po błędzie zapisu zachować tekst i odsłonięty wzorzec. Wyczyścić tekst po przejściu do następnej fiszki, zakończeniu sesji lub zmianie konta. Podczas pisania skróty ocen są nieaktywne. Przycisk odsłonięcia musi działać również przy otwartej klawiaturze telefonu.
+- Przetestować oba kierunki, pusty wpis, znaki diakrytyczne, samoocenę odmiennego poprawnego sformułowania, ponowienie zapisu i kolejne pytanie z pustym polem. Sprawdzić, że wpisana odpowiedź nie pojawia się w operacji synchronizacji.
+
+### Kolejność pracy i wydania
+
+Realizować zadania pojedynczo w kolejności podanej w [kolejce](TASKS.md). Najpierw dostarczyć i odebrać przyrost 1. Wyszukiwanie udostępnia edytor dla sugestii, a wpisywanie odpowiedzi można podjąć wcześniej, jeśli prace nad historią będą zablokowane. Po każdej zmianie uruchomić sprawdzenie typów, testy i build, a po zmianie UI lub zapisu także headless E2E. Zmiany repozytorium lokalnego sprawdzić dodatkowo w rzeczywistym IndexedDB.
+
+Odbiór lokalny przyrostu i decyzja o publikacji to osobne kroki. Przed publicznym wydaniem obowiązują istniejące zadania `FLOW-02` i `RELEASE-01` z testem logowania, offline, synchronizacji dwóch urządzeń i odtworzenia kopii na środowisku docelowym. Operacje chmurowe wymagają osobnego zlecenia. [Procedury weryfikacji](VERIFICATION.md)

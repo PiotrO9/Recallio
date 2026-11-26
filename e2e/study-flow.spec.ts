@@ -555,6 +555,9 @@ test("deck edits preserve progress and deleted cards reject stale changes", asyn
         )?.payload.epoch,
     )
     .toBe("1");
+  await expect(
+    page.getByRole("button", { name: "Zresetuj A → B" }),
+  ).toBeFocused();
   await page.getByRole("button", { name: "Usuń fiszkę" }).click();
   await page
     .getByRole("dialog")

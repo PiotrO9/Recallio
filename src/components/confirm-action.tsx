@@ -1,5 +1,5 @@
 "use client";
-import { useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { LoadingButton } from "./loading-button";
 export function ConfirmAction({
   label,
@@ -28,9 +28,17 @@ export function ConfirmAction({
 }) {
   const ref = useRef<HTMLDialogElement>(null),
     id = useId();
+  const trigger = useRef<HTMLButtonElement>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  useEffect(() => {
+    if (!confirmed || disabled || loading) return;
+    if (document.activeElement === document.body) trigger.current?.focus();
+    setConfirmed(false);
+  }, [confirmed, disabled, loading]);
   return (
     <>
       <LoadingButton
+        ref={trigger}
         type="button"
         className={triggerClassName}
         disabled={disabled}
@@ -86,6 +94,7 @@ export function ConfirmAction({
             disabled={disabled || loading}
             onClick={() => {
               ref.current?.close();
+              setConfirmed(true);
               onConfirm();
             }}
           >

@@ -33,7 +33,7 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 | REFACTOR-6 | DONE | — | Nawigacja biblioteki wraz z pozycją powrotu. |
 | REFACTOR-7 | DONE | — | Wspólna konfiguracja lokalnych usług konta. |
 | REFACTOR-8 | DONE | — | Limity treści współdzielone przez import, UI i kontrakty. |
-| REFACTOR-9 | TODO | — | Osobne scenariusze E2E i współdzielone przygotowanie kont. |
+| REFACTOR-9 | DONE | — | Osobne scenariusze E2E i współdzielone przygotowanie kont. |
 | REFACTOR-10 | TODO | — | Pomiar i weryfikacja kosztu opróżniania lokalnej kolejki. |
 
 ## Wyniki i blokady
@@ -76,3 +76,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `REFACTOR-7` — Pięć ekranów tworzy usługi przez jedną fabrykę per konto. Ponowienie w panelu sprawdza termin przed odczytem. Testy obejmują dwa konta i retry.
 
 - `REFACTOR-8` — Limity pól mają jedno źródło. Test porównuje akceptację CSV i kontraktu na granicy oraz o jeden znak powyżej.
+
+- `REFACTOR-9` — Konta i urządzenia mają współdzieloną fixture. Cztery osobne scenariusze sprawdzają trening offline, ustawienia, bibliotekę i import.

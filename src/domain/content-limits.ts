@@ -1,0 +1,3 @@
+export const MAX_CARD_SIDE_LENGTH = 4000;
+export const MAX_CARD_EXAMPLE_LENGTH = 8000;
+export const MAX_DECK_NAME_LENGTH = 120;

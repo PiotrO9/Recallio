@@ -1,3 +1,4 @@
+import { MAX_CARD_SIDE_LENGTH } from "../content-limits";
 import type { Card } from "../../contracts";
 
 export const MAX_CSV_BYTES = 1024 * 1024;
@@ -212,8 +213,8 @@ export function parseCsv(input: string): {
         if (!content.sideA.trim() || !content.sideB.trim())
           errors.push("Strony A i B są wymagane");
         if (
-          content.sideA.length > 4000 ||
-          content.sideB.length > 4000 ||
+          content.sideA.length > MAX_CARD_SIDE_LENGTH ||
+          content.sideB.length > MAX_CARD_SIDE_LENGTH ||
           (content.exampleA?.length ?? 0) > 8000 ||
           (content.exampleB?.length ?? 0) > 8000
         )

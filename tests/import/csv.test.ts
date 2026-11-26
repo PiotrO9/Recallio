@@ -7,7 +7,7 @@ import {
   MAX_CSV_BYTES,
   parseCsv,
 } from "../../src/domain/import/csv";
-import type { Card } from "../../src/contracts";
+import { cardSchema, type Card } from "../../src/contracts";
 
 test("roundtrip zachowuje surowe dane, cytaty, CRLF, null i pusty przykład", () => {
   const values = [
@@ -111,4 +111,32 @@ test("duże grupy duplikatów ograniczają liczbę zwracanych dopasowań", () =>
   assert.equal(result.at(-1)?.matchCount, 1999);
   assert.equal(result.at(-1)?.matches.length, 20);
   assert.equal(result.at(-1)?.matchesTruncated, true);
+});
+
+test("CSV and stored cards accept the same field length boundaries", () => {
+  const card: Card = {
+    id: "a1a1a1a1-1111-4111-8111-111111111111",
+    deckId: "b2b2b2b2-2222-4222-8222-222222222222",
+    sideA: "a",
+    sideB: "b",
+    exampleA: null,
+    exampleB: null,
+    deletedAt: null,
+    contentRevision: "0",
+  };
+  for (const [field, limit] of [
+    ["sideA", 4000],
+    ["sideB", 4000],
+    ["exampleA", 8000],
+    ["exampleB", 8000],
+  ] as const) {
+    for (const length of [limit, limit + 1]) {
+      const value = { ...card, [field]: "a".repeat(length) };
+      assert.equal(cardSchema.safeParse(value).success, length === limit);
+      assert.equal(
+        parseCsv(exportCsv([value])).rows[0].errors.length === 0,
+        length === limit,
+      );
+    }
+  }
 });

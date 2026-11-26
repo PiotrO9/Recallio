@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  MAX_CARD_SIDE_LENGTH,
+  MAX_CARD_EXAMPLE_LENGTH,
+  MAX_DECK_NAME_LENGTH,
+} from "@/domain/content-limits";
 import { NotebookSheet, deckColor } from "@/components/notebook";
 import { ValidatedField } from "@/components/validated-field";
 import { prepareDeckOffline, offlineErrors } from "@/features/study/offline";
@@ -453,7 +458,7 @@ export function DeckManager(entry: LibraryEntry) {
                   autoFocus
                   name="name"
                   defaultValue={deckForm?.name}
-                  maxLength={120}
+                  maxLength={MAX_DECK_NAME_LENGTH}
                   required
                 />
               </ValidatedField>
@@ -663,7 +668,7 @@ export function DeckManager(entry: LibraryEntry) {
                         name="sideA"
                         readOnly={busy}
                         defaultValue={restoredDraft?.sideA ?? cardForm?.sideA}
-                        maxLength={4000}
+                        maxLength={MAX_CARD_SIDE_LENGTH}
                         required
                       />
                     </ValidatedField>
@@ -675,7 +680,7 @@ export function DeckManager(entry: LibraryEntry) {
                         name="sideB"
                         readOnly={busy}
                         defaultValue={restoredDraft?.sideB ?? cardForm?.sideB}
-                        maxLength={4000}
+                        maxLength={MAX_CARD_SIDE_LENGTH}
                         required
                       />
                     </ValidatedField>
@@ -699,7 +704,7 @@ export function DeckManager(entry: LibraryEntry) {
                           defaultValue={
                             restoredDraft?.exampleA ?? cardForm?.exampleA ?? ""
                           }
-                          maxLength={8000}
+                          maxLength={MAX_CARD_EXAMPLE_LENGTH}
                         />
                       </label>
                       <label>
@@ -710,7 +715,7 @@ export function DeckManager(entry: LibraryEntry) {
                           defaultValue={
                             restoredDraft?.exampleB ?? cardForm?.exampleB ?? ""
                           }
-                          maxLength={8000}
+                          maxLength={MAX_CARD_EXAMPLE_LENGTH}
                         />
                       </label>
                     </div>

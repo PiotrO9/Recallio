@@ -1,3 +1,8 @@
+import {
+  MAX_CARD_SIDE_LENGTH,
+  MAX_CARD_EXAMPLE_LENGTH,
+  MAX_DECK_NAME_LENGTH,
+} from "../domain/content-limits";
 import { STUDY_TIMEZONE } from "../domain/learning/study-time";
 import { z } from "zod";
 
@@ -22,12 +27,12 @@ export const ratingSchema = z.union([
 ]);
 const content = z
   .string()
-  .max(4000)
+  .max(MAX_CARD_SIDE_LENGTH)
   .refine((value) => value.trim().length > 0, "Pole jest wymagane");
-const example = z.string().max(8000).nullable();
+const example = z.string().max(MAX_CARD_EXAMPLE_LENGTH).nullable();
 const name = z
   .string()
-  .max(120)
+  .max(MAX_DECK_NAME_LENGTH)
   .refine((value) => value.trim().length > 0);
 const cardContent = z.strictObject({
   sideA: content,

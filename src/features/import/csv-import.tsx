@@ -1,5 +1,6 @@
 "use client";
 
+import { MAX_DECK_NAME_LENGTH } from "@/domain/content-limits";
 import { ConfirmAction } from "@/components/confirm-action";
 import { LoadingButton } from "@/components/loading-button";
 import { ActionLink } from "@/components/action-link";
@@ -520,7 +521,7 @@ export function CsvImport({
                     name="name"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
-                    maxLength={120}
+                    maxLength={MAX_DECK_NAME_LENGTH}
                     required
                   />
                 </label>

@@ -10,19 +10,19 @@ MVP obejmuje pełny zakres z briefu: konta, prywatne zestawy, CSV, dwa kierunki,
 
 ## 2. Decyzje techniczne
 
-| ID  | Decyzja                                                              | Status / warunek                                                                 |
-| --- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| D01 | Next.js App Router + React + TS strict + CSS, npm                    | Przyjęta; wersje w lockfile                                                      |
-| D03 | idb jako cienka warstwa IndexedDB                                    | Używana przez repozytorium konta                                          |
-| D04 | Zapisy przez Route Handlers i transakcje PostgreSQL                  | Auth używa SDK Supabase, synchronizacja ograniczonej roli bazy                   |
-| D05 | Historia zdarzeń i materializowany postęp per kierunek               | Wdrożone w treningu i synchronizacji                                             |
-| D06 | FSRS-6 z wersjonowanym profilem                                      | Wdrożony wg [decyzji o schedulerze](decisions/learning-scheduler.md)              |
-| D07 | PWA przez jawnie wersjonowany service worker                         | Własny service worker w `public/study-sw.js`                                     |
-| D08 | Workers przez OpenNext                                               | Weryfikacja lokalna w Wranglerze, odbiór wdrożenia w kolejce                      |
+| ID  | Decyzja                                                              | Status / warunek                                                     |
+| --- | -------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| D01 | Next.js App Router + React + TS strict + CSS, npm                    | Przyjęta; wersje w lockfile                                          |
+| D03 | idb jako cienka warstwa IndexedDB                                    | Używana przez repozytorium konta                                     |
+| D04 | Zapisy przez Route Handlers i transakcje PostgreSQL                  | Auth używa SDK Supabase, synchronizacja ograniczonej roli bazy       |
+| D05 | Historia zdarzeń i materializowany postęp per kierunek               | Wdrożone w treningu i synchronizacji                                 |
+| D06 | FSRS-6 z wersjonowanym profilem                                      | Wdrożony wg [decyzji o schedulerze](decisions/learning-scheduler.md) |
+| D07 | PWA przez jawnie wersjonowany service worker                         | Własny service worker w `public/study-sw.js`                         |
+| D08 | Workers przez OpenNext                                               | Weryfikacja lokalna w Wranglerze, odbiór wdrożenia w kolejce         |
 | D09 | Przykład po odsłonięciu, po stronie odpowiedzi                       | Dostępny w treningu                                                  |
-| D10 | Limit nowych = unikalne cardId w lokalnym dniu, oba kierunki wspólne | Domyślnie 20 dziennie, zmieniane w ustawieniach                                  |
-| D11 | Licznik sesji = zaakceptowane odpowiedzi, domyślnie ukryty w MVP     | Dostępny w ustawieniach treningu                              |
-| D12 | Wylogowanie usuwa cache konta po sync lub świadomym odrzuceniu       | Robocza; szczegóły poniżej                                                       |
+| D10 | Limit nowych = unikalne cardId w lokalnym dniu, oba kierunki wspólne | Domyślnie 20 dziennie, zmieniane w ustawieniach                      |
+| D11 | Licznik sesji = zaakceptowane odpowiedzi, domyślnie ukryty w MVP     | Dostępny w ustawieniach treningu                                     |
+| D12 | Wylogowanie usuwa cache konta po sync lub świadomym odrzuceniu       | Robocza; szczegóły poniżej                                           |
 
 Zmianę decyzji zapisz w krótkim ADR w `docs/decisions/NNN-temat.md`. Uwzględnij kontekst, rozważone opcje, decyzję oraz wpływ na kontrakty, migracje i testy.
 

@@ -86,26 +86,27 @@
 .grades button {
   background: #f4e6e0;
   color: #533c41;
-  border: 1px solid #c9b3af;
+  border: 1px solid #856969;
   padding: 0.8rem 0.4rem;
 }
 .grades button:nth-child(2) {
   background: #f7eddb;
-  border-color: #cfc0a8;
+  border-color: #877252;
   color: #644d2f;
 }
 .grades button:nth-child(3) {
   background: #ece5f5;
-  border-color: #c7b8d7;
+  border-color: #84728f;
   color: #4c3769;
 }
 .grades button:nth-child(4) {
   background: #e1eee6;
-  border-color: #b3cabd;
+  border-color: #657e70;
   color: #354e40;
 }
 .grades button:hover:not(:disabled) {
-  filter: brightness(0.96);
+  border-color: currentColor;
+  text-decoration: underline;
 }
 .tools {
   display: flex;
@@ -239,4 +240,10 @@
 .written {
   white-space: pre-wrap;
   margin-bottom: 1rem !important;
+}
+
+.repairs li a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
 }

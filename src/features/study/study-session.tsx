@@ -156,6 +156,7 @@ function StudyBoard({
   const gradeGroup = useRef<HTMLDivElement>(null);
   const retryButton = useRef<HTMLButtonElement>(null);
   const returnLink = useRef<HTMLAnchorElement>(null);
+  const emptyHeading = useRef<HTMLHeadingElement>(null);
   const moveToCard = useRef(false);
   const active = useRef<Candidate | null>(null);
   const previousCard = useRef<string | null>(null);
@@ -488,6 +489,12 @@ function StudyBoard({
         const state = { ...window.history.state };
         delete state.repairPosition;
         window.history.replaceState(state, "", url);
+        document.title =
+          (offlineShell
+            ? "Nauka offline"
+            : daily
+              ? "Powtórki na dziś"
+              : "Trening zestawu") + " · Recallio";
         setSessionCount(0);
         setEnded(false);
       }
@@ -536,14 +543,21 @@ function StudyBoard({
   }
 
   useEffect(() => {
-    if (busy) return;
+    if (busy || readingNext) return;
     if (ended) returnLink.current?.focus();
-    else if (needsNextCard && !readingNext) readRetry.current?.focus();
+    else if (needsNextCard) readRetry.current?.focus();
     else if (saveError) retryButton.current?.focus();
-    else if (revealed) gradeGroup.current?.focus({ preventScroll: true });
-    else if (candidate && moveToCard.current) {
-      moveToCard.current = false;
-      (typed ? answerInput.current : revealButton.current)?.focus();
+    else if (revealed) gradeGroup.current?.focus();
+    else if (moveToCard.current) {
+      const destination = candidate
+        ? typed
+          ? answerInput.current
+          : revealButton.current
+        : emptyHeading.current;
+      if (destination) {
+        moveToCard.current = false;
+        destination.focus();
+      }
     }
   }, [
     busy,
@@ -876,7 +890,7 @@ function StudyBoard({
           tab={deckLink}
           className={styles.card}
         >
-          <h1>
+          <h1 ref={emptyHeading} tabIndex={-1}>
             {daily
               ? workspace &&
                 (offlineShell || syncState === "offline") &&

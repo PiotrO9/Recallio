@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto";
 import { holdStore } from "./hold-store";
 import { readFile } from "node:fs/promises";
 import { expect, type BrowserContext } from "@playwright/test";
-import { test } from "./local-accounts";
+import { test, signIn } from "./local-accounts";
+import { measureControl } from "./visual-accessibility";
 import { expectAccessible } from "./accessibility";
 
 test.skip(
@@ -152,10 +153,21 @@ test("a review survives an offline reload and synchronizes once to a second devi
   const grades = page.getByRole("group", { name: "Ocena odpowiedzi" });
   await expect(grades).toBeFocused();
   for (const key of ["1", "2", "3", "4"]) {
+    await measureControl(
+      grades.locator(`button[aria-keyshortcuts="${key}"]`),
+      "grade-" + key,
+      { target: true, border: true },
+    );
     const shortcut = grades.locator(`button[aria-keyshortcuts="${key}"] kbd`);
     await expect(shortcut).toHaveText(key);
     await expect(shortcut).toBeVisible();
   }
+  const firstGrade = grades.getByRole("button", { name: "Nie pamiętam" });
+  await firstGrade.hover();
+  await measureControl(firstGrade, "grade-hover", {
+    target: true,
+    border: true,
+  });
   await page.keyboard.press("Enter");
   await page.keyboard.press("Space");
   await expect(grades).toBeFocused();
@@ -549,6 +561,9 @@ test("deck edits preserve progress and deleted cards reject stale changes", asyn
     .getByRole("button", { name: "Usuń fiszkę" })
     .click();
   await expect(page.getByText("W zestawie nie ma fiszek.")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Fiszki", exact: true }),
+  ).toBeFocused();
   await expect
     .poll(async () =>
       (await changes()).some(
@@ -582,4 +597,58 @@ test("deck edits preserve progress and deleted cards reject stale changes", asyn
   expect((await stale.json()).results).toMatchObject([
     { status: "conflict", error: "entity_deleted" },
   ]);
+});
+
+test("anulowanie odrzucenia pozwala wysłać zachowaną zmianę", async ({
+  page,
+  accounts,
+  baseURL,
+}) => {
+  const user = await accounts.createAccount();
+  await signIn(page.request, baseURL!, user);
+  await page.route("**/api/v1/sync/push", (r) => r.fulfill({ status: 503 }));
+  await page.goto("/decks?new=1");
+  await page.getByLabel("Nazwa zestawu").fill("Do synchronizacji");
+  await page.getByRole("button", { name: "Zapisz zestaw" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Pierwsza fiszka" }),
+  ).toBeVisible();
+  await page.goto("/account");
+  const logout = page.getByRole("button", { name: "Wyloguj się", exact: true });
+  await logout.click();
+  const discard = page.getByRole("button", {
+    name: "Odrzuć zmiany i wyloguj się",
+  });
+  await discard.click();
+  const cancel = page.getByRole("button", { name: "Anuluj" });
+  await expect(cancel).toBeFocused();
+  await cancel.click();
+  await expect(discard).toBeFocused();
+  await cancel.click();
+  await expect(logout).toBeFocused();
+  await expect(
+    page.getByText(/Niewysłane zmiany na urządzeniu: 1/),
+  ).toBeVisible();
+  await logout.click();
+  await page
+    .getByRole("button", { name: "Synchronizuj i wyloguj się" })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Ponów synchronizację i wyloguj się" }),
+  ).toBeFocused();
+  await page.unroute("**/api/v1/sync/push");
+  await page
+    .getByRole("button", { name: "Ponów synchronizację i wyloguj się" })
+    .click();
+  await expect(page).toHaveURL(/\/auth\/login$/);
+  const second = await accounts.device(user);
+  const snapshot = await second.request.get("/api/v1/sync/pull?cursor=0");
+  expect((await snapshot.json()).changes).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        entity: "deck",
+        payload: expect.objectContaining({ name: "Do synchronizacji" }),
+      }),
+    ]),
+  );
 });

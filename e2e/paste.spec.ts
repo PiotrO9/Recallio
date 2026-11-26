@@ -1,3 +1,8 @@
+import {
+  expectUsableFocus,
+  expectReflow,
+  textSpacing,
+} from "./visual-accessibility";
 import { expect } from "@playwright/test";
 import { test, signIn } from "./local-accounts";
 
@@ -43,6 +48,8 @@ test("wklejenie dwudziestu par otwiera trening zapisanego zestawu", async ({
   await page.getByLabel("Pierwszy wiersz to nagłówki").check();
   await page.getByRole("button", { name: "Pokaż podgląd" }).click();
   const jump = page.getByRole("button", { name: "Przejdź do wiersza 22" });
+  await page.setViewportSize({ width: 320, height: 720 });
+  await page.addStyleTag({ content: textSpacing });
   await jump.click();
   const action = page.getByLabel("Akcja wiersza 22", { exact: true });
   await expect(action).toBeFocused();
@@ -55,7 +62,8 @@ test("wklejenie dwudziestu par otwiera trening zapisanego zestawu", async ({
   await action.selectOption("replace_content");
   await jump.click();
   const target = page.getByLabel("Fiszka do aktualizacji · wiersz 22");
-  await expect(target).toBeFocused();
+  await expectUsableFocus(target);
+  await expectReflow(page);
   await expect(target).toHaveAccessibleDescription(/Wybierz fiszkę/);
   await target.selectOption({ index: 1 });
   await expect(

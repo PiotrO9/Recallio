@@ -31,11 +31,7 @@ export function RepairList({
   const [open, setOpen] = useState(initialOpen);
   useEffect(() => {
     if (!open) return;
-    const previous = document.title;
     document.title = "Do poprawy · Recallio";
-    return () => {
-      document.title = previous;
-    };
   }, [open]);
   const [online, setOnline] = useState(true);
   const [retry, setRetry] = useState(0);

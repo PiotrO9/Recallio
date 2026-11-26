@@ -1,3 +1,4 @@
+import { measureControl } from "./visual-accessibility";
 import { expectAccessible } from "./accessibility";
 import { expect } from "@playwright/test";
 import { test } from "./local-accounts";
@@ -42,6 +43,7 @@ test("sugestia prowadzi do edytora, wraca po zapisie i działa z pamięci offlin
   await expect(links).toHaveCount(2);
   const label = await links.nth(1).getAttribute("aria-label");
   const chosen = page.getByRole("link", { name: label!, exact: true });
+  await measureControl(chosen, "repair-link", { target: true });
   await chosen.click();
   await expect(page.getByLabel("Przykład B")).toBeVisible();
   await page.goBack();
@@ -69,6 +71,15 @@ test("sugestia prowadzi do edytora, wraca po zapisie i działa z pamięci offlin
     await device.setOffline(false);
   }
   await expect(chosen).toBeVisible();
+  await page.goto("/study?repair=1&focusCard=missing");
+  await expect(
+    page.getByText(
+      "Wybrana fiszka nie jest już dostępna na liście do poprawy.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Do poprawy" })).toBeFocused();
+  await page.getByRole("button", { name: "Rozpocznij nową sesję" }).click();
+  await expect(page).toHaveTitle("Trening zestawu · Recallio");
   const legacy = await accounts.device(owner);
   const older = await legacy.newPage();
   await older.route("**/study/repair-candidates", (route) =>

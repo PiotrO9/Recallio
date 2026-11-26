@@ -121,6 +121,11 @@ test("account requires a verified session, sign-up and reset links stay on the l
   });
   expect(otherOrigin.status()).toBe(403);
 
+  await page.goto("/auth/login?status=link");
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(
+    "Ten link wygasł",
+  );
+  await expect(page).toHaveTitle("Zaloguj się · Recallio");
   await page.goto("/auth/signup");
   await page.getByLabel("Adres e-mail").fill(email);
   await page.getByLabel("Hasło").fill(password);
@@ -154,6 +159,10 @@ test("account requires a verified session, sign-up and reset links stay on the l
   const recovery = await emailLink(request, email, "recovery");
   expect(new URL(recovery).origin).toBe(baseURL);
   await page.goto(recovery);
+  await expect(page).toHaveTitle("Ustaw nowe hasło · Recallio");
+  await expect(page.getByLabel("Nowe hasło")).toHaveAccessibleDescription(
+    "Od 8 do 128 znaków.",
+  );
   await page.getByLabel("Nowe hasło").fill(replacement);
   await page.getByRole("button", { name: "Zapisz hasło" }).click();
   await expect(page.getByRole("heading", { name: "Moje konto" })).toBeVisible();

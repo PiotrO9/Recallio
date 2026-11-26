@@ -1,3 +1,4 @@
+import { measureControl } from "./visual-accessibility";
 import { randomUUID } from "node:crypto";
 import { expect } from "@playwright/test";
 import { test, signIn } from "./local-accounts";
@@ -88,6 +89,22 @@ test("wyszukuje tłumaczenie w 10 tys. fiszek i wraca z edytora do wyniku", asyn
   await page.getByRole("button", { name: "Pokaż więcej" }).click();
   await expect(rows).toHaveCount(100);
   await expect(rows.nth(50)).toBeFocused();
+  await measureControl(rows.nth(50), "result-51", { target: true });
+  const header = page.getByRole("banner");
+  await measureControl(header.locator(".brand"), "header-name", {
+    target: true,
+  });
+  await measureControl(header.locator(".brand-mark"), "header-mark");
+  await measureControl(
+    header.getByRole("link", { name: "Moje zestawy" }),
+    "header-current",
+    { target: true },
+  );
+  await measureControl(
+    header.getByRole("link", { name: "Moje konto" }),
+    "header-link",
+    { target: true },
+  );
   await expect(
     page
       .getByRole("status")

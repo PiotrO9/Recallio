@@ -13,9 +13,13 @@ export async function expectAccessible(page: Page, state: string) {
       id,
       help,
       tags,
-      nodes: nodes.map(({ target, failureSummary }) => ({
+      nodes: nodes.map(({ target, failureSummary, any, all, none }) => ({
         target,
         reason: failureSummary ?? help,
+        checks: [...any, ...all, ...none].map(({ id, message }) => ({
+          id,
+          message,
+        })),
       })),
     }));
   }

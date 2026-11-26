@@ -89,6 +89,12 @@ export function DeckManager(entry: LibraryEntry) {
 
   const [confirmed, setConfirmed] = useState(false);
   const [missing, setMissing] = useState(false);
+  const focusAfterDelete = useRef<{
+    list: "decks" | "cards";
+    nextId?: string;
+  } | null>(null);
+  const cardsHeading = useRef<HTMLHeadingElement>(null);
+  const indexHeading = useRef<HTMLHeadingElement>(null);
   const searchField = useRef<HTMLInputElement>(null);
   const [readError, setReadError] = useState(false);
   const [reading, setReading] = useState(false);
@@ -350,6 +356,9 @@ export function DeckManager(entry: LibraryEntry) {
 
   function remove(item: Deck | Card) {
     const isCard = "contentRevision" in item;
+    const rows = isCard ? cards : found;
+    const index = rows.findIndex((row) => row.id === item.id);
+    const nextId = (rows[index + 1] ?? rows[index - 1])?.id;
     void perform(isCard ? "deleteCard" : "deleteDeck", async () => {
       await commit(
         {
@@ -362,9 +371,11 @@ export function DeckManager(entry: LibraryEntry) {
         item,
       );
       if (isCard) {
+        focusAfterDelete.current = { list: "cards", nextId };
         discardDraft(draftKey(userId, item.deckId, item.id));
         closeCardForm();
       } else {
+        focusAfterDelete.current = { list: "decks", nextId };
         leaveDeletedDeck();
       }
     });
@@ -429,6 +440,15 @@ export function DeckManager(entry: LibraryEntry) {
     }, 300);
     return () => window.clearTimeout(timer);
   }, [search, scope, browsing, userId, total, shown]);
+  useEffect(() => {
+    if (busy || !focusAfterDelete.current) return;
+    const { list, nextId } = focusAfterDelete.current;
+    const destination =
+      (nextId && document.getElementById("library-row-" + nextId)) ||
+      (list === "decks" ? indexHeading.current : cardsHeading.current);
+    focusAfterDelete.current = null;
+    destination?.focus();
+  }, [busy, selected, cardForm]);
   const preview = !deck && !searching && found[0];
   const previewCard =
     preview && data?.cards.find((c) => !c.deletedAt && c.deckId === preview.id);
@@ -477,7 +497,13 @@ export function DeckManager(entry: LibraryEntry) {
       >
         {browsing && !target && (
           <section className={styles.index} aria-label="Biblioteka">
-            {deck ? <h2>Moje zestawy</h2> : <h1>Moje zestawy</h1>}
+            {deck ? (
+              <h2>Moje zestawy</h2>
+            ) : (
+              <h1 ref={indexHeading} tabIndex={-1}>
+                Moje zestawy
+              </h1>
+            )}
             <div className={styles.toolbar}>
               <label>
                 Szukaj w
@@ -578,6 +604,7 @@ export function DeckManager(entry: LibraryEntry) {
                   <li key={item.id}>
                     <a
                       className={styles.deckRow}
+                      id={"library-row-" + item.id}
                       href={deckHref(item.id)}
                       aria-disabled={busy || undefined}
                       style={deckColor(item.id)}
@@ -1004,7 +1031,11 @@ export function DeckManager(entry: LibraryEntry) {
                   </NotebookSheet>
                 </form>
               )}
-              {cardForm === undefined && <h2>Fiszki</h2>}
+              {cardForm === undefined && (
+                <h2 ref={cardsHeading} tabIndex={-1}>
+                  Fiszki
+                </h2>
+              )}
               {cardForm === undefined && (
                 <ul className={styles.list} aria-label="Fiszki">
                   {cards.map((card) => (
@@ -1015,6 +1046,7 @@ export function DeckManager(entry: LibraryEntry) {
                         <button
                           className="auth-secondary"
                           disabled={busy}
+                          id={"library-row-" + card.id}
                           onClick={() => openCardForm(card)}
                         >
                           Edytuj fiszkę

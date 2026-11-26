@@ -36,17 +36,41 @@ export function ConfirmAction({
         disabled={disabled}
         loading={loading}
         loadingLabel={loadingLabel}
-        onClick={() =>
-          needsConfirmation && !needsConfirmation()
-            ? onConfirm()
-            : ref.current?.showModal()
-        }
+        onClick={(event) => {
+          if (needsConfirmation && !needsConfirmation()) {
+            onConfirm();
+            return;
+          }
+          event.currentTarget.focus();
+          ref.current?.showModal();
+        }}
       >
         {label}
       </LoadingButton>
-      <dialog ref={ref} aria-labelledby={id} className="action-dialog">
+      <dialog
+        onKeyDown={(event) => {
+          if (event.key !== "Tab") return;
+          const buttons =
+            event.currentTarget.querySelectorAll<HTMLButtonElement>(
+              "button:enabled",
+            );
+          const first = buttons[0],
+            last = buttons[buttons.length - 1];
+          if (
+            (event.shiftKey && event.target === first) ||
+            (!event.shiftKey && event.target === last)
+          ) {
+            event.preventDefault();
+            (event.shiftKey ? last : first)?.focus();
+          }
+        }}
+        ref={ref}
+        aria-labelledby={id}
+        aria-describedby={id + "-description"}
+        className="action-dialog"
+      >
         <h2 id={id}>{title}</h2>
-        <p>{description}</p>
+        <p id={id + "-description"}>{description}</p>
         <div className="action-row">
           <button
             type="button"

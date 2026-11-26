@@ -1,4 +1,10 @@
 import { test, expect } from "@playwright/test";
+import {
+  measureControl,
+  expectUsableFocus,
+  textSpacing,
+  expectReflow,
+} from "./visual-accessibility";
 import { expectAccessible } from "./accessibility";
 
 test("login shows pending feedback, blocks duplicate submits and recovers after a network error", async ({
@@ -72,7 +78,26 @@ test("visitors enter through accessible sign-in at 320px", async ({ page }) => {
   await expect(
     page.getByRole("textbox", { name: "Adres e-mail" }),
   ).toBeFocused();
+  const email = page.getByRole("textbox", { name: "Adres e-mail" });
+  await measureControl(email, "email-focus", {
+    border: true,
+    focus: true,
+    target: true,
+  });
+  await measureControl(
+    page.getByRole("button", { name: "Zaloguj się" }),
+    "login",
+    { target: true },
+  );
   await expectAccessible(page, "logowanie");
+  await page.addStyleTag({ content: textSpacing });
+  await expectReflow(page);
+  await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
+  await expectUsableFocus(email);
+  await expect(email).toHaveCSS("outline-style", "solid");
+  await page.getByRole("button", { name: "Zaloguj się" }).click();
+  await expect(email).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByText("Podaj pełny adres e-mail.")).toBeVisible();
 });
 
 test("account links and old bookmarks open the correct form", async ({

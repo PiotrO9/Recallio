@@ -10,7 +10,23 @@ export function AccountPanel({ accountId }: { accountId: string }) {
   const [operation, setOperation] = useState<
     "check" | "discard" | "sync" | null
   >(null);
+  const logoutTrigger = useRef<HTMLButtonElement>(null);
+  const discardTrigger = useRef<HTMLButtonElement>(null);
+  const syncTrigger = useRef<HTMLButtonElement>(null);
+  const focusAfter = useRef<"logout" | "discard" | "sync" | null>(null);
   const busy = operation !== null;
+  useEffect(() => {
+    if (busy || !focusAfter.current) return;
+    const target = {
+      logout: logoutTrigger,
+      discard: discardTrigger,
+      sync: syncTrigger,
+    }[focusAfter.current].current;
+    if (target) {
+      target.focus();
+      focusAfter.current = null;
+    }
+  }, [pending, confirmDiscard, busy]);
   const [error, setError] = useState(false);
   const [ready, setReady] = useState(false);
   const signingOut = useRef(false);
@@ -57,6 +73,7 @@ export function AccountPanel({ accountId }: { accountId: string }) {
       }
       const count = await repository.clearForLogout(mode === "discard");
       if (count) {
+        focusAfter.current = "sync";
         setPending(count);
         return;
       }
@@ -67,6 +84,8 @@ export function AccountPanel({ accountId }: { accountId: string }) {
       window.location.assign(response.url);
       navigating = true;
     } catch {
+      if (mode === "discard") setConfirmDiscard(false);
+      focusAfter.current = mode === "check" ? "logout" : "sync";
       setError(true);
     } finally {
       repository.close();
@@ -97,6 +116,7 @@ export function AccountPanel({ accountId }: { accountId: string }) {
       {pending === null ? (
         <LoadingButton
           className="primary"
+          ref={logoutTrigger}
           loading={operation === "check"}
           loadingLabel="Wylogowywanie…"
           disabled={!ready || busy}
@@ -109,14 +129,20 @@ export function AccountPanel({ accountId }: { accountId: string }) {
           className="confirm-discard"
           aria-label="Potwierdź odrzucenie zmian"
         >
-          <h2>Odrzucić niewysłane zmiany?</h2>
-          <p>Zmiany zapisane tylko na tym urządzeniu zostaną utracone.</p>
+          <h2 id="discard-question">Odrzucić niewysłane zmiany?</h2>
+          <p id="discard-impact">
+            Zmiany zapisane tylko na tym urządzeniu zostaną utracone.
+          </p>
           <div className="action-row">
             <button
               className="auth-secondary"
               autoFocus
+              aria-describedby="discard-question discard-impact"
               disabled={busy}
-              onClick={() => setConfirmDiscard(false)}
+              onClick={() => {
+                focusAfter.current = "discard";
+                setConfirmDiscard(false);
+              }}
             >
               Anuluj
             </button>
@@ -133,12 +159,14 @@ export function AccountPanel({ accountId }: { accountId: string }) {
         </section>
       ) : (
         <>
-          <p role="status">
+          <p id="pending-changes" role="status">
             Niewysłane zmiany: {pending}. Odrzucenie usunie je z tego
             urządzenia.
           </p>
           <LoadingButton
             className="primary"
+            ref={syncTrigger}
+            aria-describedby="pending-changes"
             loading={operation === "sync"}
             loadingLabel="Synchronizowanie i wylogowywanie…"
             disabled={busy}
@@ -151,6 +179,7 @@ export function AccountPanel({ accountId }: { accountId: string }) {
           <button
             className="auth-secondary"
             disabled={busy}
+            ref={discardTrigger}
             onClick={() => setConfirmDiscard(true)}
           >
             Odrzuć zmiany i wyloguj się
@@ -158,7 +187,10 @@ export function AccountPanel({ accountId }: { accountId: string }) {
           <button
             className="auth-secondary"
             disabled={busy}
-            onClick={() => setPending(null)}
+            onClick={() => {
+              focusAfter.current = "logout";
+              setPending(null);
+            }}
           >
             Anuluj
           </button>

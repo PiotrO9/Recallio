@@ -381,6 +381,24 @@ test("wszystkie widoki makiet są dostępne w prawdziwym przebiegu nauki", async
   await expect(
     page.getByRole("dialog").getByRole("button", { name: "Anuluj" }),
   ).toBeFocused();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toHaveAccessibleDescription(/.+/);
+  const cancel = dialog.getByRole("button", { name: "Anuluj" });
+  await page.keyboard.press("Tab");
+  await expect(
+    dialog.getByRole("button", { name: "Zakończ import" }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(cancel).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(
+    dialog.getByRole("button", { name: "Zakończ import" }),
+  ).toBeFocused();
+  await page.keyboard.press("Escape");
+  const finish = page.getByRole("button", { name: "Zakończ import" });
+  await expect(finish).toBeFocused();
+  await finish.click();
+  await expect(cancel).toBeFocused();
   await expectAccessible(page, "potwierdzenie-importu");
   if (mobile) {
     await page

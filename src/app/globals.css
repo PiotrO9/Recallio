@@ -108,7 +108,7 @@ p {
   font-size: 0.94rem;
   line-height: 1.4;
 }
-.primary:hover:not(:disabled, [aria-disabled="true"]) {
+.primary:where(:hover:not(:disabled, [aria-disabled="true"])) {
   background: var(--brand-hover);
 }
 .primary:active:not(:disabled, [aria-disabled="true"]) {
@@ -137,18 +137,13 @@ p {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  position: relative;
-  isolation: isolate;
 }
-.masthead::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
+.masthead-band {
   background: #fbf9fb;
-  inset: 0 calc((100% - 100vw) / 2);
   border-bottom: 1px solid var(--line);
 }
 .brand {
+  min-height: 44px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -246,9 +241,28 @@ p {
   color: var(--rust);
   font-weight: 650;
 }
-input[aria-invalid="true"],
-textarea[aria-invalid="true"] {
-  outline: 1px solid var(--rust);
+.validated-field label :is(input, textarea)[aria-invalid="true"] {
+  border: 2px solid var(--rust);
+}
+.validated-field {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+:where(h1, h2)[tabindex="-1"]:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+  }
+  [aria-current="page"] {
+    text-decoration: underline;
+  }
+  .validated-field label [aria-invalid="true"] {
+    border-style: double;
+  }
 }
 @media (max-width: 560px) {
   .page-shell {

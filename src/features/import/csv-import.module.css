@@ -236,7 +236,7 @@
 .reviewActions p {
   flex: 1 1 12rem;
 }
-@media (min-height: 600px) {
+@media (min-height: 600px) and (min-width: 651px) {
   .reviewActions {
     position: sticky;
     bottom: 0;

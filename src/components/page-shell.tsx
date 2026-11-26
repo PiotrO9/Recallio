@@ -10,14 +10,16 @@ export function PageShell({
   className?: string;
 }) {
   return (
-    <div className="page-shell">
+    <>
       <a className="skip-link" href="#main">
         Przejdź do treści
       </a>
       {!publicEntry && <Masthead />}
-      <main id="main" tabIndex={-1} className={className}>
-        {children}
-      </main>
-    </div>
+      <div className="page-shell">
+        <main id="main" tabIndex={-1} className={className}>
+          {children}
+        </main>
+      </div>
+    </>
   );
 }

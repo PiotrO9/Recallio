@@ -42,7 +42,7 @@ Wybieraj pierwsze gotowe zadanie. Zależność jest spełniona, gdy wskazany wie
 
 | ID          | Stan | Zależy od            | Zakres i odbiór                                                                                                        |
 | ----------- | ---- | -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| PASTE-01    | TODO | IMPORT-01            | Odczytaj wklejone kolumny z arkusza. Sprawdź limity, numerację wierszy oraz zgodność z klasyfikacją importu CSV.       |
+| PASTE-01    | DONE | IMPORT-01            | Odczytaj wklejone kolumny z arkusza. Sprawdź limity, numerację wierszy oraz zgodność z klasyfikacją importu CSV.       |
 | PASTE-02    | TODO | PASTE-01             | Podłącz wklejanie do istniejącego podglądu i trwałego zapisu. Sprawdź wznowienie oraz rozpoczęcie treningu po zapisie. |
 | TODAY-01    | TODO | QUEUE-01, TRAIN-01   | Dobieraj należne kierunki z wielu zestawów. Sprawdź termin graniczny, powroty po błędzie i zakończenie sesji.          |
 | TODAY-02    | TODO | TODAY-01, PWA-01     | Połącz panel i sesję dzienną online oraz offline. Sprawdź odświeżenie i synchronizację oceny.                          |
@@ -96,3 +96,5 @@ Dodawaj po jednym krótkim wpisie na wynik. Dla `DONE` podaj ID, co dostarczono 
 - `REFACTOR-9` — Konta i urządzenia mają współdzieloną fixture. Cztery osobne scenariusze sprawdzają trening offline, ustawienia, bibliotekę i import.
 
 - `REFACTOR-10` — Migracja v7→v8 zachowuje kolejność i blokady. W Chromium mediana trzech prób dla 100 operacji spadła z 236 do 76 ms, a dla 1000 z 20 204 do 933 ms. Zakres pomiaru opisano w weryfikacji.
+
+- `PASTE-01` — Parser wklejek i CSV współdzielą walidację. Przeszły 82 testy, build i typecheck.

@@ -6,6 +6,7 @@ import {
   exportCsv,
   MAX_CSV_BYTES,
   parseCsv,
+  parsePastedRows,
 } from "../../src/domain/import/csv";
 import { cardSchema, type Card } from "../../src/contracts";
 
@@ -139,4 +140,33 @@ test("CSV and stored cards accept the same field length boundaries", () => {
       );
     }
   }
+});
+
+test("wklejenie zachowuje komórki i fizyczne linie oraz korzysta z decyzji CSV", () => {
+  const text = 'A\tB\r\n"kot\npies"\t"cat, dog"\r\n\tbrak';
+  const { rows } = parsePastedRows(text, { hasHeader: true });
+  assert.deepEqual(
+    rows,
+    parseCsv('side_a,side_b\r\n"kot\npies","cat, dog"\r\n,brak').rows,
+  );
+  assert.deepEqual(
+    rows.map((r) => r.row),
+    [2, 4],
+  );
+  const pasted = parsePastedRows('żółw\t"mój\tżółw"\nżółw\t"mój\tżółw"', {
+    hasHeader: false,
+  });
+  assert.deepEqual(
+    classifyRows(pasted.rows, []).map((r) => r.classification),
+    ["valid", "exact_duplicate"],
+  );
+  assert.equal(pasted.rows[0].content.sideB, "mój\tżółw");
+  assert.ok(
+    parsePastedRows("a\tb\tc\td\te", { hasHeader: false }).rows[0].errors
+      .length,
+  );
+  assert.throws(
+    () => parsePastedRows("ą".repeat(MAX_CSV_BYTES), { hasHeader: false }),
+    CsvError,
+  );
 });

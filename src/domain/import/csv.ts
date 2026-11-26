@@ -1,4 +1,7 @@
-import { MAX_CARD_SIDE_LENGTH } from "../content-limits";
+import {
+  MAX_CARD_SIDE_LENGTH,
+  MAX_CARD_EXAMPLE_LENGTH,
+} from "../content-limits";
 import type { Card } from "../../contracts";
 
 export const MAX_CSV_BYTES = 1024 * 1024;
@@ -167,13 +170,14 @@ function firstRecord(text: string): string {
   }
   return text;
 }
-export function parseCsv(input: string): {
-  delimiter: "," | ";";
-  rows: Array<{ row: number; content: Content; errors: string[] }>;
-} {
+function checkedText(input: string) {
   if (new TextEncoder().encode(input).length > MAX_CSV_BYTES)
     throw new CsvError(1, "Plik przekracza limit 1 MiB");
-  const text = input.replace(/^\uFEFF/, "");
+  return input.replace(/^\uFEFF/, "");
+}
+
+export function parseCsv(input: string) {
+  const text = checkedText(input);
   const header = firstRecord(text);
   const candidates = ([",", ";"] as const).filter((d) => {
     try {
@@ -195,33 +199,48 @@ export function parseCsv(input: string): {
     rows: parsed
       .slice(1)
       .filter((r) => !r.blank)
-      .map((r) => {
-        const content: Content = {
-          sideA: "",
-          sideB: "",
-          exampleA: null,
-          exampleB: null,
-        };
-        keys.forEach((key, index) => {
-          const value = r.fields[index] ?? "";
-          if (key === "exampleA" || key === "exampleB")
-            content[key] = value === "" && !r.quoted[index] ? null : value;
-          else content[key] = value;
-        });
-        const errors: string[] = [];
-        if (r.fields.length > keys.length) errors.push("Nadmiarowe kolumny");
-        if (!content.sideA.trim() || !content.sideB.trim())
-          errors.push("Strony A i B są wymagane");
-        if (
-          content.sideA.length > MAX_CARD_SIDE_LENGTH ||
-          content.sideB.length > MAX_CARD_SIDE_LENGTH ||
-          (content.exampleA?.length ?? 0) > 8000 ||
-          (content.exampleB?.length ?? 0) > 8000
-        )
-          errors.push("Przekroczono limit długości pola");
-        return { row: r.line, content, errors };
-      }),
+      .map((row) => parseRow(row, keys)),
   };
+}
+
+export function parsePastedRows(
+  input: string,
+  { hasHeader }: { hasHeader: boolean },
+) {
+  const rows = records(checkedText(input), "\t").filter((r) => !r.blank);
+  return {
+    delimiter: "\t" as const,
+    rows: rows
+      .slice(hasHeader ? 1 : 0)
+      .map((row) => parseRow(row, ["sideA", "sideB", "exampleA", "exampleB"])),
+  };
+}
+
+function parseRow(r: RecordRow, keys: readonly (keyof Content)[]) {
+  const content: Content = {
+    sideA: "",
+    sideB: "",
+    exampleA: null,
+    exampleB: null,
+  };
+  keys.forEach((key, index) => {
+    const value = r.fields[index] ?? "";
+    if (key === "exampleA" || key === "exampleB")
+      content[key] = value === "" && !r.quoted[index] ? null : value;
+    else content[key] = value;
+  });
+  const errors: string[] = [];
+  if (r.fields.length > keys.length) errors.push("Nadmiarowe kolumny");
+  if (!content.sideA.trim() || !content.sideB.trim())
+    errors.push("Strony A i B są wymagane");
+  if (
+    content.sideA.length > MAX_CARD_SIDE_LENGTH ||
+    content.sideB.length > MAX_CARD_SIDE_LENGTH ||
+    (content.exampleA?.length ?? 0) > MAX_CARD_EXAMPLE_LENGTH ||
+    (content.exampleB?.length ?? 0) > MAX_CARD_EXAMPLE_LENGTH
+  )
+    errors.push("Przekroczono limit długości pola");
+  return { row: r.line, content, errors };
 }
 
 // Comparison only; never replace the original content with these keys.

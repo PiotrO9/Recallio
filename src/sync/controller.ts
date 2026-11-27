@@ -4,9 +4,7 @@ import {
   snapshotResponseSchema,
   type Operation,
 } from "../contracts";
-import { fsrsScheduler, resetFsrsProgress } from "../domain/learning/scheduler";
 import type { createLocalRepository } from "../storage/local-repository";
-import { createSnapshotRebaser } from "../storage/snapshot-rebase";
 
 type Repository = ReturnType<typeof createLocalRepository>;
 export type SyncStatus =
@@ -36,8 +34,6 @@ interface SyncOptions {
   id: () => string;
   online: () => boolean;
 }
-
-const rebase = createSnapshotRebaser(fsrsScheduler, resetFsrsProgress);
 
 export function createSyncController(options: SyncOptions) {
   const { repository } = options;
@@ -121,7 +117,8 @@ export function createSyncController(options: SyncOptions) {
         await repository.stageSnapshot(next, page, generation);
         next = page.nextPage;
       } while (next !== null);
-      await repository.activateSnapshot(token!, rebase);
+      const { rebaseSnapshot } = await import("./snapshot-rebaser");
+      await repository.activateSnapshot(token!, rebaseSnapshot);
     } catch (error) {
       if (token) await repository.discardSnapshot(token);
       throw error;

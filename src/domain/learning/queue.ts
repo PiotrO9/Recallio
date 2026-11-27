@@ -7,7 +7,7 @@ import {
   type ReviewEvent,
   type SessionReturn,
 } from "../../contracts";
-import { fsrsScheduler } from "./scheduler";
+import { classifyProgress } from "./progress-state";
 import type { getStudyPeriod } from "./study-time";
 
 export const DEFAULT_NEW_LIMIT = 20;
@@ -40,7 +40,7 @@ export function recordSessionAnswer(
 }
 
 export function remainingNewForDay(
-  introductions: readonly Introduction[],
+  introductions: readonly Pick<Introduction, "cardId" | "firstEffectiveAt">[],
   period: ReturnType<typeof getStudyPeriod>,
   limit: number,
 ): number {
@@ -90,7 +90,7 @@ export const studyQueue: QueuePolicy = {
             card,
             direction: side,
             epoch: state?.epoch ?? "0",
-            mode: fsrsScheduler.classify(state ?? null, now),
+            mode: classifyProgress(state ?? null, now),
           },
           progress: state,
           known,

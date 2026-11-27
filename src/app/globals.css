@@ -1,5 +1,5 @@
 :root {
-  --display: "Manrope Variable", sans-serif;
+  --display: var(--manrope-latin), "Manrope Variable", sans-serif;
   --ink: #29233a;
   --muted: #645e70;
   --brand: #584080;

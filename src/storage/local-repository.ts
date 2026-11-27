@@ -1,3 +1,4 @@
+import { accountDatabaseName } from "./account-database-name";
 import { openDB, type DBSchema, type IDBPDatabase, type StoreNames } from "idb";
 import { applyContent } from "./apply-content";
 import type { ResetProjection } from "./snapshot-rebase";
@@ -247,7 +248,7 @@ export function createLocalRepository(
   let connection: Promise<IDBPDatabase<Schema>> | undefined;
   const connect = () => {
     if (!connection) {
-      const opened = openDB<Schema>(`recallio-user-${userId}`, 8, {
+      const opened = openDB<Schema>(accountDatabaseName(userId), 8, {
         upgrade(db, oldVersion, _newVersion, tx) {
           void tx.done.catch(() => {});
           if (oldVersion < 1) {

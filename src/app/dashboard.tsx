@@ -1,108 +1,41 @@
 "use client";
-import Link from "next/link";
+
 import { ActionLink } from "@/components/action-link";
-import { useEffect, useRef, useState } from "react";
-import { NotebookSheet, deckColor } from "@/components/notebook";
-import { type SnapshotData } from "@/storage/local-repository";
-import { openLocalAccount } from "@/features/local-account";
-import { DEFAULT_NEW_LIMIT, remainingNewForDay } from "@/domain/learning/queue";
-import { getStudyPeriod } from "@/domain/learning/study-time";
-import { fsrsScheduler } from "@/domain/learning/scheduler";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import type {
+  DashboardLibrary,
+  openDashboardAccount,
+} from "@/features/dashboard/workspace";
+import { accountDatabaseName } from "@/storage/account-database-name";
 import styles from "./dashboard.module.css";
 
-import { collectDue } from "@/domain/learning/daily";
-function recommend(
-  data: SnapshotData,
-  now: string,
-  offlineDecks?: ReadonlySet<string>,
-) {
-  const decks = data.decks.filter(
-    (d) => !d.deletedAt && (!offlineDecks || offlineDecks.has(d.id)),
-  );
-  const available = new Map(decks.map((d) => [d.id, d]));
-  const cards = data.cards.filter(
-    (c) => !c.deletedAt && available.has(c.deckId),
-  );
-  const byId = new Map(cards.map((c) => [c.id, c]));
-  const due = collectDue(data, now, offlineDecks);
-  const limit = data.settings?.newLimit ?? DEFAULT_NEW_LIMIT;
-  const free = remainingNewForDay(
-    data.introductions,
-    getStudyPeriod(now),
-    limit,
-  );
-  const known = new Set(
-    [...data.introductions, ...data.progress].map((x) => x.cardId),
-  );
-  const studied = new Set(
-    data.progress
-      .filter((p) => fsrsScheduler.classify(p, now) !== "introduction")
-      .map((p) => p.cardId + ":" + p.direction),
-  );
-  const fresh =
-    (free > 0 && cards.find((c) => !known.has(c.id))) ||
-    cards.find((c) => {
-      const mode = available.get(c.deckId)?.directionMode;
-      return (
-        known.has(c.id) &&
-        (mode === "mixed" ? ["a-b", "b-a"] : [mode]).some(
-          (direction) => !studied.has(c.id + ":" + direction),
-        )
-      );
-    });
-  const practice = cards.find((c) => known.has(c.id));
-  const card = byId.get(due[0]?.cardId) ?? fresh ?? practice ?? cards[0];
-  const deck = (card && available.get(card.deckId)) ?? decks[0];
+// On a new device the server-rendered link can be used before React starts.
+// If this account already has a database, leave visibility to its local reader.
+const revealOnNewDevice = `{
+  const card = document.currentScript.closest("section");
+  if (card && window.recallioDatabasesAtNavigation) {
+    window.recallioDatabasesAtNavigation.then((databases) => {
+      if (databases && card.isConnected && navigator.onLine &&
+          !databases.some((db) => db.name === card.dataset.previewDatabase)) {
+        card.hidden = false;
+      }
+    }).catch(() => {});
+  }
+}`;
 
-  if (!deck) return null;
-  const detail = "/decks?deck=" + deck.id;
-  if (!card)
-    return {
-      deckId: deck.id,
-      name: deck.name,
-      caption: "Pusty zestaw",
-      action: "Dodaj pierwszą fiszkę",
-      href: detail + "&card=new",
-    };
-  const study = "/study?deck=" + deck.id;
-  if (due.length)
-    return {
-      deckId: deck.id,
-      name: "Dzisiejsze powtórki",
-      caption: data.settings?.showDue
-        ? "Kierunki do powtórki: " + due.length
-        : "Powtórka czeka",
-      action: "Powtórz na dziś",
-      href: "/study?scope=today",
-    };
-  if (fresh)
-    return {
-      deckId: deck.id,
-      name: deck.name,
-      caption: "Nowe fiszki",
-      action: "Poznaj nowe fiszki",
-      href: study,
-    };
-  if (practice)
-    return {
-      deckId: deck.id,
-      name: deck.name,
-      caption: "Plan na dziś wykonany",
-      action: "Ćwicz dalej",
-      href: study,
-    };
-  return {
-    deckId: deck.id,
-    name: deck.name,
-    caption: limit
-      ? "Dzisiejszy limit nowych fiszek został wykorzystany."
-      : "Nowe fiszki są wyłączone.",
-    action: "Otwórz zestaw",
-    href: detail,
-  };
-}
-export function Dashboard({ userId }: { userId: string }) {
-  const [data, setData] = useState<SnapshotData>();
+export function Dashboard({
+  userId,
+  previewCard,
+  previewLibrary,
+}: {
+  userId: string;
+  previewCard: ReactNode;
+  previewLibrary: ReactNode;
+}) {
+  const [usePreview, setUsePreview] = useState(false);
+  const [data, setData] = useState<
+    DashboardLibrary & { views: typeof import("./dashboard-content") }
+  >();
   const [online, setOnline] = useState(true);
   const [offlineDecks, setOfflineDecks] = useState<ReadonlySet<string>>(
     new Set(),
@@ -114,19 +47,43 @@ export function Dashboard({ userId }: { userId: string }) {
   const resultHeading = useRef<HTMLHeadingElement>(null);
   const focusResult = useRef(false);
   useEffect(() => {
-    const { repository: repo, sync } = openLocalAccount(userId);
+    const hasPreview = !!previewCard;
+    let account: ReturnType<typeof openDashboardAccount> | undefined;
     let active = true;
     let running = false;
     let timer: number | undefined;
     async function read() {
       try {
+        const [{ openDashboardAccount, dashboardLibrary }, views] =
+          await Promise.all([
+            import("@/features/dashboard/workspace"),
+            import("./dashboard-content"),
+          ]);
+        if (!active) return;
+        account ??= openDashboardAccount(userId);
+        const { repository: repo, sync } = account;
         const [cached, prepared] = await Promise.all([
           repo.readWorkspace(),
           repo.readOfflineDecks(),
         ]);
         if (!active) return;
         setOfflineDecks(new Set(prepared));
-        if (cached.decks.some((deck) => !deck.deletedAt)) setData(cached);
+        if (cached.decks.length) {
+          setData({ ...dashboardLibrary(cached), views });
+        } else if (
+          hasPreview &&
+          !cached.cards.length &&
+          !cached.progress.length &&
+          !cached.introductions.length &&
+          !cached.settings
+        ) {
+          const [cursor, pending] = await Promise.all([
+            repo.getCursor(),
+            repo.countUnsent(),
+          ]);
+          if (!active) return;
+          setUsePreview(cursor === undefined && pending === 0);
+        }
         const status = await sync.run();
         if (!active) return;
         const updated = await repo.readWorkspace();
@@ -135,7 +92,7 @@ export function Dashboard({ userId }: { userId: string }) {
             status === "idle" &&
             retryButton.current !== null &&
             document.activeElement === retryButton.current;
-          setData(updated);
+          setData({ ...dashboardLibrary(updated), views });
           setIssue(status !== "idle");
         }
       } catch {
@@ -152,72 +109,95 @@ export function Dashboard({ userId }: { userId: string }) {
       waitForRetry();
     }
     function waitForRetry() {
-      const delay = sync.retryAt() - Date.now();
+      const delay = (account?.sync.retryAt() ?? 0) - Date.now();
       if (delay > 0) timer = window.setTimeout(waitForRetry, Math.ceil(delay));
       else void read();
     }
     function connectionChanged() {
       setOnline(navigator.onLine);
-      refresh();
+      if (navigator.onLine) refresh();
+      else void initialize();
     }
     setOnline(navigator.onLine);
     refreshRef.current = refresh;
-    refresh();
-    window.addEventListener("focus", refresh);
+    async function initialize() {
+      if (hasPreview || !navigator.onLine) {
+        try {
+          const databases = await indexedDB.databases();
+          if (!active) return;
+          if (
+            !databases.some((db) => db.name === accountDatabaseName(userId))
+          ) {
+            // A new device can show the server view online or the unprepared
+            // state offline without downloading the local workspace.
+            setUsePreview(true);
+            return;
+          }
+        } catch {
+          // If the browser cannot list databases, consult the repository.
+        }
+      }
+      if (active) refresh();
+    }
+    void initialize();
+    window.addEventListener("focus", connectionChanged);
     window.addEventListener("online", connectionChanged);
     window.addEventListener("offline", connectionChanged);
     return () => {
       active = false;
       refreshRef.current = null;
       window.clearTimeout(timer);
-      window.removeEventListener("focus", refresh);
+      window.removeEventListener("focus", connectionChanged);
       window.removeEventListener("online", connectionChanged);
       window.removeEventListener("offline", connectionChanged);
-      repo.close();
+      account?.repository.close();
     };
-  }, [userId]);
+  }, [userId, previewCard]);
   useEffect(() => {
     if (!issue && focusResult.current) {
       resultHeading.current?.focus();
       focusResult.current = false;
     }
   }, [issue]);
-  const decks = data?.decks.filter((d) => !d.deletedAt);
-  const counts = new Map<string, number>();
-  for (const card of data?.cards ?? [])
-    if (!card.deletedAt)
-      counts.set(card.deckId, (counts.get(card.deckId) ?? 0) + 1);
-  const item =
-    data &&
-    recommend(
-      data,
-      new Date().toISOString(),
-      online ? undefined : offlineDecks,
-    );
+  const preview = !data && !issue && online && !!previewCard;
+
+  const item = data
+    ? data.recommend(
+        new Date().toISOString(),
+        online ? undefined : offlineDecks,
+      )
+    : null;
   return (
     <div className={styles.dashboard}>
       <h1 className={styles.title}>Panel nauki</h1>
       <div className={styles.layout}>
-        {item ? (
-          <section className={styles.cover}>
-            <NotebookSheet deckId={item.deckId} className={styles.page}>
-              <p className={styles.caption}>{item.caption}</p>
-              <h2 ref={resultHeading} tabIndex={-1}>
-                {item.name}
-              </h2>
-              <div className="action-row">
-                <ActionLink className="primary" href={item.href}>
-                  {item.action}
-                </ActionLink>
-              </div>
-            </NotebookSheet>
+        {item || preview ? (
+          <section
+            className={styles.cover}
+            hidden={!!preview && !usePreview}
+            suppressHydrationWarning
+            data-preview-database={
+              preview ? accountDatabaseName(userId) : undefined
+            }
+          >
+            {data && item ? (
+              <data.views.RecommendationCard
+                item={item}
+                resultHeading={resultHeading}
+              />
+            ) : (
+              previewCard
+            )}
             {issue && (
               <p role="status">
                 Aktualizacja biblioteki jest chwilowo niedostępna.
               </p>
             )}
+            {preview && (
+              <script dangerouslySetInnerHTML={{ __html: revealOnNewDevice }} />
+            )}
           </section>
-        ) : !online && data ? (
+        ) : !online && (data || usePreview) ? (
           <section className={styles.stateCard}>
             <h2>Przygotuj zestaw do nauki offline</h2>
             <p>
@@ -262,27 +242,14 @@ export function Dashboard({ userId }: { userId: string }) {
             Wczytywanie biblioteki…
           </p>
         )}
-        {!!decks?.length && (
-          <section className={styles.library}>
-            <div className="section-heading">
-              <h2>Biblioteka</h2>
-              <Link href="/decks">Moje zestawy</Link>
-            </div>
-            <ul>
-              {decks.map((d) => (
-                <li key={d.id}>
-                  <Link href={"/decks?deck=" + d.id} style={deckColor(d.id)}>
-                    <strong>{d.name}</strong>
-                    <small>Fiszki: {counts.get(d.id) ?? 0}</small>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            <Link className="text-action" href="/import">
-              Importuj CSV
-            </Link>
-          </section>
+        {preview && (
+          <p className={styles.loading} role="status">
+            Wczytywanie biblioteki…
+          </p>
         )}
+        {data
+          ? !!data.decks.length && <data.views.DeckList decks={data.decks} />
+          : preview && previewLibrary}
       </div>
     </div>
   );

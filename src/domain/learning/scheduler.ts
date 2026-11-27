@@ -1,13 +1,14 @@
-import { State, createEmptyCard, fsrs, type Card } from "ts-fsrs";
-import { z } from "zod";
+import { State, createEmptyCard, fsrs } from "ts-fsrs";
+import { revisionSchema, type Progress, type Scheduler } from "../../contracts";
 import {
-  instantSchema,
-  revisionSchema,
-  type Progress,
-  type Scheduler,
-} from "../../contracts";
-
-export const FSRS_VERSION = "recallio-fsrs6-v1";
+  classify,
+  classifyProgress,
+  FSRS_VERSION,
+  restore,
+  serialize,
+  timestamp,
+} from "./progress-state";
+export { FSRS_VERSION } from "./progress-state";
 
 const engine = fsrs({
   request_retention: 0.9,
@@ -22,66 +23,6 @@ const engine = fsrs({
     0.0912, 0.0658, 0.1542,
   ],
 });
-
-const cardStateSchema = z.strictObject({
-  due: instantSchema,
-  stability: z.number().finite().nonnegative(),
-  difficulty: z.number().finite().min(0).max(10),
-  elapsed_days: z.number().int().nonnegative(),
-  scheduled_days: z.number().int().nonnegative(),
-  learning_steps: z.number().int().nonnegative(),
-  reps: z.number().int().nonnegative(),
-  lapses: z.number().int().nonnegative(),
-  state: z.enum(State),
-  last_review: instantSchema.nullable(),
-});
-
-function serialize(card: Card): Progress["schedulerState"] {
-  return {
-    version: FSRS_VERSION,
-    data: cardStateSchema.parse({
-      ...card,
-      due: card.due.toISOString(),
-      last_review: card.last_review?.toISOString() ?? null,
-    }),
-  };
-}
-
-function timestamp(instant: string): number {
-  const value = Date.parse(instantSchema.parse(instant));
-  if (!Number.isFinite(value)) throw new Error("Nieprawidłowy czas oceny");
-  return value;
-}
-
-function restore(progress: Progress): Card {
-  if (
-    progress.algorithmVersion !== FSRS_VERSION ||
-    progress.schedulerState.version !== FSRS_VERSION
-  ) {
-    throw new Error("Niezgodna wersja schedulera");
-  }
-  const { due, last_review, ...state } = cardStateSchema.parse(
-    progress.schedulerState.data,
-  );
-  if (
-    timestamp(due) !== timestamp(progress.dueAt) ||
-    (state.state === State.New) !== (last_review === null) ||
-    (last_review !== null &&
-      timestamp(last_review) > timestamp(progress.lastEffectiveAt))
-  ) {
-    throw new Error("Niespójny stan schedulera");
-  }
-  return {
-    ...state,
-    due: new Date(due),
-    last_review: last_review === null ? undefined : new Date(last_review),
-  };
-}
-
-function classify(card: Card | null, effectiveAt: number) {
-  if (!card || card.state === State.New) return "introduction";
-  return effectiveAt >= card.due.getTime() ? "due" : "practice";
-}
 
 function nextRevision(previous: Progress | null): string {
   return revisionSchema.parse(
@@ -105,12 +46,7 @@ export function getEffectiveReviewTime(
 export const fsrsScheduler: Scheduler & Required<Pick<Scheduler, "classify">> =
   {
     version: FSRS_VERSION,
-    classify(previous, effectiveAt) {
-      return classify(
-        previous ? restore(previous) : null,
-        timestamp(effectiveAt),
-      );
-    },
+    classify: classifyProgress,
     review({ previous, event, effectiveAt }) {
       if (
         event.algorithmVersion !== FSRS_VERSION ||

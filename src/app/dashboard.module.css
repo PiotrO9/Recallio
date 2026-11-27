@@ -173,3 +173,11 @@
     padding-block: 1rem;
   }
 }
+
+.cover:not([hidden]) + .loading {
+  display: none;
+}
+
+.cover[hidden] ~ .library {
+  display: none;
+}

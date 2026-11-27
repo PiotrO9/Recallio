@@ -655,3 +655,124 @@ test("anulowanie odrzucenia pozwala wysłać zachowaną zmianę", async ({
     ]),
   );
 });
+
+test.describe("dashboard preview", () => {
+  test.use({ serviceWorkers: "block" });
+
+  test("the initial dashboard counts a library with more than a thousand cards before hydration", async ({
+    page,
+    accounts,
+    baseURL,
+  }) => {
+    await signIn(page.request, baseURL!, await accounts.createAccount());
+    const { deckId } = await seedStudyDeck(page.context(), baseURL!);
+    const deviceId = randomUUID();
+    for (let batch = 0; batch < 10; batch++) {
+      const operations = Array.from({ length: 100 }, (_, index) => ({
+        id: randomUUID(),
+        entityId: randomUUID(),
+        type: "card.create",
+        payload: {
+          deckId,
+          sideA: String(batch * 100 + index),
+          sideB: "B",
+          exampleA: null,
+          exampleB: null,
+        },
+      }));
+      const response = await page.request.post("/api/v1/sync/push", {
+        headers: { origin: baseURL! },
+        data: { protocolVersion: 1, deviceId, operations },
+      });
+      expect((await response.json()).results).toEqual(
+        operations.map(() => expect.objectContaining({ status: "applied" })),
+      );
+    }
+    await page.route("**/_next/static/chunks/*.js", (route) => route.abort());
+    await page.goto("/");
+    await expect(
+      page.getByRole("link", { name: "Nauka Fiszki: 1001" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Poznaj nowe fiszki" }),
+    ).toHaveAttribute("href", "/study?deck=" + deckId);
+  });
+
+  test("the dashboard recommendation works before hydration and respects a pending local deletion", async ({
+    page,
+    accounts,
+    baseURL,
+  }) => {
+    const owner = await accounts.createAccount();
+    const device = page.context();
+    await signIn(page.request, baseURL!, owner);
+    const { deckId } = await seedStudyDeck(device, baseURL!);
+
+    // Exercise the first HTML response even when all framework scripts are delayed.
+    const chunks = "**/_next/static/chunks/*.js";
+    const waitingTab = await device.newPage();
+    let releaseScripts!: () => void;
+    const scriptsHeld = new Promise<void>((resolve) => {
+      releaseScripts = resolve;
+    });
+    await waitingTab.route(chunks, async (route) => {
+      await scriptsHeld;
+      await route.continue();
+    });
+    await waitingTab.goto("/", { waitUntil: "commit" });
+    const waitingDeck = waitingTab.getByRole("link", {
+      name: "Nauka Fiszki: 1",
+    });
+    await expect(waitingDeck).toBeVisible();
+    await page.route(chunks, (route) => route.abort());
+    await page.goto("/");
+    const study = page.getByRole("link", { name: "Poznaj nowe fiszki" });
+    await expect(study).toBeVisible();
+    await expect(study).toHaveAttribute("href", "/study?deck=" + deckId);
+    const deckLink = page.getByRole("link", { name: "Nauka Fiszki: 1" });
+    await expect(deckLink).toBeVisible();
+    await page.unroute(chunks);
+    await study.click();
+    await expect(page.getByRole("heading", { name: "pies" })).toBeVisible();
+
+    await page.goto("/decks?deck=" + deckId);
+    await page.getByText("Zarządzaj zestawem", { exact: true }).click();
+    await device.route("**/api/v1/sync/push", (route) =>
+      route.fulfill({ status: 503 }),
+    );
+    await page.getByRole("button", { name: "Usuń zestaw" }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Usuń zestaw" })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Moje zestawy" }),
+    ).toBeVisible();
+
+    await page.route(chunks, (route) => route.abort());
+    await page.goto("/");
+    // The server still knows the deck. Its link must remain hidden on this device.
+    // This tab's initial database check predates the deletion in the other tab.
+    releaseScripts();
+    await expect(waitingDeck).toHaveCount(0);
+    await expect(waitingTab.locator("[data-preview-database]")).toHaveCount(0);
+    await waitingTab.close();
+    await expect(page.locator("[data-preview-database]")).toHaveCount(1);
+    await expect(page.getByRole("status")).toHaveText(
+      "Wczytywanie biblioteki…",
+    );
+    await expect(study).toHaveCount(0);
+    await expect(deckLink).toHaveCount(0);
+    await page.unroute(chunks);
+    await page.reload();
+    await expect(
+      page.getByRole("status").filter({ hasText: "Wczytywanie biblioteki" }),
+    ).toHaveCount(0);
+    await expect(study).toHaveCount(0);
+    await expect(deckLink).toHaveCount(0);
+
+    const outsider = await accounts.device(await accounts.createAccount());
+    const otherHtml = await outsider.request.get("/");
+    expect(await otherHtml.text()).not.toContain(deckId);
+  });
+});

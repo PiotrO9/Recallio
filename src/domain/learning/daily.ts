@@ -5,22 +5,26 @@ import type {
   Progress,
   SessionReturn,
 } from "../../contracts";
-import { fsrsScheduler } from "./scheduler";
+import { classifyProgress } from "./progress-state";
 
-type Material = {
-  decks: readonly Deck[];
-  cards: readonly Card[];
+type CardIdentity = Pick<Card, "id" | "deckId" | "deletedAt">;
+type Material<C extends CardIdentity = Card> = {
+  decks: readonly Pick<Deck, "id" | "directionMode" | "deletedAt">[];
+  cards: readonly C[];
   progress: readonly Progress[];
 };
 export type DueEntry = SessionReturn & Pick<Progress, "dueAt" | "revision">;
 
-function eligibleCards(data: Material, allowed?: ReadonlySet<string>) {
+function eligibleCards<C extends CardIdentity>(
+  data: Material<C>,
+  allowed?: ReadonlySet<string>,
+) {
   const decks = new Map(
     data.decks
       .filter((d) => !d.deletedAt && (!allowed || allowed.has(d.id)))
       .map((d) => [d.id, d.directionMode]),
   );
-  const cards = new Map<string, { card: Card; mode: Deck["directionMode"] }>();
+  const cards = new Map<string, { card: C; mode: Deck["directionMode"] }>();
   for (const card of data.cards) {
     const mode = decks.get(card.deckId);
     if (!card.deletedAt && mode) cards.set(card.id, { card, mode });
@@ -28,7 +32,7 @@ function eligibleCards(data: Material, allowed?: ReadonlySet<string>) {
   return cards;
 }
 export function collectDue(
-  data: Material,
+  data: Material<CardIdentity>,
   at: string,
   allowed?: ReadonlySet<string>,
 ): DueEntry[] {
@@ -38,7 +42,7 @@ export function collectDue(
       const mode = cards.get(p.cardId)?.mode;
       return (
         (mode === "mixed" || mode === p.direction) &&
-        fsrsScheduler.classify(p, at) === "due"
+        classifyProgress(p, at) === "due"
       );
     })
     .map(({ cardId, direction, epoch, dueAt, revision }) => ({
@@ -91,7 +95,7 @@ export function dailyChoices(
       (current.dueAt !== due.dueAt || current.revision !== due.revision)
     )
       return;
-    const mode = fsrsScheduler.classify(current, now);
+    const mode = classifyProgress(current, now);
     if (mode === "introduction" || (due && mode !== "due")) return;
     choices.push({
       card: item.card,
